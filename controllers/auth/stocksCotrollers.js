@@ -29,7 +29,7 @@ const stocksControllers = {
                 face_value: Joi.number().required(),
                 registration_date: Joi.string().required(),
 
-                cmp_logo: Joi.string().allow(""),
+                // cmp_logo: Joi.string().allow("").required(),
                 stock_type: Joi.string().required()
             });
 
@@ -40,6 +40,12 @@ const stocksControllers = {
             }
 
             const dataObj = { ...req.body };
+
+            // ------------------ Handle file upload ------------------
+            if (req.files && req.files.cmp_logo && req.files.cmp_logo.length > 0) {
+                const file = req.files.cmp_logo[0];
+                dataObj.cmp_logo = `uploads/upload/${file.filename}`; // save relative path in DB
+            }
 
 
             // ------------------ Duplicate ISIN Check ------------------
@@ -84,11 +90,186 @@ const stocksControllers = {
         }
     },
 
+    async addUpdateStockPrice(req, res, next) {
+        try {
+            // ------------------ Validation ------------------
+            const schema = Joi.object({
+                stock_price_id: Joi.number().integer().optional(),
+                stock_details_id: Joi.number().integer().required(),
+                prev_price: Joi.number().precision(2).required(),
+                today_prices: Joi.number().precision(2).required(),
+                partner_price: Joi.number().precision(2).required(),
+                conviction_level: Joi.string().required(),
+                availability: Joi.string().required(),
+            });
+
+            const { error } = schema.validate(req.body);
+            if (error) return next(error);
+
+            const dataObj = { ...req.body };
+
+            // ------------------ Duplicate Check ------------------
+            let condition = dataObj.stock_price_id ? ` AND stock_price_id != '${dataObj.stock_price_id}'` : '';
+            const checkQuery = `
+                SELECT stock_price_id 
+                FROM stock_price 
+                WHERE stock_details_id='${dataObj.stock_details_id}' 
+                AND present_date='${dataObj.present_date}' ${condition}
+            `;
+            const exists = await getData(checkQuery, next);
+            if (exists.length > 0) return next(CustomErrorHandler.alreadyExist("Stock price for this date already exists"));
+
+            // ------------------ Insert / Update ------------------
+            const query = dataObj.stock_price_id
+                ? `UPDATE stock_price SET ? WHERE stock_price_id='${dataObj.stock_price_id}'`
+                : `INSERT INTO stock_price SET ?`;
+
+            const result = await insertData(query, dataObj, next);
+            if (result.insertId) dataObj.stock_price_id = result.insertId;
+
+            res.json({
+                success: true,
+                message: dataObj.stock_price_id ? "Stock price updated successfully" : "Stock price added successfully",
+                data: dataObj
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    async addUpdateStockDescription(req, res, next) {
+        try {
+            // ------------------ Validation Schema ------------------
+            const descriptionSchema = Joi.object({
+                stock_description_id: Joi.number().integer().optional(),
+                stock_details_id: Joi.number().integer().required(),
+                company_snapshot: Joi.string().required(),
+                company_outlook: Joi.string().required()
+            });
+
+            const { error } = descriptionSchema.validate(req.body);
+            if (error) return next(error);
+
+            const dataObj = { ...req.body };
+
+            // ------------------ Duplicate check ------------------
+            let condition = '';
+            if (dataObj.stock_description_id) {
+                condition = ` AND stock_description_id != '${dataObj.stock_description_id}'`;
+            }
+
+            const checkQuery = `SELECT * FROM stock_description WHERE stock_details_id='${dataObj.stock_details_id}' ${condition}`;
+            const exists = await getData(checkQuery, next);
+
+            if (exists.length > 0 && !dataObj.stock_description_id) {
+                return next(CustomErrorHandler.alreadyExist("Description for this stock already exists"));
+            }
+
+            // ------------------ Insert / Update ------------------
+            let query = '';
+            if (dataObj.stock_description_id) {
+                query = `UPDATE stock_description SET ? WHERE stock_description_id='${dataObj.stock_description_id}'`;
+            } else {
+                query = `INSERT INTO stock_description SET ?`;
+            }
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.stock_description_id = result.insertId;
+            }
+
+            return res.json({
+                success: true,
+                message: dataObj.stock_description_id
+                    ? "Stock description updated successfully"
+                    : "Stock description added successfully",
+                data: dataObj
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+
     async getStockData(req, res, next) {
-        res.json({
-            "data": "data"
-        })
+        try {
+            // Base query: join details, description, and latest price
+            let query = `
+                SELECT 
+                    s.*, 
+                    d.company_snapshot, 
+                    d.company_outlook, 
+                    p.stock_price_id, 
+                    p.prev_price, 
+                    p.today_prices, 
+                    p.partner_price, 
+                    p.conviction_level, 
+                    p.availability
+                FROM stock_details s
+                JOIN stock_description d ON s.stock_details_id = d.stock_details_id
+                JOIN stock_price p ON s.stock_details_id = p.stock_details_id
+                INNER JOIN (
+                    SELECT stock_details_id, MAX(present_date) as latest_date
+                    FROM stock_price
+                    GROUP BY stock_details_id
+                ) lp ON p.stock_details_id = lp.stock_details_id AND p.present_date = lp.latest_date
+                WHERE 1
+            `;
+
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            // Validation schema for query params
+            const stockSchema = Joi.object({
+                company_name: Joi.string(),
+                script_name: Joi.string(),
+                isin_no: Joi.string(),
+                stock_type: Joi.string(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer()
+            });
+
+            const { error } = stockSchema.validate(req.query);
+            if (error) return next(error);
+
+            // Filters
+            if (req.query.company_name) cond += ` AND s.company_name LIKE '%${req.query.company_name}%'`;
+            if (req.query.script_name) cond += ` AND s.script_name LIKE '%${req.query.script_name}%'`;
+            if (req.query.isin_no) cond += ` AND s.isin_no LIKE '%${req.query.isin_no}%'`;
+            if (req.query.stock_type) cond += ` AND s.stock_type = '${req.query.stock_type}'`;
+
+            // Pagination
+            if (req.query.pagination) {
+                page = await paginationQuery(query + cond, next, req.query.current_page, req.query.per_page_records);
+            }
+
+            query += cond + page.pageQuery;
+
+            // Fetch data
+            const data = await getData(query, next);
+
+            res.json({
+                message: 'success',
+                total_records: page.total_rec ? page.total_rec : data.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: data.length,
+                data: {
+                    pricipleData: data
+                }
+            });
+
+        } catch (err) {
+            next(err);
+        }
     }
+
+
+
 };
 
 export default stocksControllers;

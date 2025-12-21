@@ -53,7 +53,8 @@ app.use((req, res, next) => {
 app.use('/api/', routes);
 
 let image_path = SERVER_HOST === "true" ? 'Paste here url' : 'uploads';
-// app.use('/api/images', express.static(image_path));
+// app.use('/uploads', express.static('uploads'));
+app.use('/api/images', express.static(image_path));
 // app.use('/api/media', express.static(image_path));
 
 app.use(errorHandler);
