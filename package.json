@@ -1,0 +1,33 @@
+{
+  "name": "thangive",
+  "version": "1.0.0",
+  "description": "This project is created for stock database",
+  "license": "ISC",
+  "author": "Monesh Tilavi",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "forever": "forever start server.js",
+    "list": "forever list"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.0.3",
+    "express": "^5.2.1",
+    "express-rate-limit": "^6.7.0",
+    "fs-extra": "^11.3.2",
+    "joi": "^18.0.2",
+    "jsonwebtoken": "^9.0.3",
+    "md5": "^2.3.0",
+    "microtime": "^3.1.1",
+    "multer": "^2.0.2",
+    "mysql": "^2.18.1",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
