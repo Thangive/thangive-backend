@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { stocksCotrollers } from '../controllers/index.js';
+import { sectorController, stocksCotrollers } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 
 const forms = multer().array();
@@ -17,12 +17,13 @@ router.post('/AnnualReport', imageUpload, stocksCotrollers.addUpdateAnnualReport
 router.post('/devident', forms, stocksCotrollers.addUpdateDividend);
 router.post('/companyPortfolio', imageUpload, stocksCotrollers.addUpdatePortfolio);
 router.get('/stockDetails', stocksCotrollers.getStockData);
-router.get('/sectors',stocksCotrollers.getSectorData);
-router.post('/sectorscreate',stocksCotrollers.createSectors);
-router.post('/sectorsupdate',stocksCotrollers.updateSector);
-router.get('/industrys',stocksCotrollers.getIndustryData);
-router.post('/industrycreate',stocksCotrollers.createIndustry);
-router.post('/industryupdate',stocksCotrollers.updateIndistry);
+
+router.get('/sectors', sectorController.getSectorData);
+router.post('/sectorscreate', sectorController.createSectors);
+router.post('/sectorsupdate', sectorController.updateSector);
+router.get('/industrys', sectorController.getIndustryData);
+router.post('/industrycreate', sectorController.createIndustry);
+router.post('/industryupdate', sectorController.updateIndistry);
 
 
 
