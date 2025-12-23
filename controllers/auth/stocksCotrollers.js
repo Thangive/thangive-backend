@@ -29,7 +29,7 @@ const stocksControllers = {
                 face_value: Joi.number().required(),
                 registration_date: Joi.string().required(),
 
-                // cmp_logo: Joi.string().allow("").required(),
+                cmp_logo: Joi.string().allow("").required(),
                 stock_type: Joi.string().required()
             });
 
@@ -193,6 +193,340 @@ const stocksControllers = {
         }
     },
 
+    async addUpdateClientPortfolioHeading(req, res, next) {
+        try {
+            // ------------------ Validation ------------------
+            const schema = Joi.object({
+                cp_heading_id: Joi.number().integer().optional(),
+                heading1: Joi.string().required(),
+                heading2: Joi.string().required(),
+                heading3: Joi.string().required(),
+            });
+
+            const { error } = schema.validate(req.body);
+            if (error) return next(error);
+
+            const dataObj = { ...req.body };
+
+            // ------------------ Duplicate Check ------------------
+            let condition = dataObj.cp_heading_id
+                ? ` AND cp_heading_id != '${dataObj.cp_heading_id}'`
+                : '';
+
+            const checkQuery = `
+                SELECT cp_heading_id 
+                FROM clientPortfolio_Heading 
+                WHERE heading1='${dataObj.heading1}'
+                AND heading2='${dataObj.heading2}'
+                AND heading3='${dataObj.heading3}'
+                ${condition}
+            `;
+
+            const exists = await getData(checkQuery, next);
+            if (exists.length > 0) {
+                return next(
+                    CustomErrorHandler.alreadyExist("Client portfolio heading already exists")
+                );
+            }
+
+            // ------------------ Insert / Update ------------------
+            const query = dataObj.cp_heading_id
+                ? `UPDATE clientPortfolio_Heading SET ? WHERE cp_heading_id='${dataObj.cp_heading_id}'`
+                : `INSERT INTO clientPortfolio_Heading SET ?`;
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.cp_heading_id = result.insertId;
+            }
+
+            res.json({
+                success: true,
+                message: dataObj.cp_heading_id
+                    ? "Client portfolio heading updated successfully"
+                    : "Client portfolio heading added successfully",
+                data: dataObj
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    async addUpdateClientPortfolioData(req, res, next) {
+        try {
+            // ------------------ Validation ------------------
+            const schema = Joi.object({
+                cp_data_id: Joi.number().integer().optional(),
+                cp_heading_id: Joi.number().integer().required(),
+                stock_details_id: Joi.number().integer().required(),
+                data1: Joi.string().required(),
+                data2: Joi.string().required(),
+                data3: Joi.string().required(),
+            });
+
+            const { error } = schema.validate(req.body);
+            if (error) return next(error);
+
+            const dataObj = { ...req.body };
+
+            // ------------------ Duplicate Check ------------------
+            let condition = dataObj.cp_data_id
+                ? ` AND cp_data_id != '${dataObj.cp_data_id}'`
+                : '';
+
+            const checkQuery = `
+                SELECT cp_data_id
+                FROM clientPortfolio_Data
+                WHERE cp_heading_id='${dataObj.cp_heading_id}'
+                AND stock_details_id='${dataObj.stock_details_id}'
+                ${condition}
+            `;
+
+            const exists = await getData(checkQuery, next);
+            if (exists.length > 0) {
+                return next(
+                    CustomErrorHandler.alreadyExist(
+                        "Client portfolio data already exists for this heading and stock"
+                    )
+                );
+            }
+
+            // ------------------ Insert / Update ------------------
+            const query = dataObj.cp_data_id
+                ? `UPDATE clientPortfolio_Data SET ? WHERE cp_data_id='${dataObj.cp_data_id}'`
+                : `INSERT INTO clientPortfolio_Data SET ?`;
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.cp_data_id = result.insertId;
+            }
+
+            res.json({
+                success: true,
+                message: dataObj.cp_data_id
+                    ? "Client portfolio data updated successfully"
+                    : "Client portfolio data added successfully",
+                data: dataObj
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    async addUpdateDividend(req, res, next) {
+        try {
+            // ------------------ Validation ------------------
+            const schema = Joi.object({
+                devident_id: Joi.number().integer().optional(),
+                stock_details_id: Joi.number().integer().required(),
+                finacial_year: Joi.string().required(),
+                declaration_date: Joi.date().required(),
+                devident_per_share: Joi.number().precision(2).required(),
+            });
+
+            const { error } = schema.validate(req.body);
+            if (error) return next(error);
+
+            const dataObj = {
+                ...req.body,
+                updated_date: new Date()
+            };
+
+            if (!dataObj.devident_id) {
+                dataObj.created_date = new Date();
+            }
+
+            // ------------------ Duplicate Check ------------------
+            let condition = dataObj.devident_id
+                ? ` AND devident_id != '${dataObj.devident_id}'`
+                : '';
+
+            const checkQuery = `
+                SELECT devident_id
+                FROM devident
+                WHERE stock_details_id='${dataObj.stock_details_id}'
+                AND finacial_year='${dataObj.finacial_year}'
+                ${condition}
+            `;
+
+            const exists = await getData(checkQuery, next);
+            if (exists.length > 0) {
+                return next(
+                    CustomErrorHandler.alreadyExist(
+                        "Dividend already exists for this stock and financial year"
+                    )
+                );
+            }
+
+            // ------------------ Insert / Update ------------------
+            const query = dataObj.devident_id
+                ? `UPDATE devident SET ? WHERE devident_id='${dataObj.devident_id}'`
+                : `INSERT INTO devident SET ?`;
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.devident_id = result.insertId;
+            }
+
+            res.json({
+                success: true,
+                message: dataObj.devident_id
+                    ? "Dividend updated successfully"
+                    : "Dividend added successfully",
+                data: dataObj
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    async addUpdateAnnualReport(req, res, next) {
+        try {
+            imageUpload(req, res, async (err) => {
+                if (err) return next(err);
+
+                // ------------------ Validation ------------------
+                const schema = Joi.object({
+                    anual_report_id: Joi.number().integer().optional(),
+                    stock_details_id: Joi.number().integer().required(),
+                    year: Joi.string().required(),
+                    report_date: Joi.date().required(),
+                    heading: Joi.string().required(),
+                    document: Joi.string().allow("").required(),
+                });
+
+                // const dataObj = {
+                //     ...req.body,
+                //     updated_date: new Date()
+                // };
+
+                // ------------------ Document Path ------------------
+                if (req.files?.document) {
+                    dataObj.document = `uploads/upload/${req.files.document[0].filename}`;
+                }
+
+                // if (!dataObj.anual_report_id) {
+                //     dataObj.created_date = new Date();
+                // }
+
+                const { error } = schema.validate(dataObj);
+                if (error) return next(error);
+
+                // ------------------ Duplicate Check ------------------
+                let condition = dataObj.anual_report_id
+                    ? ` AND anual_report_id != '${dataObj.anual_report_id}'`
+                    : '';
+
+                const checkQuery = `
+                    SELECT anual_report_id 
+                    FROM anual_report
+                    WHERE stock_details_id='${dataObj.stock_details_id}'
+                    AND year='${dataObj.year}'
+                    ${condition}
+                `;
+
+                const exists = await getData(checkQuery, next);
+                if (exists.length > 0) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Annual report already exists for this year"
+                        )
+                    );
+                }
+
+                // ------------------ Insert / Update ------------------
+                const query = dataObj.anual_report_id
+                    ? `UPDATE anual_report SET ? WHERE anual_report_id='${dataObj.anual_report_id}'`
+                    : `INSERT INTO anual_report SET ?`;
+
+                const result = await insertData(query, dataObj, next);
+
+                if (result.insertId) {
+                    dataObj.anual_report_id = result.insertId;
+                }
+
+                res.json({
+                    success: true,
+                    message: dataObj.anual_report_id
+                        ? "Annual report updated successfully"
+                        : "Annual report added successfully",
+                    data: dataObj
+                });
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async addUpdatePortfolio(req, res, next) {
+        try {
+            imageUpload(req, res, async (err) => {
+                if (err) return next(err);
+
+                // ------------------ Validation ------------------
+                const schema = Joi.object({
+                    portfolio_id: Joi.number().integer().optional(),
+                    stock_details_id: Joi.number().integer().required(),
+                    portfolio_link: Joi.string().uri().required()
+                });
+
+                const { error } = schema.validate(req.body);
+                if (error) return next(error);
+
+                const dataObj = {
+                    stock_details_id: req.body.stock_details_id,
+                    portfolio_link: req.body.portfolio_link,
+                    updated_date: new Date()
+                };
+
+                // ------------------ Service Gallery Images ------------------
+                if (req.files?.service_gallery) {
+                    dataObj.service_gallery = JSON.stringify(
+                        req.files.service_gallery.map(file =>
+                            `uploads/upload/${file.filename}`
+                        )
+                    );
+                }
+
+                if (!req.body.portfolio_id) {
+                    dataObj.created_date = new Date();
+                }
+
+                // ------------------ Insert / Update ------------------
+                const query = req.body.portfolio_id
+                    ? `UPDATE portfolio SET ? WHERE portfolio_id='${req.body.portfolio_id}'`
+                    : `INSERT INTO portfolio SET ?`;
+
+                const result = await insertData(query, dataObj, next);
+
+                if (result.insertId) {
+                    dataObj.portfolio_id = result.insertId;
+                }
+
+                res.json({
+                    success: true,
+                    message: req.body.portfolio_id
+                        ? "Portfolio updated successfully"
+                        : "Portfolio created successfully",
+                    data: {
+                        ...dataObj,
+                        service_gallery: dataObj.service_gallery
+                            ? JSON.parse(dataObj.service_gallery)
+                            : []
+                    }
+                });
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
 
     async getStockData(req, res, next) {
         try {

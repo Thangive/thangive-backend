@@ -1,43 +1,56 @@
 import multer from 'multer';
-import { CustomErrorHandler } from '../service/index.js';
 import path from 'path';
 import fs from 'fs-extra';
 import { SERVER_HOST } from '../config/index.js';
 
 const serverpath = SERVER_HOST === 'true'
     ? '../www/html/adis.co.in/cow_assets/'
-    : 'uploads/upload/'; // fixed folder
+    : 'uploads/upload/';
 
-// Ensure upload folder exists
+// Ensure upload directory exists
 fs.ensureDirSync(serverpath);
 
+// ---------------- STORAGE ----------------
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, serverpath);
     },
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
-        const filename = `cmp_logo_${Date.now()}${ext}`;
-        cb(null, filename);
+
+        let prefix = "file";
+        if (file.fieldname === "cmp_logo") prefix = "cmp_logo";
+        if (file.fieldname === "document") prefix = "annual_report";
+        if (file.fieldname === "service_gallery") prefix = "gallery";
+
+        cb(null, `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}${ext}`);
     }
 });
 
-// Max file size 10MB
-const maxSize = 10 * 1024 * 1024;
+// ---------------- CONFIG ----------------
+const maxSize = 10 * 1024 * 1024; // 10MB
 
 const imageUpload = multer({
     storage,
     limits: { fileSize: maxSize },
     fileFilter: (req, file, cb) => {
-        const filetypes = /jpeg|jpg|png|pdf|html|mp4|mkv/;
-        const mimetype = filetypes.test(file.mimetype);
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        const allowedExt = /jpeg|jpg|png|pdf|doc|docx/;
+        const extname = allowedExt.test(path.extname(file.originalname).toLowerCase());
 
-        if (mimetype && extname) return cb(null, true);
-        return cb(new Error(`File upload only supports - ${filetypes}`));
+        const allowedMime =
+            file.mimetype.startsWith("image/") ||
+            file.mimetype === "application/pdf" ||
+            file.mimetype === "application/msword" ||
+            file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+        if (extname && allowedMime) return cb(null, true);
+
+        cb(new Error("Only JPG, PNG, PDF, DOC, DOCX files are allowed"));
     }
 }).fields([
-    { name: 'cmp_logo', maxCount: 1 }
+    { name: 'cmp_logo', maxCount: 1 },          // company logo
+    { name: 'document', maxCount: 1 },          // annual report
+    { name: 'service_gallery', maxCount: 10 }   // portfolio gallery images
 ]);
 
 export default imageUpload;
