@@ -1,29 +1,59 @@
 import mysql from 'mysql';
 import CustomErrorHandler from '../service/CustomErrorHandler.js';
 
-const credentil = false ? {
-    host: "localhost",
-    user: "root",
-    password: "!gpg3o1mcd3P3BzR",
-    database: "adis_db"
-} :
-    {
+/**
+ * ENV
+ * SERVER_HOST=true  → server
+ * SERVER_HOST=false → local
+ */
+const isServer = process.env.SERVER_HOST === 'true';
+
+const credentil = isServer
+    ? {
+        host: "127.0.0.1",
+        user: "dbt",
+        password: "thangive@2026",
+        database: "thangive"
+    }
+    : {
         host: "localhost",
         user: "root",
         password: "",
         database: "thangive"
-    }
+    };
 
-const con = mysql.createConnection(credentil);
+let con;
 
+/**
+ * ✅ SAFE CONNECTION HANDLER
+ */
+function handleDisconnect() {
+    con = mysql.createConnection(credentil);
 
-con.connect(function (err) {
-    if (err) {
-        console.log("Fail to connect to database", err.message);
-    } else {
-        console.log("database Connected successfully!");
-    }
-});
+    con.connect((err) => {
+        if (err) {
+            console.error('❌ DB connect error:', err.message);
+            setTimeout(handleDisconnect, 3000); // retry
+        } else {
+            console.log('✅ Database Connected successfully!');
+        }
+    });
+
+    con.on('error', (err) => {
+        console.error('❌ DB runtime error:', err.code);
+
+        if (
+            err.code === 'PROTOCOL_CONNECTION_LOST' ||
+            err.code === 'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR'
+        ) {
+            handleDisconnect(); // 🔥 auto reconnect
+        } else {
+            throw err;
+        }
+    });
+}
+
+handleDisconnect();
 
 // export const dbConnect= () => new Promise((resolve, reject) => {
 //     con.connect(function (err) {
