@@ -11,7 +11,8 @@ const stocksControllers = {
             // ------------------ Validation Schema ------------------
             const stockSchema = Joi.object({
                 stock_details_id: Joi.number().integer().optional(),
-
+                sector_id:Joi.number().integer().required(),
+                subindustry_id:Joi.number().integer().required(),
                 company_name: Joi.string().required(),
                 script_name: Joi.string().required(),
 
