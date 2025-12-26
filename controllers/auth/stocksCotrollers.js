@@ -6,13 +6,14 @@ import CustomErrorHandler from '../../service/CustomErrorHandler.js';
 
 
 const stocksControllers = {
-    async addUpdateStockDetails(req, res, next) {
+    async addUpdateStockDetails(req, res, next) 
+    {
         try {
             // ------------------ Validation Schema ------------------
             const stockSchema = Joi.object({
                 stock_details_id: Joi.number().integer().optional(),
-                sector_id: Joi.number().integer().required(),
-                subindustry_id: Joi.number().integer().required(),
+                sector_id:Joi.number().integer().required(),
+                subindustry_id:Joi.number().integer().required(),
                 company_name: Joi.string().required(),
                 script_name: Joi.string().required(),
 
@@ -30,24 +31,29 @@ const stocksControllers = {
                 face_value: Joi.number().required(),
                 registration_date: Joi.string().required(),
 
-                // cmp_logo: Joi.string().allow("").required(),
+                cmp_logo: Joi.string().allow("").optional(),
                 stock_type: Joi.string().required()
             });
 
             // ------------------ Validate ------------------
             const { error } = stockSchema.validate(req.body);
             if (error) {
+                console.log(error);
                 return next(error);
             }
 
             const dataObj = { ...req.body };
 
             // ------------------ Handle file upload ------------------
-            if (req.files && req.files.cmp_logo && req.files.cmp_logo.length > 0) {
-                const file = req.files.cmp_logo[0];
-                dataObj.cmp_logo = `uploads/upload/${file.filename}`; // save relative path in DB
-            }
+            // if (req.files && req.files.cmp_logo && req.files.cmp_logo.length > 0) {
+            //     const file = req.files.cmp_logo[0];
+            //     dataObj.cmp_logo = `uploads/upload/${file.filename}`; // save relative path in DB
+            // }
 
+            if (req.files?.cmp_logo?.length > 0) {
+                const file = req.files.cmp_logo[0];
+                dataObj.cmp_logo = `uploads/upload/${file.filename}`;
+            }
 
             // ------------------ Duplicate ISIN Check ------------------
             let condition = "";
@@ -582,7 +588,6 @@ const stocksControllers = {
             next(err);
         }
     },
-
 };
 
 export default stocksControllers;
