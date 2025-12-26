@@ -11,8 +11,8 @@ const stocksControllers = {
             // ------------------ Validation Schema ------------------
             const stockSchema = Joi.object({
                 stock_details_id: Joi.number().integer().optional(),
-                sector_id:Joi.number().integer().required(),
-                subindustry_id:Joi.number().integer().required(),
+                sector_id: Joi.number().integer().required(),
+                subindustry_id: Joi.number().integer().required(),
                 company_name: Joi.string().required(),
                 script_name: Joi.string().required(),
 
@@ -30,7 +30,7 @@ const stocksControllers = {
                 face_value: Joi.number().required(),
                 registration_date: Joi.string().required(),
 
-                cmp_logo: Joi.string().allow("").required(),
+                // cmp_logo: Joi.string().allow("").required(),
                 stock_type: Joi.string().required()
             });
 
@@ -532,27 +532,7 @@ const stocksControllers = {
     async getStockData(req, res, next) {
         try {
             // Base query: join details, description, and latest price
-            let query = `
-                SELECT 
-                    s.*, 
-                    d.company_snapshot, 
-                    d.company_outlook, 
-                    p.stock_price_id, 
-                    p.prev_price, 
-                    p.today_prices, 
-                    p.partner_price, 
-                    p.conviction_level, 
-                    p.availability
-                FROM stock_details s
-                JOIN stock_description d ON s.stock_details_id = d.stock_details_id
-                JOIN stock_price p ON s.stock_details_id = p.stock_details_id
-                INNER JOIN (
-                    SELECT stock_details_id, MAX(present_date) as latest_date
-                    FROM stock_price
-                    GROUP BY stock_details_id
-                ) lp ON p.stock_details_id = lp.stock_details_id AND p.present_date = lp.latest_date
-                WHERE 1
-            `;
+            let query = `SELECT s.*,sd.company_snapshot,sd.company_outlook FROM stock_details s LEFT JOIN stock_description sd ON s.stock_details_id = sd.stock_details_id LEFT JOIN stock_devidet d ON s.stock_details_id = d.stock_details_id LEFT JOIN anual_report ar ON s.stock_details_id = ar.stock_details_id LEFT JOIN product_portfolio pp ON s.stock_details_id = pp.stock_details_id WHERE 1`;
 
             let cond = '';
             let page = { pageQuery: '' };
