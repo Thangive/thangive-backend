@@ -18,16 +18,22 @@ router.post('/devident', forms, stocksCotrollers.addUpdateDividend);
 router.post('/companyPortfolio', imageUpload, stocksCotrollers.addUpdatePortfolio);
 router.get('/stockDetails', stocksCotrollers.getStockData);
 
+router.post('/shareHolding', forms, stocksCotrollers.addUpdateShareHolding);
+router.get('/shareHolding', stocksCotrollers.getShareHolding);
+
 router.get('/sectors', sectorController.getSectorData);
 router.post('/sectorscreate', sectorController.createSectors);
 router.post('/sectorsupdate', sectorController.updateSector);
 router.get('/industrys', sectorController.getIndustryData);
 router.post('/industrycreate', sectorController.createIndustry);
 router.post('/industryupdate', sectorController.updateIndistry);
-router.get('/subIndustries',sectorController.getSubindustryData);
-router.post('/subIndustries',sectorController.createSubindustry);
-router.post('/updateSubindustriess',sectorController.updatesubinditries);
-router.get('/getStockDetailson',sectorController.getStockDetailsonly)
-router.get("/stockDetailsByID/:id",sectorController.getStockDetailsById);
+router.get('/subIndustries', sectorController.getSubindustryData);
+router.post('/subIndustries', sectorController.createSubindustry);
+router.post('/updateSubindustriess', sectorController.updatesubinditries);
+router.get('/getStockDetailson', sectorController.getStockDetailsonly)
+router.get("/stockDetailsByID/:id", sectorController.getStockDetailsById);
+router.get('/subIndustries', sectorController.getSubindustryData);
+router.post('/subIndustries', sectorController.createSubindustry);
+router.post('/updateSubindustriess', sectorController.updatesubinditries);
 
 export default router;

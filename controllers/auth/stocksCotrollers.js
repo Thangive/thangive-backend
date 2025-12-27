@@ -6,15 +6,14 @@ import CustomErrorHandler from '../../service/CustomErrorHandler.js';
 
 
 const stocksControllers = {
-    async addUpdateStockDetails(req, res, next) 
-    {
+    async addUpdateStockDetails(req, res, next) {
         try {
             // ------------------ Validation Schema ------------------
             const stockSchema = Joi.object({
                 stock_details_id: Joi.number().integer().optional(),
-                sector_id:Joi.number().integer().required(),
-                industry_id:Joi.number().integer().required(),
-                subindustry_id:Joi.number().integer().required(),
+                sector_id: Joi.number().integer().required(),
+                industry_id: Joi.number().integer().required(),
+                subindustry_id: Joi.number().integer().required(),
                 company_name: Joi.string().required(),
                 script_name: Joi.string().required(),
 
@@ -587,6 +586,209 @@ const stocksControllers = {
             next(err);
         }
     },
+
+    async addUpdateShareHolding(req, res, next) {
+        try {
+            const shareholdingData = req.body;
+
+            if (!Array.isArray(shareholdingData) || shareholdingData.length === 0) {
+                return res.status(400).json({ message: "Invalid input data" });
+            }
+
+            for (const record of shareholdingData) {
+                const { category, shareholder, stock_details_id, ...years } = record;
+
+                if (!category || !shareholder || !stock_details_id) continue;
+
+                // ------------------ Category ------------------
+                let categoryResult = await getData(
+                    `SELECT category_id FROM categories WHERE category_name = '${category.replace(/'/g, "\\'")}'`,
+                    next
+                );
+
+                let category_id;
+                if (categoryResult.length > 0) {
+                    category_id = categoryResult[0].category_id;
+                } else {
+                    const insertCat = await insertData(
+                        "INSERT INTO categories SET ?",
+                        { category_name: category },
+                        next
+                    );
+                    category_id = insertCat.insertId;
+                }
+
+                // ------------------ Shareholder ------------------
+                let shareholderResult = await getData(
+                    `SELECT shareholder_id FROM shareholders WHERE shareholder_name = '${shareholder.replace(/'/g, "\\'")}'`,
+                    next
+                );
+
+                let shareholder_id;
+                if (shareholderResult.length > 0) {
+                    shareholder_id = shareholderResult[0].shareholder_id;
+                } else {
+                    const insertShare = await insertData(
+                        "INSERT INTO shareholders SET ?",
+                        { stock_details_id, shareholder_name: shareholder },
+                        next
+                    );
+                    shareholder_id = insertShare.insertId;
+                }
+
+                // ------------------ Loop over dynamic years ------------------
+                for (const year in years) {
+                    const value = years[year];
+                    if (value == null) continue;
+
+                    // ------------------ Year ------------------
+                    let yearResult = await getData(
+                        `SELECT year_id FROM years WHERE year = '${year.replace(/'/g, "\\'")}'`,
+                        next
+                    );
+
+                    let year_id;
+                    if (yearResult.length > 0) {
+                        year_id = yearResult[0].year_id;
+                    } else {
+                        const insertYear = await insertData(
+                            "INSERT INTO years SET ?",
+                            { year: year },
+                            next
+                        );
+                        year_id = insertYear.insertId;
+                    }
+
+                    // ------------------ Insert / Update Shareholding ------------------
+                    const exists = await getData(
+                        `SELECT shareholding_id, value 
+                         FROM shareholding 
+                         WHERE category_id = '${category_id}' 
+                           AND stock_details_id = '${stock_details_id}'
+                           AND shareholder_id='${shareholder_id}'
+                           AND year_id = '${year_id}'`,
+                        next
+                    );
+
+                    if (exists.length > 0) {
+                        // Update only if value has changed
+                        if (exists[0].value !== value) {
+                            await insertData(
+                                "UPDATE shareholding SET ? WHERE shareholding_id = ?",
+                                [{ value }, exists[0].shareholding_id],
+                                next
+                            );
+                        }
+                    } else {
+                        await insertData(
+                            "INSERT INTO shareholding SET ?",
+                            { category_id, stock_details_id, shareholder_id, year_id, value },
+                            next
+                        );
+                    }
+                }
+            }
+
+            return res.json({
+                success: true,
+                data: shareholdingData,
+                message: "Shareholding data saved successfully"
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async getShareHolding(req, res, next) {
+        try {
+            /* ---------------- STEP 1: Build dynamic year columns for used years ---------------- */
+
+            const yearColsSQL = `
+                SELECT GROUP_CONCAT(
+                    DISTINCT CONCAT(
+                        'IFNULL(MAX(CASE WHEN y.year = ', y.year,
+                        ' THEN sh.value END), 0) AS \`', y.year, '\`'
+                    )
+                    ORDER BY y.year
+                ) AS cols
+                FROM shareholding sh
+                JOIN years y ON sh.year_id = y.year_id
+            `;
+
+            const yearColsResult = await getData(yearColsSQL, next);
+            const yearColumns = yearColsResult?.[0]?.cols;
+
+            if (!yearColumns) {
+                return res.json({
+                    message: 'success',
+                    records: 0,
+                    data: { shareHoldingData: [] }
+                });
+            }
+
+            /* ---------------- STEP 2: Build base query with joins ---------------- */
+
+            let query = `
+                SELECT
+                    c.category_name AS category,
+                    s.shareholder_name AS shareholder,
+                    ${yearColumns}
+                FROM shareholding sh
+                INNER JOIN categories c ON sh.category_id = c.category_id
+                INNER JOIN shareholders s ON sh.shareholder_id = s.shareholder_id
+                INNER JOIN years y ON sh.year_id = y.year_id
+                WHERE 1
+            `;
+
+            const values = [];
+
+            /* ---------------- STEP 3: Validation ---------------- */
+
+            const schema = Joi.object({
+                category: Joi.string(),
+                shareholder: Joi.string()
+            });
+
+            const { error } = schema.validate(req.query);
+            if (error) return next(error);
+
+            /* ---------------- STEP 4: Filters ---------------- */
+
+            if (req.query.category) {
+                query += ` AND c.category_name LIKE ?`;
+                values.push(`%${req.query.category}%`);
+            }
+
+            if (req.query.shareholder) {
+                query += ` AND s.shareholder_name LIKE ?`;
+                values.push(`%${req.query.shareholder}%`);
+            }
+
+            /* ---------------- STEP 5: Grouping ---------------- */
+
+            query += `
+                GROUP BY c.category_name, s.shareholder_name
+                ORDER BY c.category_name, s.shareholder_name
+            `;
+
+            /* ---------------- STEP 6: Execute query ---------------- */
+
+            const data = await getData(query, next, values);
+
+            /* ---------------- STEP 7: Send response ---------------- */
+
+            res.json({
+                message: 'success',
+                total_records: data.length,
+                records: data.length,
+                data: data
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    }
 };
 
 export default stocksControllers;
