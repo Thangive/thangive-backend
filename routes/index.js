@@ -27,5 +27,7 @@ router.post('/industryupdate', sectorController.updateIndistry);
 router.get('/subIndustries',sectorController.getSubindustryData);
 router.post('/subIndustries',sectorController.createSubindustry);
 router.post('/updateSubindustriess',sectorController.updatesubinditries);
+router.get('/getStockDetailson',sectorController.getStockDetailsonly)
+router.get("/stockDetailsByID/:id",sectorController.getStockDetailsById);
 
 export default router;

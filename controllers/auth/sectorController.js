@@ -369,6 +369,119 @@ const sectorController = {
         } catch (error) {
             next(error);
         }
+    },
+    async getStockDetailsonly(req, res, next) {
+        try {
+            let query = `
+            SELECT 
+                s.*,
+                sec.sector_name,
+                sub.sub_industryName
+            FROM stock_details s
+            LEFT JOIN stock_sector sec 
+                ON s.sector_id = sec.sector_id
+            LEFT JOIN stock_subindustry sub 
+                ON s.subindustry_id = sub.subindustry_id
+            WHERE 1
+        `;
+
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            const stockSchema = Joi.object({
+                company_name: Joi.string(),
+                script_name: Joi.string(),
+                isin_no: Joi.string(),
+                stock_type: Joi.string(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer()
+            });
+
+            const { error } = stockSchema.validate(req.query);
+            if (error) return next(error);
+
+            // 🔹 Filters
+            if (req.query.company_name)
+                cond += ` AND s.company_name LIKE '%${req.query.company_name}%'`;
+
+            if (req.query.script_name)
+                cond += ` AND s.script_name LIKE '%${req.query.script_name}%'`;
+
+            if (req.query.isin_no)
+                cond += ` AND s.isin_no LIKE '%${req.query.isin_no}%'`;
+
+            if (req.query.stock_type)
+                cond += ` AND s.stock_type = '${req.query.stock_type}'`;
+
+            // 🔹 Pagination
+            if (req.query.pagination) {
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+            }
+
+            query += cond + page.pageQuery;
+
+            const data = await getData(query, next);
+            // console.log(data);
+            res.json({
+                message: 'success',
+                total_records: page.total_rec ? page.total_rec : data.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: data.length,
+                data: {
+                    pricipleData: data
+                }
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+    async getStockDetailsById(req, res, next) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({
+                    message: "Stock ID is required"
+                });
+            }
+            let query = `
+            SELECT 
+                s.*,
+                sec.sector_name,
+                sub.sub_industryName,
+                sd.*
+            FROM stock_details s
+            LEFT JOIN stock_sector sec 
+                ON s.sector_id = sec.sector_id
+            LEFT JOIN stock_subindustry sub 
+                ON s.subindustry_id = sub.subindustry_id
+            LEFT JOIN stock_description sd
+                ON sd.stock_details_id = s.stock_details_id
+            WHERE s.stock_details_id = ${id}
+            LIMIT 1
+        `;
+            const data = await getData(query, next);
+            if (!data.length) {
+                return res.status(404).json({
+                    message: "Stock not found"
+                });
+            }
+
+            res.json({
+                message: "success",
+                data: data[0]   // ✅ SINGLE STOCK
+            });
+
+        } catch (err) {
+            next(err);
+        }
     }
 }
 

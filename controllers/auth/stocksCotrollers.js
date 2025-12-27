@@ -13,6 +13,7 @@ const stocksControllers = {
             const stockSchema = Joi.object({
                 stock_details_id: Joi.number().integer().optional(),
                 sector_id:Joi.number().integer().required(),
+                industry_id:Joi.number().integer().required(),
                 subindustry_id:Joi.number().integer().required(),
                 company_name: Joi.string().required(),
                 script_name: Joi.string().required(),
@@ -38,7 +39,6 @@ const stocksControllers = {
             // ------------------ Validate ------------------
             const { error } = stockSchema.validate(req.body);
             if (error) {
-                console.log(error);
                 return next(error);
             }
 
@@ -76,7 +76,6 @@ const stocksControllers = {
             } else {
                 query = `INSERT INTO stock_details SET ?`;
             }
-            console.log(query);
 
             const result = await insertData(query, dataObj, next);
 
@@ -151,8 +150,8 @@ const stocksControllers = {
             const descriptionSchema = Joi.object({
                 stock_description_id: Joi.number().integer().optional(),
                 stock_details_id: Joi.number().integer().required(),
-                company_snapshot: Joi.string().required(),
-                company_outlook: Joi.string().required()
+                company_snapshot: Joi.string().optional(),
+                company_outlook: Joi.string().optional()
             });
 
             const { error } = descriptionSchema.validate(req.body);
