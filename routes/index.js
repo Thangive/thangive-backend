@@ -27,7 +27,6 @@ router.post('/sectorsupdate', sectorController.updateSector);
 router.get('/industrys', sectorController.getIndustryData);
 router.post('/industrycreate', sectorController.createIndustry);
 router.post('/industryupdate', sectorController.updateIndistry);
-
 router.get('/subIndustries',sectorController.getSubindustryData);
 router.post('/subIndustries',sectorController.createSubindustry);
 router.post('/updateSubindustriess',sectorController.updatesubinditries);
