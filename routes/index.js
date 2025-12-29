@@ -27,17 +27,6 @@ router.post('/sectorsupdate', sectorController.updateSector);
 router.get('/industrys', sectorController.getIndustryData);
 router.post('/industrycreate', sectorController.createIndustry);
 router.post('/industryupdate', sectorController.updateIndistry);
-<<<<<<< Updated upstream
-router.get('/subIndustries', sectorController.getSubindustryData);
-router.post('/subIndustries', sectorController.createSubindustry);
-router.post('/updateSubindustriess', sectorController.updatesubinditries);
-router.get('/getStockDetailson', sectorController.getStockDetailsonly)
-router.get("/stockDetailsByID/:id", sectorController.getStockDetailsById);
-router.get('/subIndustries', sectorController.getSubindustryData);
-router.post('/subIndustries', sectorController.createSubindustry);
-router.post('/updateSubindustriess', sectorController.updatesubinditries);
-
-=======
 router.get('/subIndustries',sectorController.getSubindustryData);
 router.post('/subIndustries',sectorController.createSubindustry);
 router.post('/updateSubindustriess',sectorController.updatesubinditries);
@@ -46,5 +35,4 @@ router.get("/stockDetailsByID/:id",sectorController.getStockDetailsById);
 router.get("/devident/:id",sectorController.getDivident);
 router.delete('/devident/:id', sectorController.deleteDividend);
 router.get("/AnnualReport/:id",sectorController.getAnualReport);
->>>>>>> Stashed changes
 export default router;
