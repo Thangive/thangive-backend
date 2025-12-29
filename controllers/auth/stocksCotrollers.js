@@ -325,7 +325,7 @@ const stocksControllers = {
         try {
             // ------------------ Validation ------------------
             const schema = Joi.object({
-                devident_id: Joi.number().integer().optional(),
+                devidet_id: Joi.number().integer().optional(),
                 stock_details_id: Joi.number().integer().required(),
                 finacial_year: Joi.string().required(),
                 declaration_date: Joi.date().required(),
@@ -340,46 +340,46 @@ const stocksControllers = {
                 updated_date: new Date()
             };
 
-            if (!dataObj.devident_id) {
+            if (!dataObj.devidet_id) {
                 dataObj.created_date = new Date();
             }
 
             // ------------------ Duplicate Check ------------------
-            let condition = dataObj.devident_id
-                ? ` AND devident_id != '${dataObj.devident_id}'`
+            let condition = dataObj.devidet_id
+                ? ` AND devidet_id != '${dataObj.devidet_id}'`
                 : '';
 
-            const checkQuery = `
-                SELECT devident_id
-                FROM devident
-                WHERE stock_details_id='${dataObj.stock_details_id}'
-                AND finacial_year='${dataObj.finacial_year}'
-                ${condition}
-            `;
+            // const checkQuery = `
+            //     SELECT devidet_id
+            //     FROM stock_devidet
+            //     WHERE stock_details_id='${dataObj.stock_details_id}'
+            //     AND finacial_year='${dataObj.finacial_year}'
+            //     ${condition}
+            // `;
 
-            const exists = await getData(checkQuery, next);
-            if (exists.length > 0) {
-                return next(
-                    CustomErrorHandler.alreadyExist(
-                        "Dividend already exists for this stock and financial year"
-                    )
-                );
-            }
+            // const exists = await getData(checkQuery, next);
+            // if (exists.length > 0) {
+            //     return next(
+            //         CustomErrorHandler.alreadyExist(
+            //             "Dividend already exists for this stock and financial year"
+            //         )
+            //     );
+            // }
 
             // ------------------ Insert / Update ------------------
-            const query = dataObj.devident_id
-                ? `UPDATE devident SET ? WHERE devident_id='${dataObj.devident_id}'`
-                : `INSERT INTO devident SET ?`;
+            const query = dataObj.devidet_id
+                ? `UPDATE stock_devidet SET ? WHERE devidet_id='${dataObj.devidet_id}'`
+                : `INSERT INTO stock_devidet SET ?`;
 
             const result = await insertData(query, dataObj, next);
 
             if (result.insertId) {
-                dataObj.devident_id = result.insertId;
+                dataObj.devidet_id = result.insertId;
             }
 
             res.json({
                 success: true,
-                message: dataObj.devident_id
+                message: dataObj.devidet_id
                     ? "Dividend updated successfully"
                     : "Dividend added successfully",
                 data: dataObj
