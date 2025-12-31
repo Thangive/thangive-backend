@@ -481,8 +481,7 @@ const sectorController = {
             next(err);
         }
     },
-    async getDivident(req, res, next)
-    {
+    async getDivident(req, res, next) {
         try {
             const { id } = req.params;
             if (!id) {
@@ -490,8 +489,8 @@ const sectorController = {
                     message: "Stock ID is required"
                 });
             }
-            let query=`SELECT * FROM stock_devidet WHERE stock_details_id=${id}`;
-            const data=await getData(query,next);
+            let query = `SELECT * FROM stock_devidet WHERE stock_details_id=${id}`;
+            const data = await getData(query, next);
             if (!data.length) {
                 return res.status(404).json({
                     message: "Stock not found"
@@ -506,8 +505,7 @@ const sectorController = {
         }
     },
 
-    async deleteDividend(req,res,next)
-    {
+    async deleteDividend(req, res, next) {
         try {
             const { id } = req.params;
             if (!id) {
@@ -527,8 +525,7 @@ const sectorController = {
             next(err);
         }
     },
-    async getAnualReport(req, res, next)
-    {
+    async getAnualReport(req, res, next) {
         const { id } = req.params;
         try {
             if (!id) {
@@ -536,10 +533,9 @@ const sectorController = {
                     message: "Stock ID is required"
                 });
             }
-            let query=`SELECT * FROM anual_report WHERE stock_details_id=${id}`;
-            const data=await getData(query,next);
-            if (!data.length) 
-            {
+            let query = `SELECT * FROM anual_report WHERE stock_details_id=${id}`;
+            const data = await getData(query, next);
+            if (!data.length) {
                 return res.status(404).json({
                     message: "Report not found"
                 });
