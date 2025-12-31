@@ -202,6 +202,7 @@ const stocksControllers = {
         try {
             // ------------------ Validation ------------------
             const schema = Joi.object({
+                stock_details_id: Joi.number().integer().required(),
                 cp_heading_id: Joi.number().integer().optional(),
                 heading1: Joi.string().required(),
                 heading2: Joi.string().required(),
@@ -214,25 +215,22 @@ const stocksControllers = {
             const dataObj = { ...req.body };
 
             // ------------------ Duplicate Check ------------------
-            let condition = dataObj.cp_heading_id
-                ? ` AND cp_heading_id != '${dataObj.cp_heading_id}'`
-                : '';
+            let condition = '';
+            // if (dataObj.cp_heading_id) {
+            //     condition = ` AND cp_heading_id != '${dataObj.cp_heading_id}'`;
+            // }
 
-            const checkQuery = `
-                SELECT cp_heading_id 
-                FROM clientPortfolio_Heading 
-                WHERE heading1='${dataObj.heading1}'
-                AND heading2='${dataObj.heading2}'
-                AND heading3='${dataObj.heading3}'
-                ${condition}
-            `;
+            // const checkQuery = `
+            //     SELECT * 
+            //     FROM clientPortfolio_Heading 
+            //     WHERE stock_details_id = '${dataObj.stock_details_id}' ${condition} `;
 
-            const exists = await getData(checkQuery, next);
-            if (exists.length > 0) {
-                return next(
-                    CustomErrorHandler.alreadyExist("Client portfolio heading already exists")
-                );
-            }
+            // const exists = await getData(checkQuery, next);
+            // if (exists.length > 0) {
+            //     return next(
+            //         CustomErrorHandler.alreadyExist("Client portfolio heading already exists")
+            //     );
+            // }
 
             // ------------------ Insert / Update ------------------
             const query = dataObj.cp_heading_id
@@ -276,26 +274,26 @@ const stocksControllers = {
             const dataObj = { ...req.body };
 
             // ------------------ Duplicate Check ------------------
-            let condition = dataObj.cp_data_id
-                ? ` AND cp_data_id != '${dataObj.cp_data_id}'`
-                : '';
+            // let condition = dataObj.cp_data_id
+            //     ? ` AND cp_data_id != '${dataObj.cp_data_id}'`
+            //     : '';
 
-            const checkQuery = `
-                SELECT cp_data_id
-                FROM clientPortfolio_Data
-                WHERE cp_heading_id='${dataObj.cp_heading_id}'
-                AND stock_details_id='${dataObj.stock_details_id}'
-                ${condition}
-            `;
+            // const checkQuery = `
+            //     SELECT cp_data_id
+            //     FROM clientPortfolio_Data
+            //     WHERE cp_heading_id='${dataObj.cp_heading_id}'
+            //     AND stock_details_id='${dataObj.stock_details_id}'
+            //     ${condition}
+            // `;
 
-            const exists = await getData(checkQuery, next);
-            if (exists.length > 0) {
-                return next(
-                    CustomErrorHandler.alreadyExist(
-                        "Client portfolio data already exists for this heading and stock"
-                    )
-                );
-            }
+            // const exists = await getData(checkQuery, next);
+            // if (exists.length > 0) {
+            //     return next(
+            //         CustomErrorHandler.alreadyExist(
+            //             "Client portfolio data already exists for this heading and stock"
+            //         )
+            //     );
+            // }
 
             // ------------------ Insert / Update ------------------
             const query = dataObj.cp_data_id
@@ -471,67 +469,82 @@ const stocksControllers = {
 
     async addUpdatePortfolio(req, res, next) {
         try {
-            imageUpload(req, res, async (err) => {
-                if (err) return next(err);
+            req.body.stock_details_id = Number(req.body.stock_details_id);
+            if (req.body.portfolio_id) {
+                req.body.portfolio_id = Number(req.body.portfolio_id);
+            }
 
-                // ------------------ Validation ------------------
-                const schema = Joi.object({
-                    portfolio_id: Joi.number().integer().optional(),
-                    stock_details_id: Joi.number().integer().required(),
-                    portfolio_link: Joi.string().uri().required()
-                });
+            /* ---------------- VALIDATION ---------------- */
+            const schema = Joi.object({
+                portfolio_id: Joi.number().integer().optional(),
+                stock_details_id: Joi.number().integer().required(),
+                portfolio_link: Joi.string().uri().optional(),
+                existing_gallery: Joi.string().optional()
+            });
 
-                const { error } = schema.validate(req.body);
-                if (error) return next(error);
+            const { error } = schema.validate(req.body);
+            if (error) return next(error);
 
-                const dataObj = {
-                    stock_details_id: req.body.stock_details_id,
-                    portfolio_link: req.body.portfolio_link,
-                    updated_date: new Date()
-                };
+            const dataObj = {
+                stock_details_id: req.body.stock_details_id,
+                portfolio_link: req.body.portfolio_link,
+                update_date: new Date()
+            };
 
-                // ------------------ Service Gallery Images ------------------
-                if (req.files?.service_gallery) {
-                    dataObj.service_gallery = JSON.stringify(
-                        req.files.service_gallery.map(file =>
-                            `uploads/upload/${file.filename}`
-                        )
-                    );
+            /* ---------------- FINAL SERVICE GALLERY ---------------- */
+            let finalGallery = [];
+
+            // OLD images (frontend se aayi)
+            if (req.body.existing_gallery) {
+                try {
+                    finalGallery = JSON.parse(req.body.existing_gallery);
+                } catch (e) {
+                    finalGallery = [];
                 }
+            }
 
-                if (!req.body.portfolio_id) {
-                    dataObj.created_date = new Date();
+            // NEW uploaded images
+            if (req.files && req.files.service_gallery?.length > 0) {
+                const newImages = req.files.service_gallery.map(
+                    file => `uploads/upload/${file.filename}`
+                );
+                finalGallery = [...finalGallery, ...newImages];
+            }
+
+            dataObj.service_gallery = JSON.stringify(finalGallery);
+
+            if (!req.body.portfolio_id) {
+                dataObj.created_date = new Date();
+            }
+
+            /* ---------------- INSERT / UPDATE ---------------- */
+            const query = req.body.portfolio_id
+                ? `UPDATE product_portfolio SET ? WHERE portfolio_id='${req.body.portfolio_id}'`
+                : `INSERT INTO product_portfolio SET ?`;
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.portfolio_id = result.insertId;
+            }
+
+            res.json({
+                success: true,
+                message: req.body.portfolio_id
+                    ? "Portfolio updated successfully"
+                    : "Portfolio created successfully",
+                data: {
+                    ...dataObj,
+                    service_gallery: JSON.parse(dataObj.service_gallery)
                 }
-
-                // ------------------ Insert / Update ------------------
-                const query = req.body.portfolio_id
-                    ? `UPDATE portfolio SET ? WHERE portfolio_id='${req.body.portfolio_id}'`
-                    : `INSERT INTO portfolio SET ?`;
-
-                const result = await insertData(query, dataObj, next);
-
-                if (result.insertId) {
-                    dataObj.portfolio_id = result.insertId;
-                }
-
-                res.json({
-                    success: true,
-                    message: req.body.portfolio_id
-                        ? "Portfolio updated successfully"
-                        : "Portfolio created successfully",
-                    data: {
-                        ...dataObj,
-                        service_gallery: dataObj.service_gallery
-                            ? JSON.parse(dataObj.service_gallery)
-                            : []
-                    }
-                });
             });
 
         } catch (error) {
+            console.error("addUpdatePortfolio ERROR:", error);
             next(error);
         }
     },
+
 
     async getStockData(req, res, next) {
         try {
@@ -596,7 +609,7 @@ const stocksControllers = {
             }
 
             for (const record of shareholdingData) {
-                const { category, shareholder, stock_details_id, ...years } = record;
+                const { category, shareholder, stock_details_id,deleted = 0, ...years } = record;
 
                 if (!category || !shareholder || !stock_details_id) continue;
 
@@ -661,7 +674,7 @@ const stocksControllers = {
 
                     // ------------------ Insert / Update Shareholding ------------------
                     const exists = await getData(
-                        `SELECT shareholding_id, value 
+                        `SELECT shareholding_id, value ,deleted
                          FROM shareholding 
                          WHERE category_id = '${category_id}' 
                            AND stock_details_id = '${stock_details_id}'
@@ -670,19 +683,22 @@ const stocksControllers = {
                         next
                     );
 
-                    if (exists.length > 0) {
-                        // Update only if value has changed
-                        if (exists[0].value !== value) {
+                    if (exists.length > 0) 
+                    {
+                        if (
+                            exists[0].value !== value ||
+                            Number(exists[0].deleted) !== Number(deleted)
+                        ) {
                             await insertData(
                                 "UPDATE shareholding SET ? WHERE shareholding_id = ?",
-                                [{ value }, exists[0].shareholding_id],
+                                [{ value, deleted }, exists[0].shareholding_id],
                                 next
                             );
                         }
                     } else {
                         await insertData(
                             "INSERT INTO shareholding SET ?",
-                            { category_id, stock_details_id, shareholder_id, year_id, value },
+                            { category_id, stock_details_id, shareholder_id, year_id, value,deleted },
                             next
                         );
                     }
@@ -704,6 +720,16 @@ const stocksControllers = {
         try {
             /* ---------------- STEP 1: Build dynamic year columns for used years ---------------- */
 
+            const schema = Joi.object({
+                stock_details_id: Joi.number().required(),
+                category: Joi.string(),
+                shareholder: Joi.string()
+            });
+
+            const { error } = schema.validate(req.query);
+            if (error) return next(error);
+
+            const stockId = req.query.stock_details_id;
             const yearColsSQL = `
                 SELECT GROUP_CONCAT(
                     DISTINCT CONCAT(
@@ -714,46 +740,38 @@ const stocksControllers = {
                 ) AS cols
                 FROM shareholding sh
                 JOIN years y ON sh.year_id = y.year_id
+                WHERE sh.stock_details_id = '${stockId}' AND sh.deleted = 0
             `;
 
             const yearColsResult = await getData(yearColsSQL, next);
             const yearColumns = yearColsResult?.[0]?.cols;
-
             if (!yearColumns) {
+                console.log(yearColumns);
                 return res.json({
                     message: 'success',
                     records: 0,
                     data: { shareHoldingData: [] }
                 });
             }
-
             /* ---------------- STEP 2: Build base query with joins ---------------- */
 
             let query = `
-                SELECT
-                    c.category_name AS category,
-                    s.shareholder_name AS shareholder,
-                    ${yearColumns}
-                FROM shareholding sh
-                INNER JOIN categories c ON sh.category_id = c.category_id
-                INNER JOIN shareholders s ON sh.shareholder_id = s.shareholder_id
-                INNER JOIN years y ON sh.year_id = y.year_id
-                WHERE 1
-            `;
+            SELECT
+                c.category_name AS category,
+                s.shareholder_name AS shareholder,
+                sh.deleted,
+                ${yearColumns}
+            FROM shareholding sh
+            INNER JOIN categories c ON sh.category_id = c.category_id
+            INNER JOIN shareholders s ON sh.shareholder_id = s.shareholder_id
+            INNER JOIN years y ON sh.year_id = y.year_id
+            WHERE 1
+              AND sh.stock_details_id = ${stockId} AND sh.deleted = 0
+        `;
 
             const values = [];
 
-            /* ---------------- STEP 3: Validation ---------------- */
-
-            const schema = Joi.object({
-                category: Joi.string(),
-                shareholder: Joi.string()
-            });
-
-            const { error } = schema.validate(req.query);
-            if (error) return next(error);
-
-            /* ---------------- STEP 4: Filters ---------------- */
+            /* ---------------- STEP 4: Filters (UNCHANGED) ---------------- */
 
             if (req.query.category) {
                 query += ` AND c.category_name LIKE ?`;
@@ -768,9 +786,9 @@ const stocksControllers = {
             /* ---------------- STEP 5: Grouping ---------------- */
 
             query += `
-                GROUP BY c.category_name, s.shareholder_name
-                ORDER BY c.category_name, s.shareholder_name
-            `;
+            GROUP BY c.category_name, s.shareholder_name
+            ORDER BY c.category_name, s.shareholder_name
+        `;
 
             /* ---------------- STEP 6: Execute query ---------------- */
 
@@ -788,7 +806,143 @@ const stocksControllers = {
         } catch (err) {
             next(err);
         }
+    },
+
+    async getCompanyPortfolioData(req, res, next) {
+        try {
+            const stock_details_id = Number(req.query.stock_details_id);
+
+            if (!stock_details_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "stock_details_id is required"
+                });
+            }
+
+            const query = `
+            SELECT 
+                portfolio_id,
+                stock_details_id,
+                portfolio_link,
+                service_gallery,
+                created_date,
+                update_date
+            FROM product_portfolio
+            WHERE stock_details_id = ${stock_details_id}
+            ORDER BY portfolio_id DESC
+        `;
+
+            const result = await getData(query, next);
+
+            const rows = Array.isArray(result)
+                ? result
+                : result
+                    ? [result]
+                    : [];
+
+            const data = rows.map(row => ({
+                ...row,
+                service_gallery: row.service_gallery
+                    ? JSON.parse(row.service_gallery)
+                    : []
+            }));
+
+            res.json({
+                success: true,
+                data
+            });
+
+        } catch (error) {
+            console.error("getCompanyPortfolioData ERROR:", error);
+            res.status(500).json({
+                message: "Internal server error",
+                error: error.message
+            });
+        }
+    },
+    async getClientPortfolioHeading(req, res, next) {
+        try {
+            const stock_details_id = Number(req.query.stock_details_id);
+
+            if (!stock_details_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "stock_details_id is required"
+                });
+            }
+
+            const query = `
+            SELECT *
+            FROM clientPortfolio_Heading
+            WHERE stock_details_id = ${stock_details_id}
+            LIMIT 1
+        `;
+
+            const result = await getData(query, next);
+
+            const data = Array.isArray(result) && result.length > 0
+                ? result[0]
+                : null;
+
+            res.json({
+                success: true,
+                data
+            });
+
+        } catch (error) {
+            console.error("getClientPortfolioHeading ERROR:", error);
+            res.status(500).json({
+                success: false,
+                message: "Internal server error",
+                error: error.message
+            });
+        }
+    },
+    async getClientPortfolioData(req, res, next) {
+        try {
+            const stock_details_id = Number(req.query.stock_details_id);
+            const cp_heading_id = Number(req.query.cp_heading_id);
+
+            if (!stock_details_id || !cp_heading_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "stock_details_id and cp_heading_id are required"
+                });
+            }
+
+            const query = `
+            SELECT 
+                cp_data_id,
+                cp_heading_id,
+                stock_details_id,
+                data1,
+                data2,
+                data3,
+                created_date,
+                update_date
+            FROM clientPortfolio_Data
+            WHERE stock_details_id = ${stock_details_id}
+              AND cp_heading_id = ${cp_heading_id}
+            ORDER BY cp_data_id DESC
+        `;
+
+            const result = await getData(query, next);
+
+            res.json({
+                success: true,
+                data: Array.isArray(result) ? result : []
+            });
+
+        } catch (error) {
+            console.error("getClientPortfolioData ERROR:", error);
+            res.status(500).json({
+                success: false,
+                message: "Internal server error",
+                error: error.message
+            });
+        }
     }
+
 };
 
 export default stocksControllers;

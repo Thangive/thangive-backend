@@ -17,6 +17,12 @@ router.post('/AnnualReport', imageUpload, stocksCotrollers.addUpdateAnnualReport
 router.post('/devident', forms, stocksCotrollers.addUpdateDividend);
 router.post('/companyPortfolio', imageUpload, stocksCotrollers.addUpdatePortfolio);
 router.get('/stockDetails', stocksCotrollers.getStockData);
+router.get('/companyPortfolio',stocksCotrollers.getCompanyPortfolioData);
+router.get('/clientPortfolioHeading',stocksCotrollers.getClientPortfolioHeading);
+router.get('/clientPortfolioData',stocksCotrollers.getClientPortfolioData);
+
+
+
 
 router.post('/shareHolding', forms, stocksCotrollers.addUpdateShareHolding);
 router.get('/shareHolding', stocksCotrollers.getShareHolding);
