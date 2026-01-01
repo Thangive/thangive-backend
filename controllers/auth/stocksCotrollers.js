@@ -95,54 +95,6 @@ const stocksControllers = {
         }
     },
 
-    async addUpdateStockPrice(req, res, next) {
-        try {
-            // ------------------ Validation ------------------
-            const schema = Joi.object({
-                stock_price_id: Joi.number().integer().optional(),
-                stock_details_id: Joi.number().integer().required(),
-                prev_price: Joi.number().precision(2).required(),
-                today_prices: Joi.number().precision(2).required(),
-                partner_price: Joi.number().precision(2).required(),
-                conviction_level: Joi.string().required(),
-                availability: Joi.string().required(),
-            });
-
-            const { error } = schema.validate(req.body);
-            if (error) return next(error);
-
-            const dataObj = { ...req.body };
-
-            // ------------------ Duplicate Check ------------------
-            let condition = dataObj.stock_price_id ? ` AND stock_price_id != '${dataObj.stock_price_id}'` : '';
-            const checkQuery = `
-                SELECT stock_price_id 
-                FROM stock_price 
-                WHERE stock_details_id='${dataObj.stock_details_id}' 
-                AND present_date='${dataObj.present_date}' ${condition}
-            `;
-            const exists = await getData(checkQuery, next);
-            if (exists.length > 0) return next(CustomErrorHandler.alreadyExist("Stock price for this date already exists"));
-
-            // ------------------ Insert / Update ------------------
-            const query = dataObj.stock_price_id
-                ? `UPDATE stock_price SET ? WHERE stock_price_id='${dataObj.stock_price_id}'`
-                : `INSERT INTO stock_price SET ?`;
-
-            const result = await insertData(query, dataObj, next);
-            if (result.insertId) dataObj.stock_price_id = result.insertId;
-
-            res.json({
-                success: true,
-                message: dataObj.stock_price_id ? "Stock price updated successfully" : "Stock price added successfully",
-                data: dataObj
-            });
-
-        } catch (err) {
-            next(err);
-        }
-    },
-
     async addUpdateStockDescription(req, res, next) {
         try {
             // ------------------ Validation Schema ------------------
@@ -609,7 +561,7 @@ const stocksControllers = {
             }
 
             for (const record of shareholdingData) {
-                const { category, shareholder, stock_details_id,deleted = 0, ...years } = record;
+                const { category, shareholder, stock_details_id, deleted = 0, ...years } = record;
 
                 if (!category || !shareholder || !stock_details_id) continue;
 
@@ -683,8 +635,7 @@ const stocksControllers = {
                         next
                     );
 
-                    if (exists.length > 0) 
-                    {
+                    if (exists.length > 0) {
                         if (
                             exists[0].value !== value ||
                             Number(exists[0].deleted) !== Number(deleted)
@@ -698,7 +649,7 @@ const stocksControllers = {
                     } else {
                         await insertData(
                             "INSERT INTO shareholding SET ?",
-                            { category_id, stock_details_id, shareholder_id, year_id, value,deleted },
+                            { category_id, stock_details_id, shareholder_id, year_id, value, deleted },
                             next
                         );
                     }

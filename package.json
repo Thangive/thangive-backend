@@ -25,7 +25,8 @@
     "microtime": "^3.1.1",
     "multer": "^2.0.2",
     "mysql": "^2.18.1",
-    "path": "^0.12.7"
+    "path": "^0.12.7",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"

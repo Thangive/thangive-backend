@@ -1,15 +1,17 @@
 import express from 'express';
 import multer from 'multer';
-import { sectorController, stocksCotrollers } from '../controllers/index.js';
+import { PriceController, sectorController, stocksCotrollers } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 
 const forms = multer().array();
+const forms1 = multer().any();
+
 
 const router = express.Router();
 
 // User API
 router.post('/stockDetails', imageUpload, stocksCotrollers.addUpdateStockDetails);
-router.post('/stockPrice', forms, stocksCotrollers.addUpdateStockPrice);
+router.post('/stockPrice', forms, PriceController.addUpdateStockPrice);
 router.post('/stockDiscription', forms, stocksCotrollers.addUpdateStockDescription);
 router.post('/clientPortfolioHeading', forms, stocksCotrollers.addUpdateClientPortfolioHeading);
 router.post('/clientPortfolioData', forms, stocksCotrollers.addUpdateClientPortfolioData);
@@ -41,4 +43,5 @@ router.get("/stockDetailsByID/:id",sectorController.getStockDetailsById);
 router.get("/devident/:id",sectorController.getDivident);
 router.delete('/devident/:id', sectorController.deleteDividend);
 router.get("/AnnualReport/:id",sectorController.getAnualReport);
+router.post("/dailyPriceExcelUpdate",forms1,PriceController.updatePriceExcel)
 export default router;
