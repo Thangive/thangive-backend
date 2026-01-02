@@ -44,4 +44,5 @@ router.get("/devident/:id",sectorController.getDivident);
 router.delete('/devident/:id', sectorController.deleteDividend);
 router.get("/AnnualReport/:id",sectorController.getAnualReport);
 router.post("/dailyPriceExcelUpdate",forms1,PriceController.updatePriceExcel)
+router.get("/stockPriceChart",PriceController.getStockPriceChartData);
 export default router;

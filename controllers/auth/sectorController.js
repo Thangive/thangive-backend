@@ -476,7 +476,15 @@ const sectorController = {
                 s.*,
                 sec.sector_name,
                 sub.sub_industryName,
-                sd.*
+                sd.*,
+                IFNULL(sp.today_prices, 0)      AS today_prices,
+                IFNULL(sp.prev_price, 0)        AS prev_price,
+                IFNULL(sp.partner_price, 0)     AS partner_price,
+                IFNULL(sp.conviction_level, '') AS conviction_level,
+                IFNULL(sp.lot, 0)               AS lot,
+                IFNULL(sp.availability, '')     AS availability,
+                sp.present_date,
+                sp.stock_price_id
             FROM stock_details s
             LEFT JOIN stock_sector sec 
                 ON s.sector_id = sec.sector_id
@@ -484,6 +492,14 @@ const sectorController = {
                 ON s.subindustry_id = sub.subindustry_id
             LEFT JOIN stock_description sd
                 ON sd.stock_details_id = s.stock_details_id
+            LEFT JOIN stock_price sp
+                ON sp.stock_details_id = s.stock_details_id
+               AND sp.present_date = (
+                    SELECT MAX(p2.present_date)
+                    FROM stock_price p2
+                    WHERE p2.stock_details_id = s.stock_details_id
+                      AND p2.present_date <= CURDATE()
+               )
             WHERE s.stock_details_id = ${id}
             LIMIT 1
         `;

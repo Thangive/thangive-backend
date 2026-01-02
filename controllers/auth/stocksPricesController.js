@@ -95,7 +95,24 @@ const PriceController = {
 
     async updatePriceExcel(req, res, next) {
         try {
-            const TODAY = new Date().toISOString().slice(0, 10);
+
+            const { present_date } = req.body;
+
+            if (!present_date) {
+                return res.status(400).json({
+                    success: false,
+                    message: "present_date is required"
+                });
+            }
+
+            const TODAY = new Date(present_date).toISOString().slice(0, 10);
+
+            if (TODAY > new Date().toISOString().slice(0, 10)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Future date not allowed"
+                });
+            }
 
             /* ---------- FILE CHECK ---------- */
             if (!req.files || req.files.length === 0) {
@@ -111,8 +128,8 @@ const PriceController = {
             const workbook = XLSX.read(file.buffer, { type: "buffer" });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-            let inserted = 0;
-            let updated = 0;
+            let inserted = [];
+            let updated = [];
             let skipped = [];
 
             /* ---------- LOOP ROWS ---------- */
@@ -121,13 +138,16 @@ const PriceController = {
                 /* ---------- COMPANY NAME ---------- */
                 const companyName = String(row["COMPANY NAME"] || "").trim();
                 if (!companyName) {
-                    skipped.push({ reason: "Company name missing" });
+                    skipped.push({
+                        company: null,
+                        reason: "Company name missing"
+                    });
                     continue;
                 }
                 const stock = await getData(
                     `SELECT stock_details_id 
                      FROM stock_details 
-                     WHERE company_name='${companyName.replace(/'/g, "\\'")}'`,
+                     WHERE script_name='${companyName.replace(/'/g, "\\'")}'`,
                     next
                 );
                 if (stock.length === 0) {
@@ -204,7 +224,7 @@ const PriceController = {
                     prev_price: prev_price,
                     today_prices: today_prices,
                     partner_price: 0,
-                    conviction_level: row["CONVICTION LEVEL"] || "Medium",
+                    conviction_level: row["CONVICTION LEVEL"] || "MEDIUM",
                     availability: availability && availability.trim() !== "" ? availability : "LIMITED",
                     lot: row["LOT SIZE"] || 0,
                     present_date: TODAY,
@@ -218,14 +238,20 @@ const PriceController = {
                         payload,
                         next
                     );
-                    updated++;
+                    updated.push({
+                        company: companyName,
+                        stock_details_id
+                    });
                 } else {
                     await insertData(
                         `INSERT INTO stock_price SET ?`,
                         payload,
                         next
                     );
-                    inserted++;
+                    inserted.push({
+                        company: companyName,
+                        stock_details_id
+                    });
                 }
             }
 
@@ -233,14 +259,62 @@ const PriceController = {
             return res.json({
                 success: true,
                 message: "Excel price upload completed",
-                inserted,
-                updated,
+                present_date,
+                inserted_count: inserted.length,
+                updated_count: updated.length,
                 skipped_count: skipped.length,
+
+                inserted,   // array of company names
+                updated,    // array of company names
                 skipped
             });
 
         } catch (err) {
             next(err);
+        }
+    },
+    async getStockPriceChartData(req, res, next) {
+        try {
+            const { stock_details_id } = req.query;
+
+            /* ---------- VALIDATION ---------- */
+            if (!stock_details_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "stock_details_id is required"
+                });
+            }
+
+            /* ---------- FETCH PRICE DATA ---------- */
+            const data = await getData(
+                `
+            SELECT 
+                DATE_FORMAT(present_date, '%Y-%m-%d') AS date,
+                today_prices AS price
+            FROM stock_price
+            WHERE stock_details_id = '${stock_details_id}'
+            ORDER BY present_date ASC
+            `,
+                next
+            );
+
+            /* ---------- NO DATA ---------- */
+            if (!data || data.length === 0) {
+                return res.json({
+                    success: true,
+                    data: []
+                });
+            }
+
+            /* ---------- RESPONSE ---------- */
+            return res.json({
+                success: true,
+                data
+            });
+
+        } catch (error) {
+            console.error("getStockPriceChartData ERROR:", error);
+            next(error);
         }
     }
 }

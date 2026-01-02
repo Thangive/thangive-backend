@@ -555,7 +555,7 @@ const stocksControllers = {
     async addUpdateShareHolding(req, res, next) {
         try {
             const shareholdingData = req.body;
-
+            console.log(shareholdingData)
             if (!Array.isArray(shareholdingData) || shareholdingData.length === 0) {
                 return res.status(400).json({ message: "Invalid input data" });
             }
@@ -584,8 +584,15 @@ const stocksControllers = {
                 }
 
                 // ------------------ Shareholder ------------------
+                // let shareholderResult = await getData(
+                //     `SELECT shareholder_id FROM shareholders WHERE shareholder_name = '${shareholder.replace(/'/g, "\\'")}'`,
+                //     next
+                // );
                 let shareholderResult = await getData(
-                    `SELECT shareholder_id FROM shareholders WHERE shareholder_name = '${shareholder.replace(/'/g, "\\'")}'`,
+                    `SELECT shareholder_id 
+                    FROM shareholders 
+                    WHERE shareholder_name='${shareholder.replace(/'/g, "\\'")}'
+                    AND stock_details_id='${stock_details_id}'`,
                     next
                 );
 
