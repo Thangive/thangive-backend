@@ -492,7 +492,6 @@ const stocksControllers = {
             });
 
         } catch (error) {
-            console.error("addUpdatePortfolio ERROR:", error);
             next(error);
         }
     },
@@ -555,7 +554,6 @@ const stocksControllers = {
     async addUpdateShareHolding(req, res, next) {
         try {
             const shareholdingData = req.body;
-            console.log(shareholdingData)
             if (!Array.isArray(shareholdingData) || shareholdingData.length === 0) {
                 return res.status(400).json({ message: "Invalid input data" });
             }
@@ -704,7 +702,6 @@ const stocksControllers = {
             const yearColsResult = await getData(yearColsSQL, next);
             const yearColumns = yearColsResult?.[0]?.cols;
             if (!yearColumns) {
-                console.log(yearColumns);
                 return res.json({
                     message: 'success',
                     records: 0,
@@ -811,7 +808,6 @@ const stocksControllers = {
             });
 
         } catch (error) {
-            console.error("getCompanyPortfolioData ERROR:", error);
             res.status(500).json({
                 message: "Internal server error",
                 error: error.message
@@ -848,7 +844,6 @@ const stocksControllers = {
             });
 
         } catch (error) {
-            console.error("getClientPortfolioHeading ERROR:", error);
             res.status(500).json({
                 success: false,
                 message: "Internal server error",
@@ -892,7 +887,6 @@ const stocksControllers = {
             });
 
         } catch (error) {
-            console.error("getClientPortfolioData ERROR:", error);
             res.status(500).json({
                 success: false,
                 message: "Internal server error",

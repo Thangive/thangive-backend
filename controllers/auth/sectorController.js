@@ -16,8 +16,6 @@ const sectorController = {
                 }
             });
         } catch (error) {
-            console.log("Error:", error);
-
             res.json({
                 message: "error",
                 error
@@ -117,7 +115,6 @@ const sectorController = {
                 ORDER BY i.industry_id DESC
             `;
             const data = await getData(query, "");
-            // console.log(data);
             res.json({
                 message: "success",
                 data: {
@@ -125,8 +122,6 @@ const sectorController = {
                 }
             });
         } catch (error) {
-            console.log("Error:", error);
-
             res.json({
                 message: "error",
                 error
@@ -255,8 +250,6 @@ const sectorController = {
             });
 
         } catch (error) {
-            console.log("Error:", error);
-
             return res.json({
                 message: "error",
                 error
@@ -447,7 +440,6 @@ const sectorController = {
             query += cond + page.pageQuery;
 
             const data = await getData(query, next);
-            // console.log(data);
             res.json({
                 message: 'success',
                 total_records: page.total_rec ? page.total_rec : data.length,

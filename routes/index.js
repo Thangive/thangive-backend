@@ -45,4 +45,17 @@ router.delete('/devident/:id', sectorController.deleteDividend);
 router.get("/AnnualReport/:id",sectorController.getAnualReport);
 router.post("/dailyPriceExcelUpdate",forms1,PriceController.updatePriceExcel)
 router.get("/stockPriceChart",PriceController.getStockPriceChartData);
+router.get("/cashflowTemplates",PriceController.getCashFlowTemplates);
+router.post("/CashflowValues",forms,PriceController.addUpdateCashFlowValues);
+router.get("/CashflowValues",PriceController.getCashFlowValues);
+router.post("/balanceSheetTemplate",forms,PriceController.addUpdateBalanceSheetTemplates);
+router.get("/balanceSheetTemplate",PriceController.getBalanceSheetTemplates);
+router.post("/balanceSheetValues",forms,PriceController.addUpdateBalanceSheetValues);
+router.get("/balanceSheetValues",PriceController.getBalanceSheetValues);
+router.post("/PLTemplate",forms,PriceController.addUpdatePLTemplates);
+router.get("/PLTemplate",PriceController.getPLTemplates);
+router.post("/PLSheetValues",forms,PriceController.addUpdatePLValues);
+router.get("/PLSheetValues",PriceController.getPLSheetValues);
+
+
 export default router;
