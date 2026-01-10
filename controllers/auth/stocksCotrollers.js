@@ -342,82 +342,81 @@ const stocksControllers = {
 
     async addUpdateAnnualReport(req, res, next) {
         try {
-            imageUpload(req, res, async (err) => {
-                if (err) return next(err);
+            // ------------------ Build Data Object ------------------
+            const dataObj = {
+                ...req.body,
+                update_date	: new Date()
+            };
 
-                // ------------------ Validation ------------------
-                const schema = Joi.object({
-                    anual_report_id: Joi.number().integer().optional(),
-                    stock_details_id: Joi.number().integer().required(),
-                    year: Joi.string().required(),
-                    report_date: Joi.date().required(),
-                    heading: Joi.string().required(),
-                    document: Joi.string().allow("").required(),
-                });
+            // ------------------ Document Path ------------------
+            if (req.files?.document) {
+                dataObj.document = `uploads/upload/${req.files.document[0].filename}`;
+            }
 
-                // const dataObj = {
-                //     ...req.body,
-                //     updated_date: new Date()
-                // };
+            if (!dataObj.anual_report_id) {
+                dataObj.created_date = new Date();
+            }
 
-                // ------------------ Document Path ------------------
-                if (req.files?.document) {
-                    dataObj.document = `uploads/upload/${req.files.document[0].filename}`;
-                }
-
-                // if (!dataObj.anual_report_id) {
-                //     dataObj.created_date = new Date();
-                // }
-
-                const { error } = schema.validate(dataObj);
-                if (error) return next(error);
-
-                // ------------------ Duplicate Check ------------------
-                let condition = dataObj.anual_report_id
-                    ? ` AND anual_report_id != '${dataObj.anual_report_id}'`
-                    : '';
-
-                const checkQuery = `
-                    SELECT anual_report_id 
-                    FROM anual_report
-                    WHERE stock_details_id='${dataObj.stock_details_id}'
-                    AND year='${dataObj.year}'
-                    ${condition}
-                `;
-
-                const exists = await getData(checkQuery, next);
-                if (exists.length > 0) {
-                    return next(
-                        CustomErrorHandler.alreadyExist(
-                            "Annual report already exists for this year"
-                        )
-                    );
-                }
-
-                // ------------------ Insert / Update ------------------
-                const query = dataObj.anual_report_id
-                    ? `UPDATE anual_report SET ? WHERE anual_report_id='${dataObj.anual_report_id}'`
-                    : `INSERT INTO anual_report SET ?`;
-
-                const result = await insertData(query, dataObj, next);
-
-                if (result.insertId) {
-                    dataObj.anual_report_id = result.insertId;
-                }
-
-                res.json({
-                    success: true,
-                    message: dataObj.anual_report_id
-                        ? "Annual report updated successfully"
-                        : "Annual report added successfully",
-                    data: dataObj
-                });
+            // ------------------ Validation ------------------
+            const schema = Joi.object({
+                anual_report_id: Joi.number().integer().optional(),
+                stock_details_id: Joi.number().integer().required(),
+                year: Joi.string().required(),
+                report_date: Joi.date().optional(),
+                heading: Joi.string().required(),
+                document: Joi.string().allow("").required(),
+                created_date: Joi.date().optional(),
+                update_date: Joi.date().optional()
             });
 
+            const { error } = schema.validate(dataObj);
+            if (error) return next(error);
+
+            // ------------------ Duplicate Check ------------------
+            let condition = dataObj.anual_report_id
+                ? ` AND anual_report_id != '${dataObj.anual_report_id}'`
+                : '';
+
+            const checkQuery = `
+            SELECT anual_report_id 
+            FROM anual_report
+            WHERE stock_details_id='${dataObj.stock_details_id}'
+            AND year='${dataObj.year}'
+            ${condition}
+        `;
+
+            const exists = await getData(checkQuery, next);
+            if (exists.length > 0) {
+                return next(
+                    CustomErrorHandler.alreadyExist(
+                        "Annual report already exists for this year"
+                    )
+                );
+            }
+
+            // ------------------ Insert / Update ------------------
+            const query = dataObj.anual_report_id
+                ? `UPDATE anual_report SET ? WHERE anual_report_id='${dataObj.anual_report_id}'`
+                : `INSERT INTO anual_report SET ?`;
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.anual_report_id = result.insertId;
+            }
+
+            res.json({
+                success: true,
+                message: dataObj.anual_report_id
+                    ? "Annual report updated successfully"
+                    : "Annual report added successfully",
+                data: dataObj
+            });
         } catch (error) {
             next(error);
         }
     },
+
 
     async addUpdatePortfolio(req, res, next) {
         try {

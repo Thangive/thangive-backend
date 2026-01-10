@@ -520,9 +520,10 @@ const sectorController = {
             }
             let query = `SELECT * FROM stock_devidet WHERE stock_details_id=${id}`;
             const data = await getData(query, next);
-            if (!data.length) {
-                return res.status(404).json({
-                    message: "Stock not found"
+            if (!data.length) 
+            {
+                return res.json({
+                    message: "Divident not found"
                 });
             }
             res.json({
@@ -565,7 +566,7 @@ const sectorController = {
             let query = `SELECT * FROM anual_report WHERE stock_details_id=${id}`;
             const data = await getData(query, next);
             if (!data.length) {
-                return res.status(404).json({
+                return res.json({
                     message: "Report not found"
                 });
             }
