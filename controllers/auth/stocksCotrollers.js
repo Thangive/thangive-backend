@@ -186,8 +186,8 @@ const stocksControllers = {
 
             // ------------------ Insert / Update ------------------
             const query = dataObj.cp_heading_id
-                ? `UPDATE clientPortfolio_Heading SET ? WHERE cp_heading_id='${dataObj.cp_heading_id}'`
-                : `INSERT INTO clientPortfolio_Heading SET ?`;
+                ? `UPDATE clientportfolio_heading SET ? WHERE cp_heading_id='${dataObj.cp_heading_id}'`
+                : `INSERT INTO clientportfolio_heading SET ?`;
 
             const result = await insertData(query, dataObj, next);
 
@@ -249,8 +249,8 @@ const stocksControllers = {
 
             // ------------------ Insert / Update ------------------
             const query = dataObj.cp_data_id
-                ? `UPDATE clientPortfolio_Data SET ? WHERE cp_data_id='${dataObj.cp_data_id}'`
-                : `INSERT INTO clientPortfolio_Data SET ?`;
+                ? `UPDATE clientportfolio_data SET ? WHERE cp_data_id='${dataObj.cp_data_id}'`
+                : `INSERT INTO clientportfolio_data SET ?`;
 
             const result = await insertData(query, dataObj, next);
 
@@ -826,7 +826,7 @@ const stocksControllers = {
 
             const query = `
             SELECT *
-            FROM clientPortfolio_Heading
+            FROM clientportfolio_heading
             WHERE stock_details_id = ${stock_details_id}
             LIMIT 1
         `;
@@ -872,10 +872,10 @@ const stocksControllers = {
                 data3,
                 created_date,
                 update_date
-            FROM clientPortfolio_Data
+            FROM clientportfolio_data
             WHERE stock_details_id = ${stock_details_id}
               AND cp_heading_id = ${cp_heading_id}
-            ORDER BY cp_data_id DESC
+            ORDER BY cp_data_id ASC
         `;
 
             const result = await getData(query, next);

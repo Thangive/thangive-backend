@@ -28,7 +28,7 @@ const storage = multer.diskStorage({
 });
 
 // ---------------- CONFIG ----------------
-const maxSize = 10 * 1024 * 1024; // 10MB
+const maxSize = 20 * 1024 * 1024; // 10MB
 
 const imageUpload = multer({
     storage,
