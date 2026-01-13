@@ -4,7 +4,7 @@ import fs from 'fs-extra';
 import { SERVER_HOST } from '../config/index.js';
 
 const serverpath = SERVER_HOST === 'true'
-    ? '../www/html/adis.co.in/cow_assets/'
+    ? 'our url'
     : 'uploads/upload/';
 
 // Ensure upload directory exists
@@ -19,6 +19,7 @@ const storage = multer.diskStorage({
         const ext = path.extname(file.originalname).toLowerCase();
 
         let prefix = "file";
+        // if (file.fieldname === "profile") prefix = "profile";
         if (file.fieldname === "cmp_logo") prefix = "cmp_logo";
         if (file.fieldname === "document") prefix = "annual_report";
         if (file.fieldname === "service_gallery") prefix = "gallery";
@@ -50,7 +51,8 @@ const imageUpload = multer({
 }).fields([
     { name: 'cmp_logo', maxCount: 1 },          // company logo
     { name: 'document', maxCount: 1 },          // annual report
-    { name: 'service_gallery', maxCount: 10 }   // portfolio gallery images
+    { name: 'service_gallery', maxCount: 10 },   // portfolio gallery images
+    { name: 'profile', maxCount: 1 }
 ]);
 
 export default imageUpload;

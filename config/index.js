@@ -11,4 +11,5 @@ export const {
     JWT_SECRET
 } = process.env;
 
+
 export { getData, insertData, getCount } from './database.js';

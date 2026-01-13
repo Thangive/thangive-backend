@@ -6,7 +6,7 @@ import CustomErrorHandler from '../service/CustomErrorHandler.js';
  * SERVER_HOST=true  → server
  * SERVER_HOST=false → local
  */
-const isServer = (process.env.SERVER_HOST === 'true');
+const isServer = (process.env.SERVER_HOST === true);
 
 const credentil = isServer
     ? {
