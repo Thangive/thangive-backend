@@ -58,6 +58,8 @@ router.post("/PLSheetValues",forms,PriceController.addUpdatePLValues);
 router.get("/PLSheetValues",PriceController.getPLSheetValues);
 router.post("/FRTemplate",forms,PriceController.addupdateFRTemplate);
 router.get("/FRTemplate",PriceController.getFRTemplates);
+router.post("/FRSheetValues",forms,PriceController.addUpdateFRValues);
+router.get("/FRSheetValues",PriceController.getFRSheetValues);
 
 
 export default router;

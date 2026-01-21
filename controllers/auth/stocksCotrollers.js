@@ -278,7 +278,7 @@ const stocksControllers = {
                 devidet_id: Joi.number().integer().optional(),
                 stock_details_id: Joi.number().integer().required(),
                 finacial_year: Joi.string().required(),
-                declaration_date: Joi.date().required(),
+                declaration_date: Joi.date().optional().allow(""),
                 devident_per_share: Joi.number().precision(2).required(),
             });
 
@@ -293,7 +293,6 @@ const stocksControllers = {
             if (!dataObj.devidet_id) {
                 dataObj.created_date = new Date();
             }
-
             // ------------------ Duplicate Check ------------------
             let condition = dataObj.devidet_id
                 ? ` AND devidet_id != '${dataObj.devidet_id}'`

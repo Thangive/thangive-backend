@@ -1246,7 +1246,175 @@ const PriceController = {
         } catch (err) {
             next(err);
         }
-    }
+    },
+    async getFRSheetValues(req, res, next) {
+        try {
+            const { stock_details_id } = req.query;
+            if (!stock_details_id) {
+                return res.status(400).json({
+                    message: "stock_details_id required"
+                });
+            }
 
+            const query = `
+            SELECT
+                frv.ratio_id,
+                y.year,
+                frv.value
+            FROM financial_ratio_values frv
+            JOIN years y ON frv.year_id = y.year_id
+            WHERE frv.stock_details_id = '${stock_details_id}'
+            AND frv.isdeleted = 0
+            ORDER BY y.year
+        `;
+
+            const rows = await getData(query, next);
+            if (!rows.length) {
+                return res.json({
+                    message: "success",
+                    data: {
+                        years: [],
+                        values: {}
+                    }
+                });
+            }
+
+            const yearsSet = new Set();
+            const values = {};
+
+            rows.forEach(r => {
+                yearsSet.add(r.year);
+
+                if (!values[r.year]) values[r.year] = {};
+                values[r.year][r.ratio_id] = Number(r.value);
+            });
+
+            return res.json({
+                message: "success",
+                data: {
+                    years: Array.from(yearsSet),
+                    values
+                }
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+    async addUpdateFRValues(req, res, next) {
+        try {
+            const { data = [], deletedYears = [] } = req.body;
+
+            if (!Array.isArray(data) || data.length === 0) {
+                return res.status(400).json({ message: "Invalid input data" });
+            }
+            /* ================= SAVE / UPDATE ================= */
+            for (const record of data) {
+
+                const {
+                    stock_details_id,
+                    ratio_id,
+                    particular_name,
+                    ...years
+                } = record;
+
+                if (!stock_details_id || !ratio_id) continue;
+                for (const year in years) {
+
+                    if (
+                        year === "stock_details_id" ||
+                        year === "particular_name" ||
+                        year === "ratio_id"
+                    ) continue;
+
+                    const value = years[year];
+                    if (value === null || value === undefined) continue;
+
+                    /* -------- YEAR TABLE -------- */
+                    let yearResult = await getData(
+                        `SELECT year_id FROM years WHERE year='${year}'`,
+                        next
+                    );
+
+                    let year_id;
+                    if (yearResult.length > 0) {
+                        year_id = yearResult[0].year_id;
+                    } else {
+                        const insertYear = await insertData(
+                            "INSERT INTO years SET ?",
+                            { year },
+                            next
+                        );
+                        year_id = insertYear.insertId;
+                    }
+                    /* -------- CHECK EXISTING -------- */
+                    const exists = await getData(
+                        `SELECT fr_valueId, value
+                     FROM financial_ratio_values
+                     WHERE stock_details_id='${stock_details_id}'
+                       AND ratio_id='${ratio_id}'
+                       AND year_id='${year_id}'`,
+                        next
+                    );
+                    if (exists.length > 0) {
+                        if (Number(exists[0].value) !== Number(value)) {
+                            await insertData(
+                                `UPDATE financial_ratio_values
+                             SET value=?, isdeleted=0, updated_at=NOW()
+                             WHERE fr_valueId=?`,
+                                [value, exists[0].fr_valueId],
+                                next
+                            );
+                        }
+                    } else {
+                        await insertData(
+                            "INSERT INTO financial_ratio_values SET ?",
+                            {
+                                stock_details_id,
+                                ratio_id,
+                                year_id,
+                                value,
+                                isdeleted: 0,
+                                created_at: new Date(),
+                                updated_at: new Date()
+                            },
+                            next
+                        );
+                    }
+                }
+            }
+
+            /* ================= SOFT DELETE YEARS ================= */
+            if (deletedYears.length > 0) {
+                const stockId = data[0].stock_details_id;
+
+                for (const year of deletedYears) {
+                    const yearRes = await getData(
+                        `SELECT year_id FROM years WHERE year='${year}'`,
+                        next
+                    );
+
+                    if (!yearRes.length) continue;
+
+                    await insertData(
+                        `UPDATE financial_ratio_values
+                     SET isdeleted=1, updated_at=NOW()
+                     WHERE stock_details_id='${stockId}'
+                       AND year_id='${yearRes[0].year_id}'`,
+                        [],
+                        next
+                    );
+                }
+            }
+
+            return res.json({
+                success: true,
+                message: "Financial values saved successfully"
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
 }
 export default PriceController
