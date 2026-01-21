@@ -1156,6 +1156,97 @@ const PriceController = {
         } catch (error) {
             next(error);
         }
+    },
+    async addupdateFRTemplate(req, res, next) {
+        try {
+            const schema = Joi.object({
+                ratio_id: Joi.number().optional(),
+                sector_id: Joi.number().required(),
+                particular_name: Joi.string().required(),
+                sequence_no: Joi.number().optional()
+            });
+
+            const { error } = schema.validate(req.body);
+            if (error) return next(error);
+
+            const { ratio_id, sector_id, particular_name, sequence_no } = req.body;
+
+            // Duplicate check
+            const dupQuery = `
+            SELECT ratio_id 
+            FROM financial_ratio_templates
+            WHERE sector_id = ${sector_id}
+              AND particular_name = '${particular_name.trim()}'
+              ${ratio_id ? `AND ratio_id != ${ratio_id}` : ""}
+        `;
+
+            const exists = await getData(dupQuery, next);
+            if (exists.length > 0) {
+                return next(CustomErrorHandler.alreadyExist("Ratio already exists"));
+            }
+
+            // UPDATE
+            if (ratio_id) {
+                const updateObj = {
+                    particular_name: particular_name.trim(),
+                    updated_at: new Date()
+                };
+
+                if (sequence_no !== undefined) updateObj.sequence_no = sequence_no;
+
+                const updateQuery = `
+                UPDATE financial_ratio_templates SET ? WHERE ratio_id = ${ratio_id}
+            `;
+
+                await insertData(updateQuery, updateObj, next);
+
+                return res.json({ message: "Ratio updated successfully" });
+            }
+
+            // AUTO SEQUENCE
+            const seqQ = `
+            SELECT COALESCE(MAX(sequence_no), 0) AS maxSeq
+            FROM financial_ratio_templates
+            WHERE sector_id = ${sector_id}
+        `;
+            const seqR = await getData(seqQ, next);
+            const nextSeq = (seqR[0]?.maxSeq || 0) + 1;
+
+            const insertObj = {
+                sector_id,
+                particular_name: particular_name.trim(),
+                sequence_no: nextSeq,
+                created_at: new Date(),
+                updated_at: new Date()
+            };
+
+            const insertQuery = `INSERT INTO financial_ratio_templates SET ?`;
+            await insertData(insertQuery, insertObj, next);
+
+            return res.json({ message: "Ratio added successfully" });
+        } catch (error) {
+            next(error);
+        }
+    },
+    async getFRTemplates(req, res, next) {
+        try {
+            const { sector_id } = req.query;
+            if (!sector_id) return res.status(400).json({ message: "sector_id is required" });
+
+            const query = `
+            SELECT ratio_id, sector_id, particular_name, sequence_no
+            FROM financial_ratio_templates
+            WHERE sector_id = ${sector_id}
+            ORDER BY sequence_no
+        `;
+
+            const rows = await getData(query, next);
+
+            return res.json({ message: "success", data: rows || [] });
+        } catch (err) {
+            next(err);
+        }
     }
+
 }
 export default PriceController

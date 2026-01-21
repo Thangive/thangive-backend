@@ -563,7 +563,7 @@ const sectorController = {
                     message: "Stock ID is required"
                 });
             }
-            let query = `SELECT * FROM anual_report WHERE stock_details_id=${id}`;
+            let query = `SELECT * FROM anual_report WHERE stock_details_id = ${parseInt(id)} ORDER BY anual_report_id DESC`;
             const data = await getData(query, next);
             if (!data.length) {
                 return res.json({
