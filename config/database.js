@@ -19,7 +19,7 @@ const credentil = isServer
         host: "localhost",
         user: "root",
         password: "",
-        database: "thangive"
+        database: "thangive1"
     };
 
 let con;

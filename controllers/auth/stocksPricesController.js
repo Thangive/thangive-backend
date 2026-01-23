@@ -10,10 +10,9 @@ const PriceController = {
     async addUpdateStockPrice(req, res, next) {
         try {
             /* ------------------ Validation ------------------ */
+
             const schema = Joi.object({
-                stock_price_id: Joi.number().integer().optional(),
                 stock_details_id: Joi.number().integer().required(),
-                prev_price: Joi.number().precision(2).required(),
                 today_prices: Joi.number().precision(2).required(),
                 partner_price: Joi.number().precision(2).required(),
                 conviction_level: Joi.string().required(),
@@ -25,69 +24,54 @@ const PriceController = {
             const { error } = schema.validate(req.body);
             if (error) return next(error);
 
-            const dataObj = {
-                ...req.body,
+            const {
+                stock_details_id,
+                today_prices,
+                partner_price,
+                conviction_level,
+                availability,
+                lot,
+                present_date
+            } = req.body;
+
+            const TODAY = new Date(present_date).toISOString().slice(0, 10);
+
+            /* ------------------ Rule 1: Get Previous Price from DB ------------------ */
+            const prevQuery = `
+                SELECT today_prices 
+                FROM stock_price
+                WHERE stock_details_id='${stock_details_id}'
+                AND present_date < '${TODAY}'
+                ORDER BY present_date DESC
+                LIMIT 1
+            `;
+            const prevData = await getData(prevQuery, next);
+            const prev_price = prevData.length > 0 ? prevData[0].today_prices : today_prices;
+
+            /* ------------------ Rule 2: ALWAYS Insert New Row ------------------ */
+            const payload = {
+                stock_details_id,
+                prev_price,                // ← fixed, read-only
+                today_prices,              // ← new price user submitted
+                partner_price,
+                conviction_level,
+                availability,
+                lot,
+                present_date: TODAY,
+                created_at: new Date(),
+                time: new Date(),
                 update_date: new Date()
             };
 
-            /* ------------------ STEP 1: Validate price_id belongs to TODAY ------------------ */
-            if (dataObj.stock_price_id) {
-                const verifyQuery = `
-                    SELECT stock_price_id
-                    FROM stock_price
-                    WHERE stock_price_id='${dataObj.stock_price_id}'
-                      AND DATE(present_date) = DATE('${dataObj.present_date}')
-                `;
-
-                const valid = await getData(verifyQuery, next);
-
-                if (valid.length === 0) {
-                    delete dataObj.stock_price_id;
-                }
-            }
-
-            /* ------------------ STEP 2: Duplicate Check (TODAY only) ------------------ */
-            let condition = dataObj.stock_price_id
-                ? ` AND stock_price_id != '${dataObj.stock_price_id}'`
-                : '';
-
-            const checkQuery = `
-                SELECT stock_price_id
-                FROM stock_price
-                WHERE stock_details_id='${dataObj.stock_details_id}'
-                  AND DATE(present_date) = DATE('${dataObj.present_date}')
-                  ${condition}
-            `;
-
-            const exists = await getData(checkQuery, next);
-            if (exists.length > 0) {
-                return next(
-                    CustomErrorHandler.alreadyExist(
-                        "Stock price for today already exists"
-                    )
-                );
-            }
-
-            /* ------------------ STEP 3: Insert / Update ------------------ */
-            const query = dataObj.stock_price_id
-                ? `UPDATE stock_price SET ? WHERE stock_price_id='${dataObj.stock_price_id}'`
-                : `INSERT INTO stock_price SET ?`;
-
-            const result = await insertData(query, dataObj, next);
-
-            if (!dataObj.stock_price_id && result.insertId) {
-                dataObj.stock_price_id = result.insertId;
-            }
+            const result = await insertData(`INSERT INTO stock_price SET ?`, payload, next);
+            payload.stock_price_id = result.insertId;
 
             /* ------------------ Response ------------------ */
-            res.json({
+            return res.json({
                 success: true,
-                message: dataObj.stock_price_id
-                    ? "Stock price updated successfully"
-                    : "Stock price added successfully",
-                data: dataObj
+                message: "Stock price added successfully",
+                data: payload
             });
-
         } catch (err) {
             next(err);
         }
@@ -162,19 +146,23 @@ const PriceController = {
                 /* ---------- READ SHEET VALUES ---------- */
                 const todayCell = row["PRICE"];
                 const prevCell = row["__EMPTY"];
+                const actionCell = row["ACTION"];
 
                 let today_prices = null;
                 let prev_price = null;
-                let availability = null;
+                // let availability = null;
 
                 /* ---------- TODAY PRICE / AVAILABILITY ---------- */
-                if (todayCell !== "" && todayCell !== null) {
-                    if (!isNaN(todayCell)) {
-                        today_prices = Number(todayCell);
-                    } else {
-                        availability = String(todayCell).trim().toUpperCase();
-                    }
+                if (todayCell !== "" && todayCell !== null && !isNaN(todayCell)) {
+                    today_prices = Number(todayCell);
                 }
+                // if (todayCell !== "" && todayCell !== null) {
+                //     if (!isNaN(todayCell)) {
+                //         today_prices = Number(todayCell);
+                //     } else {
+                //         availability = String(todayCell).trim().toUpperCase();
+                //     }
+                // }
 
                 /* ---------- PREVIOUS PRICE (SHEET FIRST) ---------- */
                 if (prevCell !== "" && prevCell !== null && !isNaN(prevCell)) {
@@ -209,66 +197,47 @@ const PriceController = {
                     today_prices = prev_price;
                 }
 
-                /* ---------- CHECK TODAY ENTRY ---------- */
-                const existing = await getData(
-                    `SELECT stock_price_id
-                     FROM stock_price
-                     WHERE stock_details_id='${stock_details_id}'
-                       AND DATE(present_date)=DATE('${TODAY}')`,
+                /* AVAILABILITY FROM ACTION */
+                let availability = "LIMITED";
+                if (actionCell && String(actionCell).trim() !== "") {
+                    availability = String(actionCell).trim().toUpperCase();
+                }
+
+                const payload = {
+                    stock_details_id,
+                    prev_price,
+                    today_prices,
+                    partner_price: 0,
+                    conviction_level: row["CONVICTION LEVEL"] || "MEDIUM",
+                    availability: availability,
+                    lot: row["LOT SIZE"] || 0,
+                    present_date: TODAY,
+                    created_at: new Date(),
+                    time: new Date(),
+                    update_date: new Date()
+                };
+
+                await insertData(
+                    `INSERT INTO stock_price SET ?`,
+                    payload,
                     next
                 );
 
-                /* ---------- PAYLOAD ---------- */
-                const payload = {
-                    stock_details_id,
-                    prev_price: prev_price,
-                    today_prices: today_prices,
-                    partner_price: 0,
-                    conviction_level: row["CONVICTION LEVEL"] || "MEDIUM",
-                    availability: availability && availability.trim() !== "" ? availability : "LIMITED",
-                    lot: row["LOT SIZE"] || 0,
-                    present_date: TODAY,
-                    update_date: new Date()
-                };
-                /* ---------- INSERT / UPDATE ---------- */
-                if (existing.length > 0) {
-                    await insertData(
-                        `UPDATE stock_price SET ? 
-                         WHERE stock_price_id='${existing[0].stock_price_id}'`,
-                        payload,
-                        next
-                    );
-                    updated.push({
-                        company: companyName,
-                        stock_details_id
-                    });
-                } else {
-                    await insertData(
-                        `INSERT INTO stock_price SET ?`,
-                        payload,
-                        next
-                    );
-                    inserted.push({
-                        company: companyName,
-                        stock_details_id
-                    });
-                }
+                inserted.push({
+                    company: companyName,
+                    stock_details_id
+                });
             }
-
             /* ---------- RESPONSE ---------- */
             return res.json({
                 success: true,
                 message: "Excel price upload completed",
                 present_date,
                 inserted_count: inserted.length,
-                updated_count: updated.length,
                 skipped_count: skipped.length,
-
-                inserted,   // array of company names
-                updated,    // array of company names
+                inserted,
                 skipped
             });
-
         } catch (err) {
             next(err);
         }
@@ -288,13 +257,25 @@ const PriceController = {
             /* ---------- FETCH PRICE DATA ---------- */
             const data = await getData(
                 `
-            SELECT 
-                DATE_FORMAT(present_date, '%Y-%m-%d') AS date,
-                today_prices AS price
-            FROM stock_price
-            WHERE stock_details_id = '${stock_details_id}'
-            ORDER BY present_date ASC
-            `,
+                    SELECT 
+                        DATE(p.update_date) AS date,
+                        p.today_prices AS price
+                    FROM stock_price p
+                    INNER JOIN (
+                        SELECT 
+                            stock_details_id,
+                            DATE(update_date) AS dt,
+                            MAX(update_date) AS max_dt
+                                FROM stock_price
+                                WHERE stock_details_id = '${stock_details_id}'
+                                GROUP BY stock_details_id, DATE(update_date)
+                            ) x 
+                            ON p.stock_details_id = x.stock_details_id 
+                            AND DATE(p.update_date) = x.dt 
+                            AND p.update_date = x.max_dt
+                            WHERE p.stock_details_id = '${stock_details_id}'
+                            ORDER BY p.update_date ASC
+                `,
                 next
             );
 
