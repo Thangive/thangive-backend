@@ -256,25 +256,21 @@ const PriceController = {
 
             /* ---------- FETCH PRICE DATA ---------- */
             const data = await getData(
-                `
-                    SELECT 
-                        DATE(p.update_date) AS date,
+                `SELECT 
+                        DATE(p.present_date) AS date,
                         p.today_prices AS price
                     FROM stock_price p
                     INNER JOIN (
                         SELECT 
-                            stock_details_id,
-                            DATE(update_date) AS dt,
-                            MAX(update_date) AS max_dt
-                                FROM stock_price
-                                WHERE stock_details_id = '${stock_details_id}'
-                                GROUP BY stock_details_id, DATE(update_date)
-                            ) x 
-                            ON p.stock_details_id = x.stock_details_id 
-                            AND DATE(p.update_date) = x.dt 
-                            AND p.update_date = x.max_dt
-                            WHERE p.stock_details_id = '${stock_details_id}'
-                            ORDER BY p.update_date ASC
+                            DATE(present_date) AS dt,
+                            MAX(stock_price_id) AS max_id
+                        FROM stock_price
+                        WHERE stock_details_id = '${stock_details_id}'
+                        GROUP BY DATE(present_date)
+                    ) x 
+                    ON p.stock_price_id = x.max_id
+                    WHERE p.stock_details_id = '${stock_details_id}'
+                    ORDER BY DATE(p.present_date) ASC;
                 `,
                 next
             );
@@ -1397,5 +1393,231 @@ const PriceController = {
             next(error);
         }
     },
+    async getSearchStock(req, res, next) {
+        try {
+            const { query } = req.query;
+
+            if (!query || query.trim() === "") {
+                return res.json({
+                    success: true,
+                    data: []
+                });
+            }
+            const sql = `
+                SELECT 
+                    stock_details_id,
+                    company_name,
+                    script_name,
+                    isin_no
+                FROM stock_details
+                WHERE company_name LIKE '%${query}%'
+                ORDER BY company_name ASC
+                LIMIT 20
+            `;
+            const data = await getData(sql, next);
+            return res.json({
+                success: true,
+                data
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+    async stockDetailsByIDPeer(req, res, next) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({
+                    message: "Stock ID is required"
+                });
+            }
+            let query = `
+            SELECT 
+                s.*,
+                sec.sector_name,
+                sub.sub_industryName,
+                IFNULL(sp.today_prices, 0)      AS today_prices,
+                IFNULL(sp.prev_price, 0)        AS prev_price,
+                IFNULL(sp.partner_price, 0)     AS partner_price,
+                IFNULL(sp.conviction_level, '') AS conviction_level,
+                IFNULL(sp.lot, 0)               AS lot,
+                IFNULL(sp.availability, '')     AS availability,
+                sp.present_date,
+                sp.stock_price_id
+            FROM stock_details s
+            LEFT JOIN stock_sector sec 
+                ON s.sector_id = sec.sector_id
+            LEFT JOIN stock_subindustry sub 
+                ON s.subindustry_id = sub.subindustry_id
+            LEFT JOIN stock_price sp
+                ON sp.stock_details_id = s.stock_details_id
+               AND sp.present_date = (
+                    SELECT MAX(p2.present_date)
+                    FROM stock_price p2
+                    WHERE p2.stock_details_id = s.stock_details_id
+                      AND p2.present_date <= CURDATE()
+               )
+            WHERE s.stock_details_id = ${id}
+            LIMIT 1
+        `;
+            const data = await getData(query, next);
+            if (!data.length) {
+                return res.status(404).json({
+                    message: "Stock not found"
+                });
+            }
+            res.json({
+                message: "success",
+                data: data[0]
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+    async getPeerComparison(req, res, next) {
+        try {
+            const { stock_details_id, peer_id } = req.query;
+
+            if (!stock_details_id) {
+                return next(
+                    CustomErrorHandler.requiredField("stock_details_id is required")
+                );
+            }
+
+            let query = `
+            SELECT *
+            FROM peer_comparison
+            WHERE stock_details_id = '${stock_details_id}'
+        `;
+
+            if (peer_id) {
+                query += ` AND peer_id = '${peer_id}'`;
+            }
+
+            query += " ORDER BY peer_id DESC";
+
+            const data = await getData(query, next);
+
+            res.json({
+                success: true,
+                message: "Peer comparison fetched successfully",
+                data
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+    async AddPeerComparison(req, res, next) {
+        try {
+            const schema = Joi.object({
+                peer_id: Joi.number().integer().optional(),
+                stock_details_id: Joi.number().integer().required(),
+
+                peer_stock_id: Joi.number().integer().allow(null),
+
+                company_name: Joi.string().allow(null),
+                face_value: Joi.number().allow(null),
+                marketCap: Joi.number().allow(null),
+                pe: Joi.number().allow(null),
+                revenue: Joi.number().allow(null),
+                pat: Joi.number().allow(null),
+                eps: Joi.number().allow(null)
+            });
+            const { error } = schema.validate(req.body);
+            if (error) return next(error);
+
+            const dataObj = { ...req.body };
+
+            /* ------------------ DUPLICATE CHECK ------------------ */
+            let duplicateQuery = `
+                SELECT peer_id 
+                FROM peer_comparison
+                WHERE stock_details_id = '${dataObj.stock_details_id}'
+            `;
+
+            // CASE 1: If peer_stock_id exists → check by peer_stock_id
+            if (dataObj.peer_stock_id !== null) {
+                duplicateQuery += ` AND peer_stock_id = '${dataObj.peer_stock_id}'`;
+            }
+            // CASE 2: If peer_stock_id is null → check by company_name
+            else {
+                duplicateQuery += ` AND company_name = '${dataObj.company_name}'`;
+            }
+            if (dataObj.peer_id) {
+                duplicateQuery += ` AND peer_id != '${dataObj.peer_id}'`;
+            }
+
+            const duplicate = await getData(duplicateQuery, next);
+            if (duplicate.length > 0) {
+                return next(
+                    CustomErrorHandler.alreadyExist(
+                        "Peer comparison already exists for this stock"
+                    )
+                );
+            }
+            const query = dataObj.peer_id
+                ? `UPDATE peer_comparison SET ?, update_date = NOW() WHERE peer_id='${dataObj.peer_id}'`
+                : `INSERT INTO peer_comparison SET ?, created_date = NOW()`;
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.peer_id = result.insertId;
+            }
+            res.json({
+                success: true,
+                message: dataObj.peer_id && req.body.peer_id
+                    ? "Peer comparison updated successfully"
+                    : "Peer comparison added successfully",
+                data: dataObj
+            });
+        } catch (error) {
+            
+        }
+    },
+    async getDeletePeer(req, res, next) {
+        try {
+            const { peer_id } = req.query;
+            console.log(peer_id);
+            if (!peer_id) {
+                return next(
+                    CustomErrorHandler.requiredField("peer_id is required")
+                );
+            }
+
+            const checkQuery = `
+            SELECT peer_id 
+            FROM peer_comparison 
+            WHERE peer_id = '${peer_id}'
+        `;
+
+            const exists = await getData(checkQuery, next);
+
+            if (exists.length === 0) {
+                return next(
+                    CustomErrorHandler.notFound("Peer comparison not found")
+                );
+            }
+
+            // DELETE RECORD
+            const deleteQuery = `
+            DELETE FROM peer_comparison 
+            WHERE peer_id = '${peer_id}'
+        `;
+
+            await getData(deleteQuery, next);
+
+            res.json({
+                success: true,
+                message: "Peer comparison deleted successfully"
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 export default PriceController

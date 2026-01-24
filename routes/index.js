@@ -60,6 +60,12 @@ router.post("/FRTemplate",forms,PriceController.addupdateFRTemplate);
 router.get("/FRTemplate",PriceController.getFRTemplates);
 router.post("/FRSheetValues",forms,PriceController.addUpdateFRValues);
 router.get("/FRSheetValues",PriceController.getFRSheetValues);
+router.get("/searchStocks",PriceController.getSearchStock);
+router.get("/stockDetailsByIDPeer/:id",PriceController.stockDetailsByIDPeer);
+router.get("/peerComparison",PriceController.getPeerComparison);
+router.post("/peerComparison",forms,PriceController.AddPeerComparison);
+router.get("/deletePeer",PriceController.getDeletePeer);
+
 
 
 export default router;
