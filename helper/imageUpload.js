@@ -22,7 +22,10 @@ const storage = multer.diskStorage({
         // if (file.fieldname === "profile") prefix = "profile";
         if (file.fieldname === "cmp_logo") prefix = "cmp_logo";
         if (file.fieldname === "document") prefix = "annual_report";
+        if (file.fieldname === "user_document") prefix = req?.body?.broker_name ?? "";
+        if (file.fieldname === "bank_document") prefix = "statement_";
         if (file.fieldname === "service_gallery") prefix = "gallery";
+        if (file.fieldname === "cmr_document") prefix = `${req?.body?.broker_name}_`;
 
         cb(null, `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}${ext}`);
     }
@@ -52,7 +55,10 @@ const imageUpload = multer({
     { name: 'cmp_logo', maxCount: 1 },          // company logo
     { name: 'document', maxCount: 1 },          // annual report
     { name: 'service_gallery', maxCount: 10 },   // portfolio gallery images
-    { name: 'profile', maxCount: 1 }
+    { name: 'profile', maxCount: 1 },
+    { name: 'user_document', maxCount: 1 },
+    { name: 'bank_document', maxCount: 1 },
+    { name: 'cmr_document', maxCount: 1 },
 ]);
 
 export default imageUpload;

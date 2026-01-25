@@ -2,6 +2,7 @@ import Joi from 'joi';
 import { getData, insertData } from '../../config/index.js';
 import { CustomErrorHandler, JwtService } from "../../service/index.js";
 import md5 from 'md5';
+import paginationQuery from '../../helper/paginationQuery.js';
 
 const userController = {
     async addUpdateUserProfile(req, res, next) {
@@ -124,7 +125,7 @@ const userController = {
                 return next(error);
             }
 
-            let query = "SELECT user_id,username,email,phone_number,password FROM users WHERE is_deleted=0 AND username='" + req.body.username + "';";
+            let query = "SELECT user_id,username,email,phone_number,user_type as Role,password FROM users WHERE is_deleted=0 AND username='" + req.body.username + "';";
             console.log("---------------", query);
             await getData(query, next).then(async (data) => {
                 if (data.length <= 0) {
@@ -161,7 +162,12 @@ const userController = {
                 user_id: Joi.number().integer().required(),
                 document_name: Joi.string().required(),
                 document_number: Joi.string().required(),
-                document_path: Joi.string().allow("").optional(),
+                document_path: Joi.string()
+                    .allow('')
+                    .required()
+                    .messages({
+                        'any.required': 'Document (user_document) is required',
+                    }),
                 document_pass: Joi.string().allow("").optional(),
             }).when(Joi.object({ doc_id: Joi.exist() }).unknown(), {
                 then: Joi.object({
@@ -170,19 +176,24 @@ const userController = {
                 }),
             });
 
+            // console.log(req.files);
+
             /* ------------------ Validate ------------------ */
-            const { error } = documentSchema.validate(req.body);
+            var dataObj = { ...req.body };
+
+            /* ------------------ Handle file upload ------------------ */
+            if (req.files?.user_document?.length > 0) {
+                const file = req.files.user_document[0];
+                dataObj.document_path = file.path;
+            }
+            console.log(JSON.stringify(dataObj, null, 12));
+            const { error } = documentSchema.validate(dataObj);
             if (error) {
                 return next(error);
             }
 
-            const dataObj = { ...req.body };
 
-            /* ------------------ Handle file upload ------------------ */
-            if (req.files?.document_path?.length > 0) {
-                const file = req.files.document_path[0];
-                dataObj.document_path = `uploads/documents/${file.filename}`;
-            }
+
 
             /* ------------------ Duplicate Document Check ------------------ */
             let condition = "";
@@ -232,8 +243,305 @@ const userController = {
         } catch (error) {
             next(error);
         }
-    }
+    },
 
+    async addUpdateUserBankDetails(req, res, next) {
+        try {
+            /* ------------------ Validation Schema ------------------ */
+            const bankSchema = Joi.object({
+                bank_id: Joi.number().integer().optional(),
+
+                user_id: Joi.number().integer().required(),
+                bank_name: Joi.string().required(),
+                account_type: Joi.string().required(),
+                account_no: Joi.string().required(),
+                ifsc_code: Joi.string().required(),
+                account_status: Joi.string().required(),
+                phone_number: Joi.string().required(),
+
+                statement: Joi.string()
+                    .allow('')
+                    .required()
+                    .messages({
+                        'any.required': 'Bank statement(bank_document) is required',
+                    }),
+
+                doc_pass: Joi.string().allow('').optional(),
+            }).when(Joi.object({ bank_id: Joi.exist() }).unknown(), {
+                then: Joi.object({
+                    statement: Joi.string().required(),
+                    doc_pass: Joi.string().optional(),
+                }),
+            });
+
+            /* ------------------ Prepare Data ------------------ */
+            let dataObj = { ...req.body };
+
+            /* ------------------ Handle File Upload ------------------ */
+            if (req.files?.bank_document?.length > 0) {
+                const file = req.files.bank_document[0];
+                dataObj.statement = file.path;
+            }
+
+            console.log(JSON.stringify(dataObj, null, 4));
+
+            /* ------------------ Validate ------------------ */
+            const { error } = bankSchema.validate(dataObj);
+            if (error) {
+                return next(error);
+            }
+
+            /* ------------------ Duplicate Account Check ------------------ */
+            let condition = '';
+            if (dataObj.bank_id) {
+                condition = `AND bank_id != ${dataObj.bank_id}`;
+            }
+
+            const checkQuery = `
+                SELECT bank_id
+                FROM user_bank_details
+                WHERE user_id = ${dataObj.user_id}
+                AND account_no = '${dataObj.account_no}'
+                ${condition}
+            `;
+
+            const exists = await getData(checkQuery, next);
+            if (exists.length > 0) {
+                return next(
+                    CustomErrorHandler.alreadyExist(
+                        'Bank account already exists for this user'
+                    )
+                );
+            }
+
+            /* ------------------ Insert / Update ------------------ */
+            let query = '';
+            if (dataObj.bank_id) {
+                query = `UPDATE user_bank_details SET ? WHERE bank_id = ${dataObj.bank_id}`;
+                dataObj.updated_on = new Date();
+            } else {
+                query = `INSERT INTO user_bank_details SET ?`;
+                dataObj.created_at = new Date();
+            }
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.bank_id = result.insertId;
+            }
+
+            return res.json({
+                success: true,
+                message: dataObj.bank_id
+                    ? 'User bank details saved successfully'
+                    : 'User bank details updated successfully',
+                data: dataObj,
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async addUpdateUserCMRDetails(req, res, next) {
+        try {
+            /* ------------------ Validation Schema ------------------ */
+            const cmrSchema = Joi.object({
+                cmr_id: Joi.number().integer().optional(),
+
+                user_id: Joi.number().integer().required(),
+                broker_name: Joi.string().required(),
+                broker_id: Joi.string().required(),
+                client_id: Joi.string().required(),
+
+                cmr_document: Joi.string()
+                    .allow('')
+                    .required()
+                    .messages({
+                        'any.required': 'CMR document (cmr_document) is required',
+                    }),
+
+                is_deleted: Joi.number().integer().optional(),
+            }).when(Joi.object({ cmr_id: Joi.exist() }).unknown(), {
+                then: Joi.object({
+                    cmr_document: Joi.string().required(),
+                }),
+            });
+
+            /* ------------------ Prepare Data ------------------ */
+            let dataObj = { ...req.body };
+
+            /* ------------------ Handle File Upload ------------------ */
+            if (req.files?.cmr_document?.length > 0) {
+                const file = req.files.cmr_document[0];
+                dataObj.cmr_document = file.path;
+            }
+
+            console.log(JSON.stringify(dataObj, null, 4));
+
+            /* ------------------ Validate ------------------ */
+            const { error } = cmrSchema.validate(dataObj);
+            if (error) {
+                return next(error);
+            }
+
+            /* ------------------ Duplicate CMR Check ------------------ */
+            let condition = '';
+            if (dataObj.cmr_id) {
+                condition = `AND cmr_id != ${dataObj.cmr_id}`;
+            }
+
+            const checkQuery = `
+                SELECT cmr_id
+                FROM user_cmr_details
+                WHERE user_id = ${dataObj.user_id}
+                AND broker_id = '${dataObj.broker_id}'
+                AND client_id = '${dataObj.client_id}'
+                ${condition}
+            `;
+
+            const exists = await getData(checkQuery, next);
+            if (exists.length > 0) {
+                return next(
+                    CustomErrorHandler.alreadyExist(
+                        'CMR details already exist for this user'
+                    )
+                );
+            }
+
+            /* ------------------ Insert / Update ------------------ */
+            let query = '';
+            if (dataObj.cmr_id) {
+                query = `UPDATE user_cmr_details SET ? WHERE cmr_id = ${dataObj.cmr_id}`;
+                dataObj.updated_on = new Date();
+            } else {
+                query = `INSERT INTO user_cmr_details SET ?`;
+                dataObj.created_at = new Date();
+            }
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.cmr_id = result.insertId;
+            }
+
+            return res.json({
+                success: true,
+                message: dataObj.cmr_id
+                    ? 'User CMR details saved successfully'
+                    : 'User CMR details updated successfully',
+                data: dataObj,
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+
+
+    async getUserProfile(req, res, next) {
+        try {
+            /* ------------------ Base Query ------------------ */
+            let query = "SELECT * FROM users WHERE 1 AND is_deleted = 0";
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            /* ------------------ Validation Schema ------------------ */
+            const userSchema = Joi.object({
+                user_id: Joi.number().integer(),
+                username: Joi.string(),
+                email: Joi.string().email(),
+                phone_number: Joi.string(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer(),
+            });
+
+            const { error } = userSchema.validate(req.query);
+            if (error) return next(error);
+
+            /* ------------------ Filters ------------------ */
+            if (req.query.user_id) {
+                cond += ` AND user_id = ${req.query.user_id}`;
+            }
+
+            if (req.query.username) {
+                cond += ` AND username LIKE '%${req.query.username}%'`;
+            }
+
+            if (req.query.email) {
+                cond += ` AND email LIKE '%${req.query.email}%'`;
+            }
+
+            if (req.query.phone_number) {
+                cond += ` AND phone_number LIKE '%${req.query.phone_number}%'`;
+            }
+
+            /* ------------------ Pagination ------------------ */
+            if (req.query.pagination) {
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+            }
+
+            query += cond + page.pageQuery;
+            console.log("Query===>", query);
+
+            /* ------------------ Fetch Users ------------------ */
+            const users = await getData(query, next);
+
+            /* ------------------ Attach Documents ------------------ */
+            if (users.length) {
+                for (const user of users) {
+                    const docQuery = `
+                        SELECT * FROM user_documents
+                        WHERE is_deleted = 0 AND user_id = ${user.user_id}
+                    `;
+                    const documents = await getData(docQuery, next);
+                    user.documents = documents ?? [];
+                }
+            }
+
+            /* ------------------ Bank  Details ------------------ */
+            if (users.length) {
+                for (const user of users) {
+                    const docQuery = `
+                        SELECT * FROM user_bank_details
+                        WHERE is_deleted = 0 AND user_id = ${user.user_id}
+                    `;
+                    const bankDetails = await getData(docQuery, next);
+                    user.bankDetails = bankDetails ?? [];
+                }
+            }
+
+            /* ------------------ Bank  Details ------------------ */
+            if (users.length) {
+                for (const user of users) {
+                    const docQuery = `
+                        SELECT * FROM user_cmr_details
+                        WHERE is_deleted = 0 AND user_id = ${user.user_id}
+                    `;
+                    const cmrDetails = await getData(docQuery, next);
+                    user.cmrDetails = cmrDetails ?? [];
+                }
+            }
+
+            return res.json({
+                message: 'success',
+                total_records: page.total_rec ?? users.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: users.length,
+                data: users
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
 
 }
 

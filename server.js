@@ -1,3 +1,4 @@
+import './config/index.js';   // 👈 must be first
 import express from "express";
 import { APP_PORT, SERVER_HOST, WEB_PORT } from "./config/index.js";
 import errorHandler from "./middlewares/errorHandler.js";
