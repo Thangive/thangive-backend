@@ -10,6 +10,14 @@ const forms1 = multer().any();
 const router = express.Router();
 
 // User API
+router.post('/userRegister', forms, userController.addUpdateUserProfile);
+router.post('/userProfile', auth, imageUpload, userController.addUpdateUserProfile);
+router.post('/userDocument', auth, imageUpload, userController.addUpdateUserDocument);
+router.post('/login', forms, userController.login);
+
+
+
+// Stock Details API
 router.post('/stockDetails', imageUpload, stocksCotrollers.addUpdateStockDetails);
 router.post('/stockPrice', forms, PriceController.addUpdateStockPrice);
 router.post('/stockDiscription', forms, stocksCotrollers.addUpdateStockDescription);

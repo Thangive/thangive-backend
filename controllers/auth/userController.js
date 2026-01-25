@@ -19,6 +19,7 @@ const userController = {
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
                 whatsapp_number: Joi.string().allow(""),
+                user_type: Joi.string().allow(""),
             }).when(Joi.object({ user_id: Joi.exist() }).unknown(), {
                 then: Joi.object({
                     profile: Joi.string().required(),
@@ -29,12 +30,14 @@ const userController = {
                     email: Joi.string().email().optional(),
                     phone_number: Joi.string().optional(),
                     whatsapp_number: Joi.string().required(),
-                    password: Joi.string().required()
+                    password: Joi.string().required(),
+                    user_type: Joi.string().optional(),
                 }),
                 otherwise: Joi.object({
                     username: Joi.string().required(),
                     email: Joi.string().email().required(),
                     phone_number: Joi.string().required(),
+                    user_type: Joi.string().required(),
                 }),
             });
 
@@ -59,9 +62,6 @@ const userController = {
                 condition = ` AND user_id != '${dataObj.user_id}'`;
             } else {
                 dataObj.password = md5(dataObj?.phone_number);
-
-
-
 
                 const checkQuery = `
                 SELECT user_id 
