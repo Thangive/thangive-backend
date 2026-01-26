@@ -87,10 +87,14 @@ router.get("/peerComparison", PriceController.getPeerComparison);
 router.post("/peerComparison", forms, PriceController.AddPeerComparison);
 router.get("/deletePeer", PriceController.getDeletePeer);
 
-// Stock Fetch APIS
-router.get('/getStocks', stocksGetController.getStocks)
-router.get('/getStocksList', stocksGetController.getStockList)
 
+// Stock Fetch APIS
+router.get('/getStocks',stocksGetController.getStocks)
+router.get('/getStocksList',stocksGetController.getStockList)
+router.get('/getStockData',stocksGetController.getStockData)
+
+router.post("/chartBulkUpload",forms1,PriceController.chartBulkUpload)
+router.post("/chartSingleUpload",forms1,PriceController.chartSingleUpload)
 
 
 export default router;
