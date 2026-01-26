@@ -71,6 +71,85 @@ const wishlistController = {
         }
     },
 
+    async addStockToWishlist(req, res, next) {
+
+    },
+
+    async addStockToWishlist(req, res, next) {
+        try {
+            /* ------------------ Validation Schema ------------------ */
+            const wishlistStockSchema = Joi.object({
+                wishlist_stock_id: Joi.number().integer().optional(),
+
+                wishlist_id: Joi.number().integer().required(),
+                user_id: Joi.number().integer().required(),
+                stock_details_id: Joi.number().integer().required(),
+            });
+
+            /* ------------------ Prepare Data ------------------ */
+            let dataObj = { ...req.body };
+
+            /* ------------------ Validate ------------------ */
+            const { error } = wishlistStockSchema.validate(dataObj);
+            if (error) return next(error);
+
+            /* ------------------ Duplicate Check ------------------ */
+            let condition = '';
+            if (dataObj.wishlist_stock_id) {
+                condition = `AND wishlist_stock_id != ${dataObj.wishlist_stock_id}`;
+            }
+
+            const checkQuery = `
+                SELECT wishlist_stock_id
+                FROM wishlist_stock
+                WHERE wishlist_id = ${dataObj.wishlist_id}
+                AND user_id = ${dataObj.user_id}
+                AND stock_details_id = ${dataObj.stock_details_id}
+                ${condition}
+            `;
+
+            const exists = await getData(checkQuery, next);
+            if (exists.length > 0) {
+                return next(
+                    CustomErrorHandler.alreadyExist(
+                        'Stock already exists in this wishlist'
+                    )
+                );
+            }
+
+            /* ------------------ Insert / Update ------------------ */
+            let query = '';
+            if (dataObj.wishlist_stock_id) {
+                query = `
+                    UPDATE wishlist_stock
+                    SET ?
+                    WHERE wishlist_stock_id = ${dataObj.wishlist_stock_id}
+                `;
+                dataObj.updated_on = new Date();
+            } else {
+                query = `INSERT INTO wishlist_stock SET ?`;
+                dataObj.created_at = new Date();
+            }
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.wishlist_stock_id = result.insertId;
+            }
+
+            return res.json({
+                success: true,
+                message: dataObj.wishlist_stock_id
+                    ? 'Stock added to wishlist successfully'
+                    : 'Wishlist stock updated successfully',
+                data: dataObj
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+
     async getWishlist(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
