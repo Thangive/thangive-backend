@@ -159,6 +159,7 @@ const stocksControllers = {
                 heading1: Joi.string().required(),
                 heading2: Joi.string().required(),
                 heading3: Joi.string().required(),
+                heading4: Joi.string().optional(),
             });
 
             const { error } = schema.validate(req.body);
@@ -218,13 +219,13 @@ const stocksControllers = {
                 data1: Joi.string().required(),
                 data2: Joi.string().required(),
                 data3: Joi.string().required(),
+                data4: Joi.string().optional(),
             });
 
             const { error } = schema.validate(req.body);
             if (error) return next(error);
 
             const dataObj = { ...req.body };
-
             // ------------------ Duplicate Check ------------------
             // let condition = dataObj.cp_data_id
             //     ? ` AND cp_data_id != '${dataObj.cp_data_id}'`
@@ -869,6 +870,7 @@ const stocksControllers = {
                 data1,
                 data2,
                 data3,
+                data4,
                 created_date,
                 update_date
             FROM clientportfolio_data
