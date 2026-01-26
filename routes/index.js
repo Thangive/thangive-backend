@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { PriceController, sectorController, stocksCotrollers, stocksGetController } from '../controllers/index.js';
+import { PriceController, sectorController, stocksCotrollers, stocksGetController, userController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
 import wishlistController from '../controllers/auth/wishlistController.js';
@@ -88,8 +88,8 @@ router.post("/peerComparison", forms, PriceController.AddPeerComparison);
 router.get("/deletePeer", PriceController.getDeletePeer);
 
 // Stock Fetch APIS
-router.get('/getStocks',stocksGetController.getStocks)
-router.get('/getStocksList',stocksGetController.getStockList)
+router.get('/getStocks', stocksGetController.getStocks)
+router.get('/getStocksList', stocksGetController.getStockList)
 
 
 

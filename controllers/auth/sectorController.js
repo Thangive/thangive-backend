@@ -383,6 +383,9 @@ const sectorController = {
             LEFT JOIN stock_sector sec 
                 ON s.sector_id = sec.sector_id
 
+            LEFT JOIN wishlist_stock ws 
+                ON ws.wishlist_stock_id=s.stock_details_id
+
             LEFT JOIN stock_subindustry sub 
                 ON s.subindustry_id = sub.subindustry_id
 
@@ -412,6 +415,7 @@ const sectorController = {
                 script_name: Joi.string(),
                 isin_no: Joi.string(),
                 stock_type: Joi.string(),
+                wishlist_id: Joi.string().optional(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer()
@@ -432,6 +436,9 @@ const sectorController = {
 
             if (req.query.stock_type)
                 cond += ` AND s.stock_type = '${req.query.stock_type}'`;
+
+            if (req.query.wishlist_id)
+                cond += ` AND ws.wishlist_id = '${req.query.wishlist_id}'`;
 
             // 🔹 Pagination
             if (req.query.pagination) {
