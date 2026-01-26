@@ -1575,7 +1575,7 @@ const PriceController = {
                 data: dataObj
             });
         } catch (error) {
-            
+
         }
     },
     async getDeletePeer(req, res, next) {
@@ -1617,6 +1617,188 @@ const PriceController = {
 
         } catch (error) {
             next(error);
+        }
+    },
+    async chartBulkUpload(req, res, next) {
+        try {
+            const stock_id = req.body.stock_id;
+
+            if (!stock_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "stock_id required"
+                });
+            }
+
+            let file = null;
+            if (req.file) file = req.file;
+            else if (req.files && req.files[0]) file = req.files[0];
+            else if (req.files && req.files.excel_file) file = req.files.excel_file[0];
+
+            if (!file) {
+                return res.status(400).json({ success: false, message: "Excel file required" });
+            }
+
+            const workbook = XLSX.read(file.buffer, { type: "buffer" });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+            let inserted = [];
+            let skipped = [];
+            const dates = [];
+            const seenDates = new Set();
+            for (let i = 0; i < rows.length; i++) {
+                const dateCell = rows[i][0];
+                const priceCell = rows[i][1];
+                if (typeof dateCell === "string" && isNaN(Date.parse(dateCell))) {
+                    continue;
+                }
+                if (!dateCell || !priceCell) {
+                    continue;
+                }
+                let present_date = "";
+                if (typeof dateCell === "string" && dateCell.includes("/")) {
+                    // dd/mm/yyyy → yyyy-mm-dd 00:00:00
+                    const [d, m, y] = dateCell.split("/");
+                    present_date = `${y}-${m}-${d} 00:00:00`;
+                } else {
+                    // Excel numeric date
+                    const dt = new Date((dateCell - 25569) * 86400 * 1000);
+                    present_date = dt.toISOString().slice(0, 10) + " 00:00:00";
+                }
+                const today_prices = Number(priceCell);
+                if (isNaN(today_prices)) continue;
+                const onlyDate = present_date.slice(0, 10);
+                console.log(onlyDate)
+                if (seenDates.has(onlyDate)) {
+                    skipped.push({
+                        date: present_date,
+                        reason: "Duplicate date inside Excel — skipped"
+                    });
+                    continue;
+                }
+                seenDates.add(onlyDate);
+                const exists = await getData(
+                    `SELECT stock_price_id 
+                 FROM stock_price 
+                 WHERE stock_details_id='${stock_id}'
+                 AND DATE(present_date) = DATE('${present_date}')
+                 LIMIT 1`,
+                    next
+                );
+                if (exists.length > 0) {
+                    skipped.push({
+                        date: present_date,
+                        reason: "Date already exists in DB — skipped"
+                    });
+                    continue;
+                }
+                const prev = await getData(
+                    `SELECT today_prices 
+                 FROM stock_price
+                 WHERE stock_details_id='${stock_id}'
+                 AND present_date < '${present_date}'
+                 ORDER BY present_date DESC
+                 LIMIT 1`,
+                    next
+                );
+                const prev_price = prev.length > 0 ? prev[0].today_prices : today_prices;
+                const payload = {
+                    stock_details_id: stock_id,
+                    prev_price,
+                    today_prices,
+                    partner_price: 0,
+                    conviction_level: "HIGH",
+                    availability: "AVAILABLE",
+                    lot: 100,
+                    present_date,
+                    created_at: new Date(),
+                    update_date: new Date(),
+                    time: new Date()
+                };
+                await insertData(`INSERT INTO stock_price SET ?`, payload, next);
+                inserted.push({
+                    date: present_date,
+                    price: today_prices
+                });
+            }
+            return res.json({
+                success: true,
+                message: "Chart data uploaded successfully",
+                inserted_count: inserted.length,
+                skipped_count: skipped.length,
+                inserted,
+                skipped
+            });
+        } catch (err) {
+            next(err);
+        }
+    },
+    async chartSingleUpload(req, res, next) {
+        try {
+            const { stock_id, price, date } = req.body;
+
+            if (!stock_id) return res.status(400).json({ success: false, message: "stock_id required" });
+            if (!price) return res.status(400).json({ success: false, message: "price required" });
+            if (!date) return res.status(400).json({ success: false, message: "date required" });
+
+            const present_date = date + " 00:00:00";
+
+            // Check duplicate
+            const exists = await getData(
+                `SELECT stock_price_id FROM stock_price 
+             WHERE stock_details_id='${stock_id}'
+             AND DATE(present_date)=DATE('${present_date}') LIMIT 1`,
+                next
+            );
+
+            if (exists.length > 0) {
+                return res.json({
+                    success: false,
+                    skipped_count: 1,
+                    inserted_count: 0,
+                    skipped: [{ date: present_date, reason: "Date already exists in DB" }],
+                    inserted: []
+                });
+            }
+
+            // Previous price
+            const prev = await getData(
+                `SELECT today_prices FROM stock_price
+             WHERE stock_details_id='${stock_id}'
+             AND present_date < '${present_date}'
+             ORDER BY present_date DESC LIMIT 1`,
+                next
+            );
+
+            const prev_price = prev.length ? prev[0].today_prices : price;
+
+            const payload = {
+                stock_details_id: stock_id,
+                prev_price,
+                today_prices: price,
+                partner_price: 0,
+                conviction_level: "HIGH",
+                availability: "AVAILABLE",
+                lot: 100,
+                present_date,
+                created_at: new Date(),
+                update_date: new Date(),
+                time: new Date()
+            };
+
+            await insertData(`INSERT INTO stock_price SET ?`, payload, next);
+
+            return res.json({
+                success: true,
+                inserted_count: 1,
+                skipped_count: 0,
+                inserted: [{ date: present_date, price }],
+                skipped: []
+            });
+
+        } catch (err) {
+            next(err);
         }
     }
 }

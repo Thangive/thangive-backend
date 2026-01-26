@@ -124,7 +124,7 @@ const stocksGetController = {
             const sort_order = req.query.sort_order === "desc" ? "DESC" : "ASC";
 
             const offset = limit === 0 ? 0 : (page - 1) * limit;
-            
+
             let baseQuery = `
             FROM stock_details s
             LEFT JOIN stock_sector sec 
@@ -196,9 +196,105 @@ const stocksGetController = {
         } catch (error) {
             next(error);
         }
-    }
+    },
+    async getStockData(req, res, next) {
+        try {
+            let query = `
+                SELECT 
+                    s.*,
+                    sec.sector_name,
+                    sub.sub_industryName,
+    
+                    IFNULL(sp.today_prices, 0)      AS today_prices,
+                    IFNULL(sp.prev_price, 0)        AS prev_price,
+                    IFNULL(sp.partner_price, 0)     AS partner_price,
+                    IFNULL(sp.conviction_level, '') AS conviction_level,
+                    IFNULL(sp.lot, 0)               AS lot,
+                    IFNULL(sp.availability, '')     AS availability,
+                    sp.present_date,
+                    sp.stock_price_id
+                FROM stock_details s
+    
+                LEFT JOIN stock_sector sec 
+                    ON s.sector_id = sec.sector_id
+    
+                LEFT JOIN stock_subindustry sub 
+                    ON s.subindustry_id = sub.subindustry_id
+    
+                LEFT JOIN stock_price sp
+                    ON sp.stock_price_id = (
+                        SELECT p1.stock_price_id
+                        FROM stock_price p1
+                        WHERE p1.stock_details_id = s.stock_details_id
+                        AND p1.present_date = (
+                            SELECT MAX(p2.present_date)
+                            FROM stock_price p2
+                            WHERE p2.stock_details_id = s.stock_details_id
+                                AND p2.present_date <= CURDATE()
+                        )
+                        ORDER BY p1.time DESC
+                        LIMIT 1
+                    )
+    
+                WHERE 1
+            `;
 
+            let cond = '';
+            let page = { pageQuery: '' };
 
+            const stockSchema = Joi.object({
+                company_name: Joi.string(),
+                script_name: Joi.string(),
+                isin_no: Joi.string(),
+                stock_type: Joi.string(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer()
+            });
 
+            const { error } = stockSchema.validate(req.query);
+            if (error) return next(error);
+
+            // 🔹 Filters
+            if (req.query.company_name)
+                cond += ` AND s.company_name LIKE '%${req.query.company_name}%'`;
+
+            if (req.query.script_name)
+                cond += ` AND s.script_name LIKE '%${req.query.script_name}%'`;
+
+            if (req.query.isin_no)
+                cond += ` AND s.isin_no LIKE '%${req.query.isin_no}%'`;
+
+            if (req.query.stock_type)
+                cond += ` AND s.stock_type = '${req.query.stock_type}'`;
+
+            // 🔹 Pagination
+            if (req.query.pagination) {
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+            }
+
+            query += cond + page.pageQuery;
+
+            const data = await getData(query, next);
+            res.json({
+                message: 'success',
+                total_records: page.total_rec ? page.total_rec : data.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: data.length,
+                data: {
+                    pricipleData: data
+                }
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
 }
 export default stocksGetController;
