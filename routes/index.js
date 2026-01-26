@@ -1,9 +1,8 @@
 import express from 'express';
 import multer from 'multer';
-import { PriceController, sectorController, stocksCotrollers, stocksGetController, userController } from '../controllers/index.js';
+import { advisorControler, PriceController, sectorController, stocksCotrollers, stocksGetController, userController, wishlistController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
-import wishlistController from '../controllers/auth/wishlistController.js';
 
 
 
@@ -28,7 +27,8 @@ router.post('/wishlist', auth, forms, wishlistController.addUpdateWishlist);
 router.post('/addStockToWishlist', auth, forms, wishlistController.addStockToWishlist);
 router.get('/wishlist', auth, wishlistController.getWishlist);
 
-
+router.post('/advisor', auth, forms, advisorControler.addUpdateAdvisor);
+router.get('/advisor', auth, advisorControler.getAdvisor);
 
 
 // Stock Details API

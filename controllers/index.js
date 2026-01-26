@@ -2,4 +2,6 @@ export { default as stocksCotrollers } from './auth/stocksCotrollers.js';
 export { default as sectorController } from './auth/sectorController.js';
 export { default as PriceController } from './auth/stocksPricesController.js';
 export { default as userController } from './auth/userController.js';
-export { default as stocksGetController }from './auth/stocksGetController.js';
+export { default as stocksGetController } from './auth/stocksGetController.js';
+export { default as wishlistController } from './auth/wishlistController.js';
+export { default as advisorControler } from './auth/advisorControler.js';
