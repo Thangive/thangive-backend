@@ -126,7 +126,6 @@ const userController = {
             }
 
             let query = "SELECT user_id,username,email,phone_number,user_type as Role,password FROM users WHERE is_deleted=0 AND username='" + req.body.username + "';";
-            console.log("---------------", query);
             await getData(query, next).then(async (data) => {
                 if (data.length <= 0) {
                     return next(CustomErrorHandler.wrongCredentials());
@@ -488,7 +487,6 @@ const userController = {
             }
 
             query += cond + page.pageQuery;
-            console.log("Query===>", query);
 
             /* ------------------ Fetch Users ------------------ */
             const users = await getData(query, next);

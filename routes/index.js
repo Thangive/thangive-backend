@@ -3,6 +3,7 @@ import multer from 'multer';
 import { PriceController, sectorController, stocksCotrollers, stocksGetController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
+import wishlistController from '../controllers/auth/wishlistController.js';
 
 
 
@@ -21,6 +22,11 @@ router.post('/userBankDetails', auth, imageUpload, userController.addUpdateUserB
 router.post('/userCMRDetails', auth, imageUpload, userController.addUpdateUserCMRDetails);
 
 router.post('/login', forms, userController.login);
+
+// Wishlist API 
+router.post('/wishlist', auth, forms, wishlistController.addUpdateWishlist);
+router.get('/wishlist', auth, wishlistController.getWishlist);
+
 
 
 

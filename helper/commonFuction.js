@@ -9,8 +9,6 @@ const commonFuction = {
         fs.pathExists(dest, (err, exists) => {
             if (!err) {
                 if (exists) {
-                    console.log("src===>", src);
-                    console.log("dest===>", dest);
                     fs.remove(dest, err => {
                         if (err) return console.error(err)
                         console.log('removed success!');
@@ -35,7 +33,7 @@ const commonFuction = {
                 if (exists) {
                     fs.readdir(src, (err, files) => {
                         if (err) {
-                           return false
+                            return false
                         } else {
                             return excelFiles = files.filter(file => path.extname(file).toLowerCase() === '.xlsx');
                         }

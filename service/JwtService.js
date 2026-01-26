@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 
 class JwtService {
     static sign(payload, expire = '30d', secret = JWT_SECRET) {
-        console.log("payload=>", payload, "expire=>", expire);
         return jwt.sign(payload, secret, { expiresIn: expire });
     }
 
