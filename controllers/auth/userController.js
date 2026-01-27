@@ -23,15 +23,15 @@ const userController = {
                 user_type: Joi.string().allow(""),
             }).when(Joi.object({ user_id: Joi.exist() }).unknown(), {
                 then: Joi.object({
-                    profile: Joi.string().required(),
+                    profile: Joi.string().optional(),
                     username: Joi.string().optional(),
                     first_name: Joi.string().required(),
-                    middle_name: Joi.string().required(),
+                    middle_name: Joi.string().optional(),
                     last_name: Joi.string().required(),
-                    email: Joi.string().email().optional(),
-                    phone_number: Joi.string().optional(),
-                    whatsapp_number: Joi.string().required(),
-                    password: Joi.string().required(),
+                    email: Joi.string().email().required(),
+                    phone_number: Joi.string().required(),
+                    whatsapp_number: Joi.string().optional(),
+                    password: Joi.string().optional(),
                     user_type: Joi.string().optional(),
                 }),
                 otherwise: Joi.object({
@@ -39,6 +39,7 @@ const userController = {
                     email: Joi.string().email().required(),
                     phone_number: Joi.string().required(),
                     user_type: Joi.string().required(),
+                    residency_status:Joi.string().required()
                 }),
             });
 
@@ -62,8 +63,8 @@ const userController = {
                 }
                 condition = ` AND user_id != '${dataObj.user_id}'`;
             } else {
-                dataObj.password = md5(dataObj?.phone_number);
-
+                const phone = String(dataObj?.phone_number || "").trim();
+                dataObj.password = md5(phone);
                 const checkQuery = `
                 SELECT user_id 
                 FROM users 
@@ -81,7 +82,6 @@ const userController = {
                     );
                 }
             }
-
             // ------------------ Insert / Update ------------------
             let query = "";
             if (dataObj.user_id) {
@@ -124,8 +124,7 @@ const userController = {
             if (error) {
                 return next(error);
             }
-
-            let query = "SELECT user_id,username,email,phone_number,user_type as Role,password FROM users WHERE is_deleted=0 AND username='" + req.body.username + "';";
+            let query = `SELECT user_id,username,email,phone_number,user_type as Role,password FROM users WHERE is_deleted=0 AND username='${req.body.username}'`;
             await getData(query, next).then(async (data) => {
                 if (data.length <= 0) {
                     return next(CustomErrorHandler.wrongCredentials());
