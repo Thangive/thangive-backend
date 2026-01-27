@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { brokerAndAdvisorControler, PriceController, sectorController, stocksCotrollers, stocksGetController, userController, wishlistController } from '../controllers/index.js';
+import { brokerAndAdvisorControler, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
 
@@ -33,6 +33,8 @@ router.get('/broker', auth, brokerAndAdvisorControler.getBroker);
 router.post('/advisor', auth, forms, brokerAndAdvisorControler.addUpdateAdvisor);
 router.get('/advisor', auth, brokerAndAdvisorControler.getAdvisor);
 
+router.post('/buyStock', auth, forms, transactionController.addUpdateOrder);
+router.get('/userHoldings', auth, transactionController.getUserHoldigs);
 
 
 // Stock Details API
