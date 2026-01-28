@@ -197,6 +197,8 @@ const stocksGetController = {
             next(error);
         }
     },
+
+    //without Auth Stock Fetch API
     async getStockData(req, res, next) {
         try {
             let query = `
@@ -296,5 +298,26 @@ const stocksGetController = {
             next(err);
         }
     },
+    // get stock Counts
+    async getStockCounts(req, res, next) {
+        try {
+            const query = `
+            SELECT 
+                COUNT(*) AS total,
+                SUM(stock_type = 'Unlisted') AS unlisted,
+                SUM(stock_type = 'Pre IPO') AS pre_ipo,
+                SUM(stock_type = 'Delisted') AS delisted,
+                SUM(stock_type = 'Listed') AS listed
+            FROM stock_details
+        `;
+
+            const result = await getData(query, next);
+            res.json({ message: "success", data: result[0] });
+
+        } catch (err) {
+            next(err);
+        }
+    }
+
 }
 export default stocksGetController;
