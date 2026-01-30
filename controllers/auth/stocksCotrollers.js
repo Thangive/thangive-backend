@@ -496,59 +496,59 @@ const stocksControllers = {
     },
 
 
-    async getStockData(req, res, next) {
-        try {
-            // Base query: join details, description, and latest price
-            let query = `SELECT s.*,sd.company_snapshot,sd.company_outlook FROM stock_details s LEFT JOIN stock_description sd ON s.stock_details_id = sd.stock_details_id LEFT JOIN stock_devidet d ON s.stock_details_id = d.stock_details_id LEFT JOIN anual_report ar ON s.stock_details_id = ar.stock_details_id LEFT JOIN product_portfolio pp ON s.stock_details_id = pp.stock_details_id WHERE 1`;
+    // async getStockData(req, res, next) {
+    //     try {
+    //         // Base query: join details, description, and latest price
+    //         let query = `SELECT s.*,sd.company_snapshot,sd.company_outlook FROM stock_details s LEFT JOIN stock_description sd ON s.stock_details_id = sd.stock_details_id LEFT JOIN stock_devidet d ON s.stock_details_id = d.stock_details_id LEFT JOIN anual_report ar ON s.stock_details_id = ar.stock_details_id LEFT JOIN product_portfolio pp ON s.stock_details_id = pp.stock_details_id WHERE 1`;
 
-            let cond = '';
-            let page = { pageQuery: '' };
+    //         let cond = '';
+    //         let page = { pageQuery: '' };
 
-            // Validation schema for query params
-            const stockSchema = Joi.object({
-                company_name: Joi.string(),
-                script_name: Joi.string(),
-                isin_no: Joi.string(),
-                stock_type: Joi.string(),
-                pagination: Joi.boolean(),
-                current_page: Joi.number().integer(),
-                per_page_records: Joi.number().integer()
-            });
+    //         // Validation schema for query params
+    //         const stockSchema = Joi.object({
+    //             company_name: Joi.string(),
+    //             script_name: Joi.string(),
+    //             isin_no: Joi.string(),
+    //             stock_type: Joi.string(),
+    //             pagination: Joi.boolean(),
+    //             current_page: Joi.number().integer(),
+    //             per_page_records: Joi.number().integer()
+    //         });
 
-            const { error } = stockSchema.validate(req.query);
-            if (error) return next(error);
+    //         const { error } = stockSchema.validate(req.query);
+    //         if (error) return next(error);
 
-            // Filters
-            if (req.query.company_name) cond += ` AND s.company_name LIKE '%${req.query.company_name}%'`;
-            if (req.query.script_name) cond += ` AND s.script_name LIKE '%${req.query.script_name}%'`;
-            if (req.query.isin_no) cond += ` AND s.isin_no LIKE '%${req.query.isin_no}%'`;
-            if (req.query.stock_type) cond += ` AND s.stock_type = '${req.query.stock_type}'`;
+    //         // Filters
+    //         if (req.query.company_name) cond += ` AND s.company_name LIKE '%${req.query.company_name}%'`;
+    //         if (req.query.script_name) cond += ` AND s.script_name LIKE '%${req.query.script_name}%'`;
+    //         if (req.query.isin_no) cond += ` AND s.isin_no LIKE '%${req.query.isin_no}%'`;
+    //         if (req.query.stock_type) cond += ` AND s.stock_type = '${req.query.stock_type}'`;
 
-            // Pagination
-            if (req.query.pagination) {
-                page = await paginationQuery(query + cond, next, req.query.current_page, req.query.per_page_records);
-            }
+    //         // Pagination
+    //         if (req.query.pagination) {
+    //             page = await paginationQuery(query + cond, next, req.query.current_page, req.query.per_page_records);
+    //         }
 
-            query += cond + page.pageQuery;
+    //         query += cond + page.pageQuery;
 
-            // Fetch data
-            const data = await getData(query, next);
+    //         // Fetch data
+    //         const data = await getData(query, next);
 
-            res.json({
-                message: 'success',
-                total_records: page.total_rec ? page.total_rec : data.length,
-                number_of_pages: page.number_of_pages || 1,
-                currentPage: page.currentPage || 1,
-                records: data.length,
-                data: {
-                    pricipleData: data
-                }
-            });
+    //         res.json({
+    //             message: 'success',
+    //             total_records: page.total_rec ? page.total_rec : data.length,
+    //             number_of_pages: page.number_of_pages || 1,
+    //             currentPage: page.currentPage || 1,
+    //             records: data.length,
+    //             data: {
+    //                 pricipleData: data
+    //             }
+    //         });
 
-        } catch (err) {
-            next(err);
-        }
-    },
+    //     } catch (err) {
+    //         next(err);
+    //     }
+    // },
 
     async addUpdateShareHolding(req, res, next) {
         try {

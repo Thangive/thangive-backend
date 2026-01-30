@@ -46,7 +46,7 @@ router.post('/clientPortfolioData', forms, stocksCotrollers.addUpdateClientPortf
 router.post('/AnnualReport', imageUpload, stocksCotrollers.addUpdateAnnualReport);
 router.post('/devident', forms, stocksCotrollers.addUpdateDividend);
 router.post('/companyPortfolio', imageUpload, stocksCotrollers.addUpdatePortfolio);
-router.get('/stockDetails', stocksCotrollers.getStockData);
+// router.get('/stockDetails', stocksCotrollers.getStockData);
 router.get('/companyPortfolio', stocksCotrollers.getCompanyPortfolioData);
 router.get('/clientPortfolioHeading', stocksCotrollers.getClientPortfolioHeading);
 router.get('/clientPortfolioData', stocksCotrollers.getClientPortfolioData);
@@ -66,7 +66,7 @@ router.post('/industryupdate', sectorController.updateIndistry);
 router.get('/subIndustries', sectorController.getSubindustryData);
 router.post('/subIndustries', sectorController.createSubindustry);
 router.post('/updateSubindustriess', sectorController.updatesubinditries);
-router.get('/getStockDetailson', sectorController.getStockDetailsonly)
+// router.get('/getStockDetailson', sectorController.getStockDetailsonly)
 router.get("/stockDetailsByID/:id", sectorController.getStockDetailsById);
 router.get("/devident/:id", sectorController.getDivident);
 router.delete('/devident/:id', sectorController.deleteDividend);
@@ -88,7 +88,6 @@ router.post("/FRTemplate", forms, PriceController.addupdateFRTemplate);
 router.get("/FRTemplate", PriceController.getFRTemplates);
 router.post("/FRSheetValues", forms, PriceController.addUpdateFRValues);
 router.get("/FRSheetValues", PriceController.getFRSheetValues);
-router.get("/searchStocks", PriceController.getSearchStock);
 router.get("/stockDetailsByIDPeer/:id", PriceController.stockDetailsByIDPeer);
 router.get("/peerComparison", PriceController.getPeerComparison);
 router.post("/peerComparison", forms, PriceController.AddPeerComparison);
@@ -96,11 +95,11 @@ router.get("/deletePeer", PriceController.getDeletePeer);
 
 
 // Stock Fetch APIS
-router.get('/getStocks', stocksGetController.getStocks)
-router.get('/getStocksList', stocksGetController.getStockList)
 router.get('/getStockData', stocksGetController.getStockData)
 router.get('/getStockCount', stocksGetController.getStockCounts)
+router.get("/searchStocks", stocksGetController.getSearchStock);
 
+// Chart Data APIS
 router.post("/chartBulkUpload", forms1, PriceController.chartBulkUpload)
 router.post("/chartSingleUpload", forms1, PriceController.chartSingleUpload)
 

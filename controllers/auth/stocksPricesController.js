@@ -198,7 +198,7 @@ const PriceController = {
                 }
 
                 /* AVAILABILITY FROM ACTION */
-                let availability = "LIMITED";
+                let availability = "AVAILABLE";
                 if (actionCell && String(actionCell).trim() !== "") {
                     availability = String(actionCell).trim().toUpperCase();
                 }
@@ -1391,37 +1391,6 @@ const PriceController = {
 
         } catch (error) {
             next(error);
-        }
-    },
-    async getSearchStock(req, res, next) {
-        try {
-            const { query } = req.query;
-
-            if (!query || query.trim() === "") {
-                return res.json({
-                    success: true,
-                    data: []
-                });
-            }
-            const sql = `
-                SELECT 
-                    stock_details_id,
-                    company_name,
-                    script_name,
-                    isin_no
-                FROM stock_details
-                WHERE company_name LIKE '%${query}%'
-                ORDER BY company_name ASC
-                LIMIT 20
-            `;
-            const data = await getData(sql, next);
-            return res.json({
-                success: true,
-                data
-            });
-
-        } catch (err) {
-            next(err);
         }
     },
     async stockDetailsByIDPeer(req, res, next) {

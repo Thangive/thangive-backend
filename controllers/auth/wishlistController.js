@@ -71,9 +71,9 @@ const wishlistController = {
         }
     },
 
-    async addStockToWishlist(req, res, next) {
+    // async addStockToWishlist(req, res, next) {
 
-    },
+    // },
 
     async addStockToWishlist(req, res, next) {
         try {
