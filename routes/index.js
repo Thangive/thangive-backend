@@ -19,6 +19,9 @@ router.get('/userProfile', auth, userController.getUserProfile);
 router.post('/userDocument', auth, imageUpload, userController.addUpdateUserDocument);
 router.post('/userBankDetails', auth, imageUpload, userController.addUpdateUserBankDetails);
 router.post('/userCMRDetails', auth, imageUpload, userController.addUpdateUserCMRDetails);
+router.get('/RMList', auth, userController.getRMList);
+router.post('/assignToRM', auth, forms, userController.assignToRM);
+
 
 router.post('/login', forms, userController.login);
 

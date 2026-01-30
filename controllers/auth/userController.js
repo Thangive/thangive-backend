@@ -39,7 +39,7 @@ const userController = {
                     email: Joi.string().email().required(),
                     phone_number: Joi.string().required(),
                     user_type: Joi.string().required(),
-                    residency_status:Joi.string().required()
+                    residency_status: Joi.string().required()
                 }),
             });
 
@@ -436,7 +436,6 @@ const userController = {
         }
     },
 
-
     async getUserProfile(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
@@ -539,6 +538,129 @@ const userController = {
             next(err);
         }
     },
+
+    async getRMList(req, res, next) {
+        try {
+            /* ------------------ Base Query ------------------ */
+            let query = "SELECT `user_id` AS `id`,`username` FROM `users` WHERE `user_type`='RM' AND is_deleted = 0";
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            /* ------------------ Validation Schema ------------------ */
+            const userSchema = Joi.object({
+                user_id: Joi.number().integer(),
+                username: Joi.string(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer(),
+            });
+
+            const { error } = userSchema.validate(req.query);
+            if (error) return next(error);
+
+            /* ------------------ Filters ------------------ */
+            if (req.query.user_id) {
+                cond += ` AND user_id = ${req.query.user_id}`;
+            }
+
+            if (req.query.username) {
+                cond += ` AND username LIKE '%${req.query.username}%'`;
+            }
+
+            /* ------------------ Pagination ------------------ */
+            if (req.query.pagination) {
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+            }
+
+            query += cond + page.pageQuery;
+
+            /* ------------------ Fetch Users ------------------ */
+            const users = await getData(query, next);
+
+            return res.json({
+                message: 'success',
+                total_records: page.total_rec ?? users.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: users.length,
+                data: users
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    async assignToRM(req, res, next) {
+        const userSchema = Joi.object({
+            user_id: Joi.number().integer().required(),
+            assign_to: Joi.number().integer().required(),
+        });
+
+        const dataObj = req.body ?? {};
+        const { error } = userSchema.validate(dataObj);
+        if (error) {
+            return next(error);
+        }
+
+        try {
+            // ---------- Check user exists ----------
+            const checkUserQuery = `
+                SELECT user_id 
+                FROM users 
+                WHERE user_id = ${dataObj.user_id}
+            `;
+
+            const userExists = await getData(checkUserQuery, next);
+            if (!userExists || userExists.length === 0) {
+                return next(
+                    CustomErrorHandler.doesNotExist("User not found")
+                );
+            }
+
+            // ---------- Check RM exists ----------
+            const checkRMQuery = `
+                SELECT user_id 
+                FROM users 
+                WHERE user_id = ${dataObj.assign_to}
+            `;
+
+            const rmExists = await getData(checkRMQuery, next);
+            if (!rmExists || rmExists.length === 0) {
+                return next(
+                    CustomErrorHandler.doesNotExist("RM not found")
+                );
+            }
+
+            // ---------- Update assignment ----------
+            const updateQuery = `
+                UPDATE users 
+                SET assign_to = ${dataObj.assign_to}
+                WHERE user_id = ${dataObj.user_id}
+            `;
+
+            await insertData(updateQuery, next);
+
+            return res.json({
+                success: true,
+                message: "RM assigned to user successfully",
+                data: {
+                    user_id: dataObj.user_id,
+                    assign_to: dataObj.assign_to
+                }
+            });
+
+        } catch (err) {
+            return next(err);
+        }
+    }
+
+
 
 }
 
