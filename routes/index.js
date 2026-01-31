@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { brokerAndAdvisorControler, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController } from '../controllers/index.js';
+import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
 
@@ -23,7 +23,12 @@ router.get('/RMList', auth, userController.getRMList);
 router.post('/assignToRM', auth, forms, userController.assignToRM);
 
 
-router.post('/login', forms, userController.login);
+router.post('/login', forms, serviceController.login);
+router.post('/forgotPassword', forms, serviceController.forgotPassword);
+router.post('/changePassword', forms, serviceController.changePassword);
+router.get('/logHistory', auth, serviceController.getLogHistory);
+router.post('/otpVerification', forms, serviceController.verifyOtp);
+router.post('/logout', auth, serviceController.logout);
 
 // Wishlist API 
 router.post('/wishlist', auth, forms, wishlistController.addUpdateWishlist);

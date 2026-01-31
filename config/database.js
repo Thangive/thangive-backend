@@ -1,5 +1,6 @@
 import mysql from 'mysql';
 import CustomErrorHandler from '../service/CustomErrorHandler.js';
+import { isArray } from 'util';
 
 /**
  * ENV
@@ -69,7 +70,7 @@ handleDisconnect();
 export const getData = (query, next) => new Promise((resolve, reject) => {
     con.query(query, function (err, result, fields) {
         if (err) {
-            resolve(err);
+            reject(err);
         } else {
             // result && result.length <= 0 && (result.push({}));
             resolve(result);
@@ -77,15 +78,24 @@ export const getData = (query, next) => new Promise((resolve, reject) => {
     });
 });
 
-export const insertData = (query, array, next) => new Promise((resolve, reject) => {
-    con.query(query, array, function (err, result, fields) {
-        if (err) {
-            next(err);
-        } else {
+export const insertData = (query, array, next) =>
+    new Promise((resolve, reject) => {
+
+        const callback = (err, result) => {
+            if (err) {
+                if (typeof next === "function") return next(err);
+                return reject(err);
+            }
             resolve(result);
+        };
+
+        if (Array.isArray(array) && array.length > 0) {
+            con.query(query, array, callback);
+        } else {
+            con.query(query, callback);
         }
     });
-});
+
 
 
 export const getCount = async (query, next) => {

@@ -10,7 +10,7 @@ const userController = {
             // ------------------ Validation Schema ------------------
             const userSchema = Joi.object({
                 user_id: Joi.number().integer().optional(),
-
+                employee_id: Joi.string().allow(""),
                 profile: Joi.string().allow(""),
                 username: Joi.string(),
                 first_name: Joi.string(),
@@ -107,47 +107,6 @@ const userController = {
 
         } catch (error) {
             next(error);
-        }
-    },
-
-    async login(req, res, next) {
-        try {
-            // validation
-            const loginSchema = Joi.object({
-                // phone_number: Joi.string().length(10).pattern(/^[0-9]+$/).required(),
-                // password: Joi.string().pattern(new RegExp('^[a-zA-Z0-9]{3,30}$'))
-                username: Joi.string().required(),
-                password: Joi.string().required(),
-            });
-
-            const { error } = loginSchema.validate(req.body ?? {});
-            if (error) {
-                return next(error);
-            }
-            let query = `SELECT user_id,username,email,phone_number,user_type as Role,password FROM users WHERE is_deleted=0 AND username='${req.body.username}'`;
-            await getData(query, next).then(async (data) => {
-                if (data.length <= 0) {
-                    return next(CustomErrorHandler.wrongCredentials());
-                } else {
-                    // const match = await bcrypt.compare(req.body.password, data[0].password);
-                    const match = md5(req.body.password) === data[0].password ? true : false;
-                    delete data[0].password;
-                    if (!match) {
-                        return next(CustomErrorHandler.wrongCredentials());
-                    } else {
-                        const accessToken = JwtService.sign({ _id: data[0].id, role: data[0].userType }, '1d');
-                        res.json(
-                            {
-                                message: "User loged in successfully",
-                                accessToken,
-                                data: data[0]
-                            }
-                        )
-                    }
-                }
-            });
-        } catch (error) {
-            next(error)
         }
     },
 

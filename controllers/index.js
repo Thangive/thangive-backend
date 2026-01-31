@@ -6,3 +6,4 @@ export { default as stocksGetController } from './auth/stocksGetController.js';
 export { default as wishlistController } from './auth/wishlistController.js';
 export { default as brokerAndAdvisorControler } from './auth/brokerAndAdvisorControler.js';
 export { default as transactionController } from './auth/transactionController.js'
+export { default as serviceController } from './auth/serviceController.js'

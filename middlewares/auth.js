@@ -18,9 +18,7 @@ const auth = async (req, res, next) => {
 
     } catch (err) {
         return next(CustomErrorHandler.unAuthorise(err.message));
-        // return next(err);
     }
-
 }
 
 export default auth;

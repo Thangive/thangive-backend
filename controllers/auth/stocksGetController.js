@@ -1,7 +1,7 @@
 import { randomInt } from 'crypto';
 import Joi from 'joi';
 import { getCount, getData, insertData } from '../../config/index.js';
-import { imageUpload, paginationQuery, commonFuction } from '../../helper/index.js';
+import { imageUpload, paginationQuery, commonFunction } from '../../helper/index.js';
 import CustomErrorHandler from '../../service/CustomErrorHandler.js';
 
 const stocksGetController = {
