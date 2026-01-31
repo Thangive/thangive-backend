@@ -1465,7 +1465,7 @@ const PriceController = {
                 query += ` AND peer_id = '${peer_id}'`;
             }
 
-            query += " ORDER BY peer_id DESC";
+            query += " ORDER BY peer_id asc";
 
             const data = await getData(query, next);
 
