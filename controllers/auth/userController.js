@@ -8,7 +8,8 @@ const userController = {
     async addUpdateUserProfile(req, res, next) {
         try {
             // ------------------ Validation Schema ------------------
-            const userSchema = Joi.object({
+            const baseSchema = {
+                user_type: Joi.valid('user', 'RM', 'ADMIN', 'AM', 'SM', 'ST').required(),
                 user_id: Joi.number().integer().optional(),
                 employee_id: Joi.string().allow(""),
                 profile: Joi.string().allow(""),
@@ -16,32 +17,54 @@ const userController = {
                 first_name: Joi.string(),
                 middle_name: Joi.string().allow(""),
                 last_name: Joi.string(),
-
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
                 whatsapp_number: Joi.string().allow(""),
-                user_type: Joi.string().allow(""),
-            }).when(Joi.object({ user_id: Joi.exist() }).unknown(), {
-                then: Joi.object({
-                    profile: Joi.string().optional(),
-                    username: Joi.string().optional(),
-                    first_name: Joi.string().required(),
-                    middle_name: Joi.string().optional(),
-                    last_name: Joi.string().required(),
-                    email: Joi.string().email().required(),
-                    phone_number: Joi.string().required(),
-                    whatsapp_number: Joi.string().optional(),
-                    password: Joi.string().optional(),
-                    user_type: Joi.string().optional(),
-                }),
-                otherwise: Joi.object({
-                    username: Joi.string().required(),
-                    email: Joi.string().email().required(),
-                    phone_number: Joi.string().required(),
-                    user_type: Joi.string().required(),
-                    residency_status: Joi.string().required()
-                }),
-            });
+                password: Joi.string().allow(""),
+                residency_status: Joi.string().allow("")
+            };
+
+            const userSchema = Joi.object(baseSchema)
+                .when(Joi.object({ user_type: Joi.valid('user') }).unknown(), {
+                    // 👉 USER TYPE = user (your existing logic)
+                    then: Joi.object()
+                        .when(Joi.object({ user_id: Joi.exist() }).unknown(), {
+                            then: Joi.object({
+                                first_name: Joi.string().required(),
+                                middle_name: Joi.string().optional(),
+                                last_name: Joi.string().required(),
+                                email: Joi.string().email().optional(),
+                                phone_number: Joi.string().optional(),
+                                whatsapp_number: Joi.string().optional(),
+                                profile: Joi.string().optional(),
+                                password: Joi.string().optional(),
+                            }),
+                            otherwise: Joi.object({
+                                username: Joi.string().required(),
+                                email: Joi.string().email().required(),
+                                phone_number: Joi.string().required(),
+                                user_type: Joi.string().required(),
+                                residency_status: Joi.string().required(),
+                            }),
+                        }),
+                })
+                .when(Joi.object({ user_type: Joi.invalid('user') }).unknown(), {
+                    // 👉 USER TYPE ≠ user (Admin / Staff / Employee etc.)
+                    then: Joi.object({
+                        first_name: Joi.string().required(),
+                        middle_name: Joi.string().optional(),
+                        last_name: Joi.string().required(),
+                        email: Joi.string().email().required(),
+                        whatsapp_number: Joi.string().optional(),
+                        phone_number: Joi.string().required(),
+                        profile: Joi.string().optional(),
+                        user_type: Joi.string().required(),
+                        username: Joi.string().required(),
+                        password: Joi.string().required(),
+                        employee_id: Joi.string().required(),
+                    })
+                });
+
 
 
             var dataObj = { ...req.body };
@@ -55,9 +78,15 @@ const userController = {
             if (error) {
                 return next(error);
             }
+
+            if (dataObj.user_type != 'user') {
+                dataObj.user_custum_id = dataObj.employee_id;
+                delete dataObj.employee_id;
+            }
+
             // ------------------ Duplicate Email / Phone Check ------------------
             let condition = "";
-            if (dataObj.user_id) {
+            if ((dataObj.user_id && dataObj.user_type == 'user') || (dataObj.user_type != 'user')) {
                 if (dataObj?.password) {
                     dataObj.password = md5(dataObj?.password);
                 }
@@ -82,6 +111,21 @@ const userController = {
                     );
                 }
             }
+
+
+            const exists = await getData(`SELECT user_id 
+                FROM users 
+                WHERE username = '${dataObj.username}'`, next);
+            if (exists.length > 0) {
+                return next(
+                    CustomErrorHandler.alreadyExist(
+                        `${dataObj.username} Username already exists`
+                    )
+                );
+            }
+
+
+
             // ------------------ Insert / Update ------------------
             let query = "";
             if (dataObj.user_id) {
@@ -100,8 +144,8 @@ const userController = {
             return res.json({
                 success: true,
                 message: dataObj.user_id
-                    ? "User profile saved successfully"
-                    : "User profile updated successfully",
+                    ? `${dataObj.user_type} registered saved successfully`
+                    : `${dataObj.user_type} updated successfully`,
                 data: dataObj
             });
 

@@ -78,10 +78,10 @@ export const getData = (query, next) => new Promise((resolve, reject) => {
     });
 });
 
-export const insertData = (query, array, next) =>
+export const insertData = (query, data, next) =>
     new Promise((resolve, reject) => {
 
-        const callback = (err, result) => {
+        const callback = (err, result, fields) => {
             if (err) {
                 if (typeof next === "function") return next(err);
                 return reject(err);
@@ -89,10 +89,17 @@ export const insertData = (query, array, next) =>
             resolve(result);
         };
 
-        if (Array.isArray(array) && array.length > 0) {
-            con.query(query, array, callback);
+        // ✔ If params is Array (bulk insert / positional values)
+        if (Array.isArray(data) && data.length > 0) {
+            con.query(query, data, callback);
+
+            // ✔ If params is Object (INSERT SET ? / named values)
+        } else if (data && typeof data === "object") {
+            con.query(query, data, callback);
+
+            // ✔ If no params required
         } else {
-            con.query(query, callback);
+            con.query(data, callback);
         }
     });
 
