@@ -156,19 +156,30 @@ const serviceController = {
     async verifyOtp(req, res, next) {
         try {
             const schema = Joi.object({
-                user_id: Joi.number().integer().required(),
+                user_id: Joi.number().integer().optional(),
+                phone_number: Joi.string().optional(),
                 otp: Joi.number().required()
-            });
+            }).or('user_id', 'phone_number');
 
             const { error, value } = schema.validate(req.body ?? {});
             if (error) return next(error);
 
-            // ---------- Verify OTP ----------
+            const { user_id, phone_number, otp } = value;
+
+            // ---------- Build condition dynamically ----------
+            let whereClause = ``;
+
+            if (user_id) {
+                whereClause = `user_id = "${user_id}"`;
+            } else {
+                whereClause = `phone_number = "${phone_number}"`;
+            }
+
             const otpQuery = `
                 SELECT otp_id, created_at
                 FROM otp
-                WHERE user_id = ${value.user_id}
-                  AND otp = ${value.otp}
+                WHERE ${whereClause}
+                  AND otp = ${otp}
                 ORDER BY otp_id DESC
                 LIMIT 1
             `;
@@ -176,7 +187,9 @@ const serviceController = {
             const otpData = await getData(otpQuery, next);
 
             if (!otpData || otpData.length === 0) {
-                return next(CustomErrorHandler.wrongCredentials("Invalid OTP"));
+                return next(
+                    CustomErrorHandler.wrongCredentials("Invalid OTP")
+                );
             }
 
             // ---------- Check expiry (10 minutes) ----------
@@ -184,10 +197,19 @@ const serviceController = {
             const now = new Date();
             const diffMinutes = (now - createdAt) / (1000 * 60);
 
-            if (diffMinutes > 10) {
+            if (diffMinutes > 50) {
                 return next(
                     CustomErrorHandler.badRequest("OTP expired")
                 );
+            }
+
+            if (phone_number && diffMinutes < 50) {
+                const useQuery = `SELECT * FROM users WHERE is_deleted='1' AND phone_number='${phone_number}'`;
+                const response = await getData(useQuery, next);
+                if (response || response.length !== 0) {
+                    const query = `UPDATE users SET ? WHERE is_deleted='1' AND phone_number='${phone_number}'`
+                    const result = await insertData(query, { is_deleted: 0 }, next);
+                }
             }
 
             // ---------- OTP verified ----------

@@ -891,7 +891,148 @@ const stocksControllers = {
                 error: error.message
             });
         }
+    },
+
+    async addUpdatePreStock(req, res, next) {
+        try {
+            // ------------------ Validation Schema ------------------
+            const stockSchema = Joi.object({
+                ps_id: Joi.number().integer().optional(),
+
+                stock_details_id: Joi.number().integer().optional(),
+                stock_name: Joi.string().required(),
+                entry_prize: Joi.number().required(),
+                pre_ipo: Joi.number().required(),
+                stock_return: Joi.number().required(),
+                stock_status: Joi.string().valid('UNLISTED', 'LISTED').required(),
+                ps_logo: Joi.string().required(),
+            });
+
+            // ------------------ Prepare Data ------------------
+            let dataObj = { ...req.body };
+
+            // Handle file upload
+            if (req.files?.ps_logo?.length > 0) {
+                const file = req.files.ps_logo[0];
+                dataObj.ps_logo = file.path;
+            }
+
+            // ------------------ Validate ------------------
+            const { error } = stockSchema.validate(dataObj ?? {});
+            if (error) {
+                return next(error);
+            }
+
+            // ------------------ Duplicate Stock Check (Add only) ------------------
+            if (!dataObj.ps_id) {
+                const exists = await getData(
+                    `SELECT ps_id FROM premium_stockes 
+                     WHERE is_deleted = 0 
+                       AND stock_name = '${dataObj.stock_name}'`,
+                    next
+                );
+
+                if (exists.length > 0) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Stock name already exists"
+                        )
+                    );
+                }
+            }
+
+            // ------------------ Insert / Update ------------------
+            let query = "";
+
+            if (dataObj.ps_id) {
+                dataObj.updated_on = new Date();
+                query = `UPDATE premium_stockes SET ? WHERE ps_id = '${dataObj.ps_id}'`;
+            } else {
+                dataObj.created_at = new Date();
+                query = `INSERT INTO premium_stockes SET ?`;
+            }
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.ps_id = result.insertId;
+            }
+
+            return res.json({
+                success: true,
+                message: dataObj.ps_id
+                    ? "Pre-stock updated successfully"
+                    : "Pre-stock added successfully",
+                data: dataObj
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async getPreStocks(req, res, next) {
+        try {
+            /* ------------------ Base Query ------------------ */
+            let query = `SELECT * FROM premium_stockes WHERE is_deleted = 0`;
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            /* ------------------ Validation Schema ------------------ */
+            const preStockSchema = Joi.object({
+                ps_id: Joi.number().integer(),
+                stock_name: Joi.string(),
+                stock_status: Joi.string().valid('UNLISTED', 'LISTED'),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer(),
+            });
+
+            const { error } = preStockSchema.validate(req.query ?? {});
+            if (error) return next(error);
+
+            /* ------------------ Filters ------------------ */
+            if (req.query.ps_id) {
+                cond += ` AND ps_id = ${req.query.ps_id}`;
+            }
+
+            if (req.query.stock_name) {
+                cond += ` AND stock_name = '${req.query.stock_name}'`;
+            }
+
+            if (req.query.stock_status) {
+                cond += ` AND stock_status = '${req.query.stock_status}'`;
+            }
+
+            /* ------------------ Pagination ------------------ */
+            if (req.query.pagination) {
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+            }
+
+            query += cond + page.pageQuery;
+
+            const data = await getData(query, next);
+
+            return res.json({
+                message: 'success',
+                total_records: page.total_rec ?? data.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: data.length,
+                data: data
+            });
+
+        } catch (err) {
+            next(err);
+        }
     }
+
+
 
 };
 

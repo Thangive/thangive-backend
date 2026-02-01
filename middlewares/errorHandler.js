@@ -6,7 +6,7 @@ const { ValidationError } = pkg;
 const errorHandler = (err, req, res, next) => {
 
     let statusCode = 500;
-    (DEBUG_MODE === "true") && console.log("-----------", err,);
+    (DEBUG_MODE === "true") && console.log("Error", err);
 
     let data = {
         message: 'Internal server error',
