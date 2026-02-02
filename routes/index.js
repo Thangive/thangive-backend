@@ -15,7 +15,8 @@ const router = express.Router();
 // User API
 router.post('/userRegister', forms, userController.addUpdateUserProfile);
 router.post('/userProfile', auth, imageUpload, userController.addUpdateUserProfile);
-router.get('/userProfile', auth, userController.getUserProfile);
+router.get('/userList', auth, userController.getUserList);
+router.get('/employeeList', auth, userController.getEmplyees);
 router.post('/userDocument', auth, imageUpload, userController.addUpdateUserDocument);
 router.post('/userBankDetails', auth, imageUpload, userController.addUpdateUserBankDetails);
 router.post('/userCMRDetails', auth, imageUpload, userController.addUpdateUserCMRDetails);
@@ -46,28 +47,28 @@ router.get('/userHoldings', auth, transactionController.getUserHoldigs);
 
 
 // Stock Details API
-router.post('/stockDetails',imageUpload, stocksCotrollers.addUpdateStockDetails);
-router.post('/stockPrice',forms, PriceController.addUpdateStockPrice);
-router.post('/stockDiscription',forms, stocksCotrollers.addUpdateStockDescription);
-router.post('/clientPortfolioHeading',forms, stocksCotrollers.addUpdateClientPortfolioHeading);
-router.post('/clientPortfolioData',forms, stocksCotrollers.addUpdateClientPortfolioData);
-router.post('/AnnualReport',imageUpload, stocksCotrollers.addUpdateAnnualReport);
-router.post('/devident',forms, stocksCotrollers.addUpdateDividend);
-router.post('/companyPortfolio',imageUpload, stocksCotrollers.addUpdatePortfolio);
+router.post('/stockDetails', imageUpload, stocksCotrollers.addUpdateStockDetails);
+router.post('/stockPrice', forms, PriceController.addUpdateStockPrice);
+router.post('/stockDiscription', forms, stocksCotrollers.addUpdateStockDescription);
+router.post('/clientPortfolioHeading', forms, stocksCotrollers.addUpdateClientPortfolioHeading);
+router.post('/clientPortfolioData', forms, stocksCotrollers.addUpdateClientPortfolioData);
+router.post('/AnnualReport', imageUpload, stocksCotrollers.addUpdateAnnualReport);
+router.post('/devident', forms, stocksCotrollers.addUpdateDividend);
+router.post('/companyPortfolio', imageUpload, stocksCotrollers.addUpdatePortfolio);
 // router.get('/stockDetails', stocksCotrollers.getStockData);
-router.get('/companyPortfolio',stocksCotrollers.getCompanyPortfolioData);
+router.get('/companyPortfolio', stocksCotrollers.getCompanyPortfolioData);
 router.get('/clientPortfolioHeading', stocksCotrollers.getClientPortfolioHeading);
 router.get('/clientPortfolioData', stocksCotrollers.getClientPortfolioData);
 
 router.post('/PreStock', imageUpload, stocksCotrollers.addUpdatePreStock);
-router.get('/PreStock',stocksCotrollers.getPreStocks);
+router.get('/PreStock', stocksCotrollers.getPreStocks);
 
-router.post('/shareHolding',forms, stocksCotrollers.addUpdateShareHolding);
-router.get('/shareHolding',stocksCotrollers.getShareHolding);
+router.post('/shareHolding', forms, stocksCotrollers.addUpdateShareHolding);
+router.get('/shareHolding', stocksCotrollers.getShareHolding);
 
 router.get('/sectors', sectorController.getSectorData);
-router.post('/sectorscreate',sectorController.createSectors);
-router.post('/sectorsupdate',sectorController.updateSector);
+router.post('/sectorscreate', sectorController.createSectors);
+router.post('/sectorsupdate', sectorController.updateSector);
 router.get('/industrys', sectorController.getIndustryData);
 router.post('/industrycreate', sectorController.createIndustry);
 router.post('/industryupdate', sectorController.updateIndistry);

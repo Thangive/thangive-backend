@@ -439,10 +439,10 @@ const userController = {
         }
     },
 
-    async getUserProfile(req, res, next) {
+    async getUserList(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = "SELECT * FROM users WHERE 1 AND is_deleted = 0 AND user_type != 'ADMIN'";
+            let query = "SELECT * FROM users WHERE 1 AND user_type='user' AND is_deleted = 0 AND user_type != 'ADMIN'";
             let cond = '';
             let page = { pageQuery: '' };
 
@@ -452,7 +452,119 @@ const userController = {
                 username: Joi.string(),
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
-                user_type: Joi.valid('user', 'RM', 'ADMIN', 'AM', 'SM', 'ST').optional(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer(),
+            });
+
+            const { error } = userSchema.validate(req.query);
+            if (error) return next(error);
+
+            /* ------------------ Filters ------------------ */
+            if (req.query.user_id) {
+                cond += ` AND user_id = ${req.query.user_id}`;
+            }
+
+            if (req.query.username) {
+                cond += ` AND username LIKE '%${req.query.username}%'`;
+            }
+
+            if (req.query.email) {
+                cond += ` AND email LIKE '%${req.query.email}%'`;
+            }
+
+            if (req.query.phone_number) {
+                cond += ` AND phone_number LIKE '%${req.query.phone_number}%'`;
+            }
+
+            /* ------------------ Pagination ------------------ */
+            if (req.query.pagination) {
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+            }
+
+            query += cond + page.pageQuery;
+
+            /* ------------------ Fetch Users ------------------ */
+            const users = await getData(query, next);
+
+            /* ------------------ Attach Documents ------------------ */
+            if (users.length) {
+                for (const user of users) {
+                    const docQuery = `
+                        SELECT * FROM user_documents
+                        WHERE is_deleted = 0 AND user_id = ${user.user_id}
+                    `;
+                    const documents = await getData(docQuery, next);
+                    user.documents = documents ?? [];
+                }
+            }
+
+            /* ------------------ Bank  Details ------------------ */
+            if (users.length) {
+                for (const user of users) {
+                    const docQuery = `
+                        SELECT * FROM user_bank_details
+                        WHERE is_deleted = 0 AND user_id = ${user.user_id}
+                    `;
+                    const bankDetails = await getData(docQuery, next);
+                    user.bankDetails = bankDetails ?? [];
+                }
+            }
+
+            /* ------------------ Bank  Details ------------------ */
+            if (users.length) {
+                for (const user of users) {
+                    const docQuery = `
+                    SELECT 
+                        cmr.*,
+                        broker.broker_custom_id,
+                        broker.broker_name,
+                        broker.broker_email,
+                        broker.broker_contact
+                    FROM user_cmr_details AS cmr
+                    INNER JOIN broker 
+                        ON broker.broker_id = cmr.broker_id
+                    WHERE cmr.is_deleted = 0
+                      AND cmr.user_id = "${user.user_id}"
+                `;
+                    const cmrDetails = await getData(docQuery, next);
+                    user.cmrDetails = cmrDetails ?? [];
+                }
+            }
+
+            return res.json({
+                message: 'success',
+                total_records: page.total_rec ?? users.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: users.length,
+                data: users
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    async getEmplyees(req, res, next) {
+        try {
+            /* ------------------ Base Query ------------------ */
+            let query = "SELECT * FROM users WHERE 1 AND user_type!='user' AND user_type!='admin' AND is_deleted = 0 AND user_type != 'ADMIN'";
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            /* ------------------ Validation Schema ------------------ */
+            const userSchema = Joi.object({
+                user_id: Joi.number().integer(),
+                username: Joi.string(),
+                email: Joi.string().email(),
+                phone_number: Joi.string(),
+                user_type: Joi.valid('RM', 'AM', 'SM', 'ST').optional(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),

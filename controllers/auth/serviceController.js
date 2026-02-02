@@ -58,22 +58,33 @@ const serviceController = {
     async forgotPassword(req, res, next) {
         try {
             const schema = Joi.object({
-                username: Joi.string().required()
-            });
+                username: Joi.string().optional(),
+                phone_number: Joi.number().optional(),
+                user_type: Joi.valid('user', 'employee').required(),
+            })
+                .or('username', 'phone_number')
+                .messages({
+                    'object.missing': 'Either username or phone number is required'
+                });
+
 
             const { error, value } = schema.validate(req.body ?? {});
             if (error) return next(error);
+            let cond = (value.user_type == 'user') ? `AND user_type = 'user'` : `AND user_type != 'user'`;
+            const userQuery = `SELECT user_id, phone_number FROM users WHERE  is_deleted = 0 ${cond} AND  username = '${value.username}' OR phone_number = '${value.phone_number}'`;
 
-            const userQuery = `SELECT user_id, phone_number FROM users WHERE is_deleted = 0 AND username = '${value.username}'`;
 
+            const users = await getData(userQuery, next);
 
-            const user = await getData(userQuery, next);
-
-            if (!user || user.length === 0) {
+            if (!users || users.length === 0) {
                 return next(CustomErrorHandler.doesNotExist("User not found"));
             }
 
-            const otp = await commonFunction.setOtp(user[0].user_id, next);
+            const user = users[0];
+            // Send OTP only when creating new password
+            const otp = await commonFunction.setOtp({ userId: user?.user_id, phoneNumber: user?.phone_number }, next);
+            const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`;
+            await commonFunction.sendSMS(user?.phone_number, message);
 
             // sendOtpSMS(user[0].phone_number, otp);
 
@@ -155,24 +166,42 @@ const serviceController = {
 
     async verifyOtp(req, res, next) {
         try {
+
             const schema = Joi.object({
-                user_id: Joi.number().integer().optional(),
+                username: Joi.string().optional(),
                 phone_number: Joi.string().optional(),
+                user_type: Joi.valid('user', 'employee').required(),
                 otp: Joi.number().required()
-            }).or('user_id', 'phone_number');
+            }).or('user_id', 'phone_number').or('username', 'phone_number')
+                .messages({
+                    'object.missing': 'Either username or phone number is required'
+                });
 
             const { error, value } = schema.validate(req.body ?? {});
             if (error) return next(error);
 
-            const { user_id, phone_number, otp } = value;
+            let cond = (value.user_type == 'user') ? `AND user_type = 'user'` : `AND user_type != 'user'`;
+            const userQuery = `SELECT user_id, phone_number FROM users WHERE is_deleted = 0  AND  username = '${value.username}' OR phone_number = '${value.phone_number}' ${cond}`;
+
+            console.log(userQuery);
+
+            const { otp } = value;
 
             // ---------- Build condition dynamically ----------
             let whereClause = ``;
 
-            if (user_id) {
-                whereClause = `user_id = "${user_id}"`;
+            const users = await getData(userQuery, next);
+
+            if (!users || users.length === 0) {
+                return next(CustomErrorHandler.doesNotExist("Username or phone number is wrong"));
+            }
+
+            const user = users[0];
+
+            if (user?.user_id) {
+                whereClause = `user_id = "${user?.user_id}"`;
             } else {
-                whereClause = `phone_number = "${phone_number}"`;
+                whereClause = `phone_number = "${user?.phone_number}"`;
             }
 
             const otpQuery = `
@@ -197,17 +226,17 @@ const serviceController = {
             const now = new Date();
             const diffMinutes = (now - createdAt) / (1000 * 60);
 
-            if (diffMinutes > 50) {
+            if (diffMinutes > 1) {
                 return next(
                     CustomErrorHandler.badRequest("OTP expired")
                 );
             }
 
-            if (phone_number && diffMinutes < 50) {
-                const useQuery = `SELECT * FROM users WHERE is_deleted='1' AND phone_number='${phone_number}'`;
+            if (user?.phone_number && diffMinutes < 1) {
+                const useQuery = `SELECT * FROM users WHERE is_deleted='1' AND phone_number='${user?.phone_number}'`;
                 const response = await getData(useQuery, next);
                 if (response || response.length !== 0) {
-                    const query = `UPDATE users SET ? WHERE is_deleted='1' AND phone_number='${phone_number}'`
+                    const query = `UPDATE users SET ? WHERE is_deleted='1' AND phone_number='${user?.phone_number}'`
                     const result = await insertData(query, { is_deleted: 0 }, next);
                 }
             }

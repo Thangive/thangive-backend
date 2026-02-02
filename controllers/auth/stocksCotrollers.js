@@ -912,7 +912,7 @@ const stocksControllers = {
             let dataObj = { ...req.body };
 
             // Handle file upload
-            if (req.files?.ps_logo?.length > 0) {
+            if ((req.files?.ps_logo?.length > 0) && !dataObj.stock_details_id) {
                 const file = req.files.ps_logo[0];
                 dataObj.ps_logo = file.path;
             }
@@ -1031,8 +1031,6 @@ const stocksControllers = {
             next(err);
         }
     }
-
-
 
 };
 
