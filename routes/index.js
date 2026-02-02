@@ -46,28 +46,28 @@ router.get('/userHoldings', auth, transactionController.getUserHoldigs);
 
 
 // Stock Details API
-router.post('/stockDetails', imageUpload, stocksCotrollers.addUpdateStockDetails);
-router.post('/stockPrice', forms, PriceController.addUpdateStockPrice);
-router.post('/stockDiscription', forms, stocksCotrollers.addUpdateStockDescription);
-router.post('/clientPortfolioHeading', forms, stocksCotrollers.addUpdateClientPortfolioHeading);
-router.post('/clientPortfolioData', forms, stocksCotrollers.addUpdateClientPortfolioData);
-router.post('/AnnualReport', imageUpload, stocksCotrollers.addUpdateAnnualReport);
-router.post('/devident', forms, stocksCotrollers.addUpdateDividend);
-router.post('/companyPortfolio', imageUpload, stocksCotrollers.addUpdatePortfolio);
+router.post('/stockDetails', auth, imageUpload, stocksCotrollers.addUpdateStockDetails);
+router.post('/stockPrice', auth, forms, PriceController.addUpdateStockPrice);
+router.post('/stockDiscription', auth, forms, stocksCotrollers.addUpdateStockDescription);
+router.post('/clientPortfolioHeading', auth, forms, stocksCotrollers.addUpdateClientPortfolioHeading);
+router.post('/clientPortfolioData', auth, forms, stocksCotrollers.addUpdateClientPortfolioData);
+router.post('/AnnualReport', auth, imageUpload, stocksCotrollers.addUpdateAnnualReport);
+router.post('/devident', auth, forms, stocksCotrollers.addUpdateDividend);
+router.post('/companyPortfolio', auth, imageUpload, stocksCotrollers.addUpdatePortfolio);
 // router.get('/stockDetails', stocksCotrollers.getStockData);
-router.get('/companyPortfolio', stocksCotrollers.getCompanyPortfolioData);
-router.get('/clientPortfolioHeading', stocksCotrollers.getClientPortfolioHeading);
-router.get('/clientPortfolioData', stocksCotrollers.getClientPortfolioData);
+router.get('/companyPortfolio', auth, stocksCotrollers.getCompanyPortfolioData);
+router.get('/clientPortfolioHeading', auth, stocksCotrollers.getClientPortfolioHeading);
+router.get('/clientPortfolioData', auth, stocksCotrollers.getClientPortfolioData);
 
+router.post('/PreStock', auth, imageUpload, stocksCotrollers.addUpdatePreStock);
+router.get('/PreStock', auth, stocksCotrollers.getPreStocks);
 
+router.post('/shareHolding', auth, forms, stocksCotrollers.addUpdateShareHolding);
+router.get('/shareHolding', auth, stocksCotrollers.getShareHolding);
 
-
-router.post('/shareHolding', forms, stocksCotrollers.addUpdateShareHolding);
-router.get('/shareHolding', stocksCotrollers.getShareHolding);
-
-router.get('/sectors', sectorController.getSectorData);
-router.post('/sectorscreate', sectorController.createSectors);
-router.post('/sectorsupdate', sectorController.updateSector);
+router.get('/sectors', auth, sectorController.getSectorData);
+router.post('/sectorscreate', auth, sectorController.createSectors);
+router.post('/sectorsupdate', auth, sectorController.updateSector);
 router.get('/industrys', sectorController.getIndustryData);
 router.post('/industrycreate', sectorController.createIndustry);
 router.post('/industryupdate', sectorController.updateIndistry);

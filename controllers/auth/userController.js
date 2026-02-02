@@ -3,6 +3,7 @@ import { getData, insertData } from '../../config/index.js';
 import { CustomErrorHandler, JwtService } from "../../service/index.js";
 import md5 from 'md5';
 import paginationQuery from '../../helper/paginationQuery.js';
+import commonFunction from '../../helper/commonFunction.js';
 
 const userController = {
     async addUpdateUserProfile(req, res, next) {
@@ -98,7 +99,7 @@ const userController = {
                 SELECT user_id 
                 FROM users 
                 WHERE (email='${dataObj.email}' 
-                    OR phone_number='${dataObj.phone_number}') 
+                    OR phone_number='${dataObj.phone_number}') AND user_type = '${dataObj.user_type}'
                 ${condition}
             `;
 
@@ -124,8 +125,9 @@ const userController = {
                 );
             }
 
-
-
+            const otp = await commonFunction.setOtp({ phoneNumber: dataObj.phone_number }, next);
+            const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`
+            const response = await commonFunction.sendSMS(dataObj.phone_number, message);
             // ------------------ Insert / Update ------------------
             let query = "";
             if (dataObj.user_id) {
@@ -143,7 +145,7 @@ const userController = {
             return res.json({
                 success: true,
                 message: dataObj.user_id
-                    ? `${dataObj.user_type} registered saved successfully`
+                    ? `${dataObj.user_type} registered successfully`
                     : `${dataObj.user_type} updated successfully`,
                 data: dataObj
             });
@@ -350,10 +352,8 @@ const userController = {
                 cmr_id: Joi.number().integer().optional(),
 
                 user_id: Joi.number().integer().required(),
-                broker_name: Joi.string().required(),
                 broker_id: Joi.string().required(),
                 client_id: Joi.string().required(),
-
                 cmr_document: Joi.string()
                     .allow('')
                     .required()
@@ -361,7 +361,6 @@ const userController = {
                         'any.required': 'CMR document (cmr_document) is required',
                     }),
 
-                is_deleted: Joi.number().integer().optional(),
             }).when(Joi.object({ cmr_id: Joi.exist() }).unknown(), {
                 then: Joi.object({
                     cmr_document: Joi.string().required(),
@@ -451,6 +450,7 @@ const userController = {
                 username: Joi.string(),
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
+                user_type: Joi.valid('user', 'RM', 'ADMIN', 'AM', 'SM', 'ST').optional(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),
@@ -462,6 +462,10 @@ const userController = {
             /* ------------------ Filters ------------------ */
             if (req.query.user_id) {
                 cond += ` AND user_id = ${req.query.user_id}`;
+            }
+
+            if (req.query.user_type) {
+                cond += ` AND user_type = '${req.query.user_type}'`;
             }
 
             if (req.query.username) {
@@ -519,9 +523,18 @@ const userController = {
             if (users.length) {
                 for (const user of users) {
                     const docQuery = `
-                        SELECT * FROM user_cmr_details
-                        WHERE is_deleted = 0 AND user_id = ${user.user_id}
-                    `;
+                    SELECT 
+                        cmr.*,
+                        broker.broker_custom_id,
+                        broker.broker_name,
+                        broker.broker_email,
+                        broker.broker_contact
+                    FROM user_cmr_details AS cmr
+                    INNER JOIN broker 
+                        ON broker.broker_id = cmr.broker_id
+                    WHERE cmr.is_deleted = 0
+                      AND cmr.user_id = "${user.user_id}"
+                `;
                     const cmrDetails = await getData(docQuery, next);
                     user.cmrDetails = cmrDetails ?? [];
                 }
@@ -661,8 +674,6 @@ const userController = {
             return next(err);
         }
     }
-
-
 
 }
 

@@ -1,5 +1,6 @@
 import fs from 'fs-extra'
 import { getData, insertData, SERVER_HOST } from '../config/index.js';
+import axios from 'axios';
 
 const commonFunction = {
     moveFiles(src, dest) {
@@ -43,21 +44,37 @@ const commonFunction = {
         });
     },
 
-    async setOtp(userId, next) {
+    async setOtp(data = {}, next) {
         try {
+            const { userId, phoneNumber } = data;
+
+            if (!userId && !phoneNumber) {
+                throw new Error("Either userId or phoneNumber is required");
+            }
+
+            // 🔐 Generate 6-digit OTP
             const otp = Math.floor(100000 + Math.random() * 900000);
 
-            const query = `
-                INSERT INTO otp (user_id, otp)
-                VALUES (?, ?)
-            `;
-            console.log("hded", query);
+            const insertPayload = {
+                otp: otp
+            };
 
-            await insertData(query, [userId, otp], next);
+            if (userId) {
+                insertPayload.user_id = userId;
+            }
+
+            if (phoneNumber) {
+                insertPayload.phone_number = phoneNumber;
+            }
+
+            const query = `INSERT INTO otp SET ?`;
+
+            await insertData(query, insertPayload, next);
 
             return otp;
+
         } catch (err) {
-            if (typeof next === 'function') {
+            if (typeof next === "function") {
                 return next(err);
             }
             throw err;
@@ -66,26 +83,26 @@ const commonFunction = {
 
     async sendSMS(phoneNumber, message) {
         try {
-            // 🔁 Replace with your SMS gateway details
-            const SMS_API_URL = "https://api.smsprovider.com/send";
-            const API_KEY = process.env.SMS_API_KEY;
+            const SMS_API_URL = "https://www.alots.in/sms-panel/api/http/index.php";
 
-            const payload = {
-                to: phoneNumber,
-                message: message
+            const params = {
+                username: "THANGIV",
+                apikey: "6F5F5-7AE2B",
+                apirequest: "Text",
+                sender: "THANGV",
+                mobile: phoneNumber,
+                message: message,
+                route: "TRANS",
+                TemplateID: "1707176958944181442",
+                format: "JSON"
             };
 
-            const headers = {
-                Authorization: `Bearer ${API_KEY}`,
-                "Content-Type": "application/json"
-            };
-
-            const response = await axios.post(SMS_API_URL, payload, { headers });
+            const response = await axios.get(SMS_API_URL, { params });
 
             return response.data;
 
         } catch (error) {
-            console.error("SMS sending failed:", error.message);
+            console.error("SMS sending failed:", error.response?.data || error.message);
             throw error;
         }
     },
