@@ -116,11 +116,7 @@ const userController = {
 
             const exists = await getData(`SELECT user_id 
                 FROM users 
-<<<<<<< HEAD
-                WHERE username = '${dataObj.username}' ${condition}`, next);
-=======
                 WHERE username = '${dataObj.username}'${condition}`, next);
->>>>>>> akash-branch
             if (exists.length > 0) {
                 return next(
                     CustomErrorHandler.alreadyExist(
