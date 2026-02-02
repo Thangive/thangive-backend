@@ -60,7 +60,7 @@ const userController = {
                         profile: Joi.string().optional(),
                         user_type: Joi.string().required(),
                         username: Joi.string().required(),
-                        password: Joi.string().required(),
+                        password: Joi.string().optional(),
                         employee_id: Joi.string().required(),
                     })
                 });
@@ -115,7 +115,7 @@ const userController = {
 
             const exists = await getData(`SELECT user_id 
                 FROM users 
-                WHERE username = '${dataObj.username}'`, next);
+                WHERE username = '${dataObj.username}'${condition}`, next);
             if (exists.length > 0) {
                 return next(
                     CustomErrorHandler.alreadyExist(
@@ -140,7 +140,6 @@ const userController = {
                 dataObj.user_id = result.insertId;
             }
             delete dataObj.password;
-
             return res.json({
                 success: true,
                 message: dataObj.user_id
