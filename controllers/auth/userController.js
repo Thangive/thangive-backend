@@ -353,10 +353,8 @@ const userController = {
                 cmr_id: Joi.number().integer().optional(),
 
                 user_id: Joi.number().integer().required(),
-                broker_name: Joi.string().required(),
                 broker_id: Joi.string().required(),
                 client_id: Joi.string().required(),
-
                 cmr_document: Joi.string()
                     .allow('')
                     .required()
@@ -364,7 +362,6 @@ const userController = {
                         'any.required': 'CMR document (cmr_document) is required',
                     }),
 
-                is_deleted: Joi.number().integer().optional(),
             }).when(Joi.object({ cmr_id: Joi.exist() }).unknown(), {
                 then: Joi.object({
                     cmr_document: Joi.string().required(),
