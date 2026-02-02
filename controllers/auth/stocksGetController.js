@@ -189,6 +189,7 @@ const stocksGetController = {
             let page = { pageQuery: '' };
 
             const stockSchema = Joi.object({
+                stock_details_id:Joi.number().integer(),
                 company_name: Joi.string(),
                 script_name: Joi.string(),
                 isin_no: Joi.string(),
@@ -203,6 +204,9 @@ const stocksGetController = {
             if (error) return next(error);
 
             // 🔹 Filters
+            if (req.query.stock_details_id)
+                cond += ` AND s.stock_details_id ='${req.query.stock_details_id}'`;
+
             if (req.query.company_name)
                 cond += ` AND s.company_name LIKE '%${req.query.company_name}%'`;
 
