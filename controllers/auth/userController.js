@@ -124,10 +124,12 @@ const userController = {
                     )
                 );
             }
-
-            const otp = await commonFunction.setOtp({ phoneNumber: dataObj.phone_number }, next);
-            const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`
-            const response = await commonFunction.sendSMS(dataObj.phone_number, message);
+            // Send OTP only when creating new USER (no user_id)
+            if (dataObj.user_type == 'user' && !dataObj.user_id) {
+                const otp = await commonFunction.setOtp({ phoneNumber: dataObj.phone_number }, next);
+                const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`;
+                await commonFunction.sendSMS(dataObj.phone_number, message);
+            }
             // ------------------ Insert / Update ------------------
             let query = "";
             if (dataObj.user_id) {
@@ -356,14 +358,14 @@ const userController = {
                 client_id: Joi.string().required(),
                 cmr_document: Joi.string()
                     .allow('')
-                    .required()
+                    .optional()
                     .messages({
                         'any.required': 'CMR document (cmr_document) is required',
                     }),
 
             }).when(Joi.object({ cmr_id: Joi.exist() }).unknown(), {
                 then: Joi.object({
-                    cmr_document: Joi.string().required(),
+                    cmr_document: Joi.string().optional(),
                 }),
             });
 
@@ -440,7 +442,7 @@ const userController = {
     async getUserProfile(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = "SELECT * FROM users WHERE 1 AND is_deleted = 0";
+            let query = "SELECT * FROM users WHERE 1 AND is_deleted = 0 AND user_type != 'ADMIN'";
             let cond = '';
             let page = { pageQuery: '' };
 
