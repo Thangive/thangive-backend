@@ -121,10 +121,12 @@ const stocksGetController = {
             const query = `
             SELECT 
                 COUNT(*) AS total,
-                SUM(stock_type = 'Unlisted') AS unlisted,
-                SUM(stock_type = 'Pre IPO') AS pre_ipo,
-                SUM(stock_type = 'Delisted') AS delisted,
-                SUM(stock_type = 'Listed') AS listed
+                SUM(stock_type = 'UNLISTED') AS unlisted,
+                SUM(stock_type = 'PRE IPO') AS pre_ipo,
+                SUM(stock_type = 'DELISTED') AS delisted,
+                SUM(stock_type = 'LISTED') AS listed,
+                 SUM(stock_type = 'ANGEL INVESTING') AS angel_investing,
+                  SUM(stock_type = 'THANGIV') AS thangiv
             FROM stock_details
         `;
 
@@ -182,18 +184,18 @@ const stocksGetController = {
                     LIMIT 1
                 )
 
-            WHERE 1
+            WHERE s.stock_type != 'LISTED'
         `;
 
             let cond = '';
             let page = { pageQuery: '' };
 
             const stockSchema = Joi.object({
-                stock_details_id:Joi.number().integer(),
+                stock_details_id: Joi.number().integer(),
                 company_name: Joi.string(),
                 script_name: Joi.string(),
                 isin_no: Joi.string(),
-                stock_type: Joi.string(),
+                stock_type: Joi.valid('UNLISTED', 'PRE IPO', 'DELISTED', 'ANGEL INVESTING', 'THANGIV'),
                 wishlist_id: Joi.string().optional(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
@@ -250,6 +252,7 @@ const stocksGetController = {
             next(err);
         }
     },
+
     async getSearchStock(req, res, next) {
         try {
             const { query } = req.query;
@@ -268,7 +271,7 @@ const stocksGetController = {
                     isin_no,
                     cmp_logo
                 FROM stock_details
-                WHERE company_name LIKE '%${query}%'
+                WHERE stock_type != 'LISTED' AND company_name LIKE '%${query}%'
                 ORDER BY company_name ASC
                 LIMIT 20
             `;

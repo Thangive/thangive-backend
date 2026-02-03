@@ -104,7 +104,7 @@ const serviceController = {
             // ---------- Validation ----------
             const schema = Joi.object({
                 username: Joi.string().required(),
-                password: Joi.string().required(),
+                newPassword: Joi.string().required(),
                 confirmPassword: Joi.string().required()
             });
 
@@ -114,7 +114,7 @@ const serviceController = {
             }
 
             // ---------- Password match check ----------
-            if (value.password !== value.confirmPassword) {
+            if (value.newPassword !== value.confirmPassword) {
                 return next(
                     CustomErrorHandler.badRequest("Password and confirm password do not match")
                 );
@@ -141,15 +141,15 @@ const serviceController = {
             }
 
             // ---------- Update password ----------
-            const newPassword = md5(value.password);
+            const newPassword1 = md5(value.newPassword);
 
             const updateQuery = `
                     UPDATE users 
-                    SET password = '${newPassword}'
+                    SET password = '${newPassword1}'
                     WHERE user_id = ${data[0].user_id}
                 `;
 
-            await insertData(updateQuery, next);
+            await insertData(updateQuery, {}, next);
 
             delete data[0].password;
 
@@ -172,7 +172,7 @@ const serviceController = {
                 phone_number: Joi.string().optional(),
                 user_type: Joi.valid('user', 'employee').required(),
                 otp: Joi.number().required()
-            }).or('user_id', 'phone_number').or('username', 'phone_number')
+            }).or('username', 'phone_number').or('username', 'phone_number')
                 .messages({
                     'object.missing': 'Either username or phone number is required'
                 });
