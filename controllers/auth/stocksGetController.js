@@ -265,7 +265,8 @@ const stocksGetController = {
                     stock_details_id,
                     company_name,
                     script_name,
-                    isin_no
+                    isin_no,
+                    cmp_logo
                 FROM stock_details
                 WHERE company_name LIKE '%${query}%'
                 ORDER BY company_name ASC

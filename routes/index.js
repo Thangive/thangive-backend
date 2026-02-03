@@ -60,7 +60,7 @@ router.get('/companyPortfolio', stocksCotrollers.getCompanyPortfolioData);
 router.get('/clientPortfolioHeading', stocksCotrollers.getClientPortfolioHeading);
 router.get('/clientPortfolioData', stocksCotrollers.getClientPortfolioData);
 
-router.post('/PreStock', imageUpload, stocksCotrollers.addUpdatePreStock);
+router.post('/PreStock',auth, imageUpload, stocksCotrollers.addUpdatePreStock);
 router.get('/PreStock', stocksCotrollers.getPreStocks);
 
 router.post('/shareHolding', forms, stocksCotrollers.addUpdateShareHolding);

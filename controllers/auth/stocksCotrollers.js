@@ -1,6 +1,7 @@
 import Joi from 'joi';
 import { getData, insertData } from '../../config/index.js';
 import CustomErrorHandler from '../../service/CustomErrorHandler.js';
+import paginationQuery from '../../helper/paginationQuery.js';
 
 
 const stocksControllers = {

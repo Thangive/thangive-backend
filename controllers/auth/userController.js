@@ -773,7 +773,7 @@ const userController = {
                 WHERE user_id = ${dataObj.user_id}
             `;
 
-            await insertData(updateQuery, next);
+            await insertData(updateQuery,dataObj, next);
 
             return res.json({
                 success: true,

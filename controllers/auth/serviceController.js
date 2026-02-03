@@ -198,10 +198,10 @@ const serviceController = {
 
             const user = users[0];
 
-            if (user?.user_id) {
-                whereClause = `user_id = "${user?.user_id}"`;
-            } else {
+            if (user?.phone_number) {
                 whereClause = `phone_number = "${user?.phone_number}"`;
+            } else {
+                whereClause = `user_id = "${user?.user_id}"`;
             }
 
             const otpQuery = `
