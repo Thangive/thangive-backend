@@ -96,7 +96,7 @@ const userController = {
                 const phone = String(dataObj?.phone_number || "").trim();
                 dataObj.password = md5(phone);
                 const checkQuery = `
-                SELECT user_id 
+                SELECT user_id, is_deleted
                 FROM users 
                 WHERE (email='${dataObj.email}' 
                     OR phone_number='${dataObj.phone_number}') AND user_type = '${dataObj.user_type}'
@@ -104,7 +104,7 @@ const userController = {
             `;
 
                 const exists = await getData(checkQuery, next);
-                if (exists.length > 0) {
+                if ((exists.length > 0) && exists[0].is_deleted == '0') {
                     return next(
                         CustomErrorHandler.alreadyExist(
                             "Email or phone number already exists"
@@ -113,11 +113,10 @@ const userController = {
                 }
             }
 
-
-            const exists = await getData(`SELECT user_id 
+            const exists = await getData(`SELECT user_id, is_deleted
                 FROM users 
                 WHERE username = '${dataObj.username}'${condition}`, next);
-            if (exists.length > 0) {
+            if ((exists.length > 0) && exists[0].is_deleted == '0') {
                 return next(
                     CustomErrorHandler.alreadyExist(
                         `${dataObj.username} Username already exists`
@@ -132,7 +131,7 @@ const userController = {
             }
             // ------------------ Insert / Update ------------------
             let query = "";
-            if (dataObj.user_id) {
+            if (dataObj.user_id || (exists[0]?.user_id && exists[0]?.is_deleted != '0')) {
                 query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
             } else {
                 query = `INSERT INTO users SET ?`;
@@ -773,7 +772,7 @@ const userController = {
                 WHERE user_id = ${dataObj.user_id}
             `;
 
-            await insertData(updateQuery,dataObj, next);
+            await insertData(updateQuery, dataObj, next);
 
             return res.json({
                 success: true,

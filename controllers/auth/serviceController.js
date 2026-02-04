@@ -180,8 +180,8 @@ const serviceController = {
             const { error, value } = schema.validate(req.body ?? {});
             if (error) return next(error);
 
-            let cond = (value.user_type == 'user') ? `AND user_type = 'user'` : `AND user_type != 'user'`;
-            const userQuery = `SELECT user_id, phone_number FROM users WHERE is_deleted = 0  AND  username = '${value.username}' OR phone_number = '${value.phone_number}' ${cond}`;
+            let cond = (value.user_type == 'user') ? `AND user_type = 'user'` : `AND is_deleted = 0 AND user_type != 'user'`;
+            const userQuery = `SELECT user_id, phone_number FROM users WHERE username = '${value.username}' OR phone_number = '${value.phone_number}' ${cond}`;
 
             console.log(userQuery);
 

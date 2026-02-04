@@ -26,6 +26,7 @@ router.post('/assignToRM', auth, forms, userController.assignToRM);
 
 router.post('/login', forms, serviceController.login);
 router.post('/forgotPassword', forms, serviceController.forgotPassword);
+router.post('/resendOTP', forms, serviceController.forgotPassword);
 router.post('/changePassword', forms, serviceController.changePassword);
 router.get('/logHistory', auth, serviceController.getLogHistory);
 router.post('/otpVerification', forms, serviceController.verifyOtp);
@@ -60,7 +61,7 @@ router.get('/companyPortfolio', stocksCotrollers.getCompanyPortfolioData);
 router.get('/clientPortfolioHeading', stocksCotrollers.getClientPortfolioHeading);
 router.get('/clientPortfolioData', stocksCotrollers.getClientPortfolioData);
 
-router.post('/PreStock',auth, imageUpload, stocksCotrollers.addUpdatePreStock);
+router.post('/PreStock', auth, imageUpload, stocksCotrollers.addUpdatePreStock);
 router.get('/PreStock', stocksCotrollers.getPreStocks);
 
 router.post('/shareHolding', forms, stocksCotrollers.addUpdateShareHolding);
