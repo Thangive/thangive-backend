@@ -129,6 +129,10 @@ const userController = {
                 const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`;
                 await commonFunction.sendSMS(dataObj.phone_number, message);
             }
+
+            if (dataObj.user_type !== "user") {
+                dataObj["is_deleted"] = 0;
+            }
             // ------------------ Insert / Update ------------------
             let query = "";
             if (dataObj.user_id || (exists[0]?.user_id && exists[0]?.is_deleted != '0')) {

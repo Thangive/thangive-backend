@@ -14,13 +14,13 @@ const credentil = isServer
         host: "127.0.0.1",
         user: "dbt",
         password: "thangive@2026",
-        database: "thangive"
+        database: "thangive1"
     }
     : {
         host: "localhost",
         user: "root",
         password: "",
-        database: "thangive"
+        database: "thangive1"
     };
 
 let con;
