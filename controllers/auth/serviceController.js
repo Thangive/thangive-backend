@@ -103,10 +103,14 @@ const serviceController = {
         try {
             // ---------- Validation ----------
             const schema = Joi.object({
-                username: Joi.string().required(),
+                username: Joi.string().optional(),
+                phone_number: Joi.number().optional(),
                 newPassword: Joi.string().required(),
                 confirmPassword: Joi.string().required()
-            });
+            }).or('username', 'phone_number')
+                .messages({
+                    'object.missing': 'Either username or phone number is required'
+                });
 
             const { error, value } = schema.validate(req.body ?? {});
             if (error) {

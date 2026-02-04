@@ -1031,6 +1031,51 @@ const stocksControllers = {
         } catch (err) {
             next(err);
         }
+    },
+
+    async getCompanyLogos(req, res, next) {
+        try {
+            /* ------------------ Base Query ------------------ */
+            let query = `SELECT stock_details_id,company_name,cmp_logo FROM stock_details WHERE stock_type='UNLISTED'`;
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            /* ------------------ Validation Schema ------------------ */
+            const preStockSchema = Joi.object({
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer(),
+            });
+
+            const { error } = preStockSchema.validate(req.query ?? {});
+            if (error) return next(error);
+
+            /* ------------------ Pagination ------------------ */
+            if (req.query.pagination) {
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+            }
+
+            query += cond + page.pageQuery;
+
+            const data = await getData(query, next);
+
+            return res.json({
+                message: 'success',
+                total_records: page.total_rec ?? data.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: data.length,
+                data: data
+            });
+
+        } catch (err) {
+            next(err);
+        }
     }
 
 };

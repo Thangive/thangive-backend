@@ -123,6 +123,60 @@ const transactionController = {
         } catch (err) {
             next(err);
         }
+    },
+
+    async getOrderDetails(req, res, next) {
+        try {
+            /* ------------------ Base Query ------------------ */
+            let query = "SELECT ot.order_id,ot.user_id, b.broker_name, ot.transaction_type, sd.isin_no, sd.company_name, ot.price_per_share, ot.quatity FROM order_transactions ot JOIN stock_details sd ON sd.stock_details_id = ot.stock_details_id JOIN broker b ON b.broker_id = ot.broker_id WHERE 1";
+
+            let cond = '';
+            var clientData;
+            let page = { pageQuery: '' };
+
+            /* ------------------ Validation Schema ------------------ */
+            const holdingSchema = Joi.object({
+                order_id: Joi.number().integer().required()
+            });
+
+            const { error } = holdingSchema.validate(req.query);
+            if (error) return next(error);
+
+            /* ------------------ Filters ------------------ */
+            cond += ` AND ot.order_id = ${req.query.order_id}`;
+
+            query += cond + page.pageQuery;
+
+            console.log("Holdings Query =>", query);
+
+            /* ------------------ Fetch Data ------------------ */
+            const users = await getData(query, next);
+
+            /* ------------------ Client Fetch Data ------------------ */
+            if (users.length) {
+                const clientQuery = `SELECT user_id,username,user_custum_id,email,phone_number FROM users WHERE user_id='${users[0].user_id}';`;
+                clientData = await getData(clientQuery, next);
+            }
+
+            /* ------------------ Bank  Details ------------------ */
+            if (users.length) {
+                const clientQuery = `SELECT user_id,username,user_custum_id,email,phone_number FROM users WHERE user_id='${users[0].user_id}';`;
+                clientData = await getData(clientQuery, next);
+            }
+
+
+            return res.json({
+                message: 'success',
+                records: data.length,
+                data: {
+                    clientDetails: clientData[0],
+                    transactionData: data[0]
+                }
+            });
+
+        } catch (err) {
+            next(err);
+        }
     }
 
 

@@ -48,6 +48,7 @@ router.get('/userHoldings', auth, transactionController.getUserHoldigs);
 
 
 // Stock Details API
+router.get('/getCompanyLogos', stocksCotrollers.getCompanyLogos);
 router.post('/stockDetails', imageUpload, stocksCotrollers.addUpdateStockDetails);
 router.post('/stockPrice', forms, PriceController.addUpdateStockPrice);
 router.post('/stockDiscription', forms, stocksCotrollers.addUpdateStockDescription);
@@ -66,6 +67,7 @@ router.get('/PreStock', stocksCotrollers.getPreStocks);
 
 router.post('/shareHolding', forms, stocksCotrollers.addUpdateShareHolding);
 router.get('/shareHolding', stocksCotrollers.getShareHolding);
+router.get('/orderDetails', transactionController.getOrderDetails);
 
 router.get('/sectors', sectorController.getSectorData);
 router.post('/sectorscreate', sectorController.createSectors);
