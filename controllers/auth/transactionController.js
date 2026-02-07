@@ -13,13 +13,17 @@ const transactionController = {
                 advisor_id: Joi.number().integer().required(),
                 broker_id: Joi.number().integer().required(),
                 stock_details_id: Joi.number().integer().required(),
-
                 quantity: Joi.number().required(),
-                price_per_share: Joi.number().required(),
-
+                current_share_price: Joi.number().integer().required(),
                 order_type: Joi.string()
                     .valid('MARKET', 'LIMIT')
                     .required(),
+
+                price_per_share: Joi.when('order_type', {
+                    is: 'LIMIT',
+                    then: Joi.number().required(),
+                    otherwise: Joi.number().optional()
+                }),
 
                 transaction_type: Joi.string()
                     .valid('BUY', 'SELL')
@@ -62,7 +66,7 @@ const transactionController = {
         }
     },
 
-    async addUpdateOrder(req, res, next) {
+    async addUpdateOrder1(req, res, next) {
         try {
             /* ------------------ Validation Schema ------------------ */
             const orderSchema = Joi.object({
@@ -299,6 +303,60 @@ const transactionController = {
             next(err);
         }
     },
+
+    async getHoldingStockQuantity(req, res, next) {
+        try {
+            /* ------------------ Validation Schema ------------------ */
+            const holdingSchema = Joi.object({
+                user_id: Joi.number().integer().required(),
+                stock_details_id: Joi.number().integer().required(),
+                broker_id: Joi.number().integer().required(),
+                advisor_id: Joi.number().integer().required(),
+            });
+
+            const { error, value } = holdingSchema.validate(req.query ?? {});
+            if (error) return next(error);
+
+            /* ------------------ Base Query ------------------ */
+            let query = `
+                SELECT 
+                    SUM(
+                        CASE 
+                            WHEN ot.transaction_type = 'BUY' THEN ot.quantity
+                            WHEN ot.transaction_type = 'SELL' THEN -ot.quantity
+                            ELSE 0
+                        END
+                    ) AS remaining_quantity
+                FROM order_transactions ot
+                WHERE 1
+            `;
+
+            /* ------------------ Filters ------------------ */
+            query += ` AND ot.user_id = ${value.user_id}`;
+            query += ` AND ot.stock_details_id = ${value.stock_details_id}`;
+            query += ` AND ot.broker_id = ${value.broker_id}`;
+            query += ` AND ot.advisor_id = ${value.advisor_id}`;
+
+            console.log("Holding Quantity Query =>", query);
+
+            /* ------------------ Fetch Data ------------------ */
+            const result = await getData(query, next);
+
+            const remainingQty = result?.[0]?.remaining_quantity ?? 0;
+
+            return res.json({
+                success: true,
+                data: {
+                    remaining_quantity: remainingQty
+                }
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+
 
     async getOrderDetails(req, res, next) {
         try {

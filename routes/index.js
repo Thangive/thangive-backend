@@ -44,6 +44,10 @@ router.post('/advisor', auth, forms, brokerAndAdvisorControler.addUpdateAdvisor)
 router.get('/advisor', auth, brokerAndAdvisorControler.getAdvisor);
 
 router.post('/buyStock', auth, forms, transactionController.addUpdateOrder);
+router.post('/sellStock', auth, forms, transactionController.addUpdateOrder);
+router.get('/holdedStockQuantity', auth, transactionController.getHoldingStockQuantity);
+
+
 // router.post('/stockTransactionUpdate', auth, forms, transactionController.addUpdateOrder);
 router.post('/stockTransactionUpdate', auth, forms, transactionController.addUpdateOrder);
 router.get('/stockOrderList', auth, forms, transactionController.getStockOrderList);
