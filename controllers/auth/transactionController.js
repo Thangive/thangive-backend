@@ -13,8 +13,9 @@ const transactionController = {
                 advisor_id: Joi.number().integer().required(),
                 broker_id: Joi.number().integer().required(),
                 stock_details_id: Joi.number().integer().required(),
-                quantity: Joi.number().required(),
-                current_share_price: Joi.number().integer().required(),
+                quantity: Joi.number().positive().required(),
+                current_share_price: Joi.number().required(),
+
                 order_type: Joi.string()
                     .valid('MARKET', 'LIMIT')
                     .required(),
@@ -22,7 +23,7 @@ const transactionController = {
                 price_per_share: Joi.when('order_type', {
                     is: 'LIMIT',
                     then: Joi.number().required(),
-                    otherwise: Joi.number().optional()
+                    otherwise: Joi.optional()
                 }),
 
                 transaction_type: Joi.string()
@@ -30,12 +31,49 @@ const transactionController = {
                     .required(),
             });
 
-            /* ------------------ Prepare Data ------------------ */
-            let dataObj = { ...req.body };
+            const dataObj = { ...req.body };
 
             /* ------------------ Validate ------------------ */
             const { error } = orderSchema.validate(dataObj);
             if (error) return next(error);
+
+            /* ------------------ MARKET price handling ------------------ */
+            if (dataObj.order_type === 'MARKET') {
+                dataObj.price_per_share = dataObj.current_share_price;
+            }
+
+            /* ------------------ SELL Validation ------------------ */
+            if (dataObj.transaction_type === 'SELL') {
+
+                const qtyQuery = `
+                    SELECT 
+                        COALESCE(SUM(
+                            CASE 
+                                WHEN transaction_type = 'BUY'  THEN quantity
+                                WHEN transaction_type = 'SELL' THEN -quantity
+                                ELSE 0
+                            END
+                        ), 0) AS remaining_quantity
+                    FROM order_transactions
+                    WHERE user_id = ${dataObj.user_id}
+                      AND stock_details_id = ${dataObj.stock_details_id}
+                      AND broker_id = ${dataObj.broker_id}
+                      AND rm_status = 'COMPLETED'
+                      AND am_status = 'COMPLETED'
+                      AND st_status = 'COMPLETED'
+                `;
+
+                const qtyResult = await getData(qtyQuery, next);
+                const remainingQty = qtyResult?.[0]?.remaining_quantity || 0;
+
+                if (remainingQty < dataObj.quantity) {
+                    return next(
+                        CustomErrorHandler.badRequest(
+                            `Insufficient quantity. Available: ${remainingQty}`
+                        )
+                    );
+                }
+            }
 
             /* ------------------ Insert / Update ------------------ */
             let query = '';
@@ -66,53 +104,67 @@ const transactionController = {
         }
     },
 
-    async addUpdateOrder1(req, res, next) {
+    async updateOrderStatus(req, res, next) {
         try {
             /* ------------------ Validation Schema ------------------ */
             const orderSchema = Joi.object({
-                order_id: Joi.number().integer().optional(),
+                order_id: Joi.number().integer().required(),
+                user_id: Joi.number().integer().required(),
                 employee_id: Joi.number().integer().required(),
-                advisor_id: Joi.number().integer().required(),
-                broker_id: Joi.number().integer().required(),
+                employee_type: Joi.string().valid('RM', 'AM', 'ST').required(),
                 stock_details_id: Joi.number().integer().required(),
-
-                quantity: Joi.number().required(),
-                price_per_share: Joi.number().required(),
-
                 status: Joi.string()
-                    .valid('MARKET', 'LIMIT')
+                    .valid('COMPLETED', 'PROCCESSING', 'HOLD', 'REJECTED', 'CANCEL', 'PENDING')
                     .required(),
             });
 
-            /* ------------------ Prepare Data ------------------ */
-            let dataObj = { ...req.body };
+            const dataObj = { ...req.body };
 
-            /* ------------------ Validate ------------------ */
-            const { error } = orderSchema.validate(dataObj);
+            /* ------------------ Validate Request ------------------ */
+            const { error } = orderSchema.validate(dataObj ?? {});
             if (error) return next(error);
 
-            /* ------------------ Insert / Update ------------------ */
-            let query = '';
-            if (dataObj.order_id) {
-                query = `UPDATE order_transactions SET ? WHERE order_id = ${dataObj.order_id}`;
-                dataObj.updated_on = new Date();
-            } else {
-                query = `INSERT INTO order_transactions SET ?`;
-                dataObj.created_at = new Date();
+            /* ------------------ USER ↔ EMPLOYEE ASSIGNMENT CHECK ------------------ */
+            const assignCheckQuery = ` SELECT user_id  FROM users WHERE user_id = '${dataObj.user_id}' AND assign_to = '${dataObj.employee_id}' AND is_deleted = 0 LIMIT 1 `;
+            if (dataObj.employee_type == "RM") {
+                const assignCheck = await getData(
+                    assignCheckQuery,
+                    next
+                );
+
+                if (!assignCheck || assignCheck.length === 0) {
+                    return next(
+                        CustomErrorHandler.unauthorized(
+                            "This user is not assigned to the given employee"
+                        )
+                    );
+                }
+
+            }
+            /* ------------------ UPDATE ORDER ------------------ */
+            let updatedObject = {};
+            // store status against employee type
+            if (dataObj.employee_type === 'RM') {
+                updatedObject.rm_status = dataObj.status;
+            } else if (dataObj.employee_type === 'AM') {
+                updatedObject.am_status = dataObj.status;
+            } else if (dataObj.employee_type === 'ST') {
+                updatedObject.st_status = dataObj.status;
             }
 
-            const result = await insertData(query, dataObj, next);
+            const query = `
+                UPDATE order_transactions 
+                SET ? 
+                WHERE order_id = ${dataObj.order_id}
+                  AND user_id = ${dataObj.user_id}
+                  AND stock_details_id =  ${dataObj.stock_details_id}
+            `;
 
-            if (result.insertId) {
-                dataObj.order_id = result.insertId;
-            }
+            await insertData(query, updatedObject, next);
 
             return res.json({
                 success: true,
-                message: dataObj.order_id
-                    ? 'Order updated successfully'
-                    : 'Order placed successfully',
-                data: dataObj
+                message: "Order status updated successfully"
             });
 
         } catch (error) {
@@ -123,7 +175,7 @@ const transactionController = {
     async getUserHoldigs(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = "SELECT * FROM `vw_portfolio_summary` WHERE 1";
+            let query = "SELECT * FROM `vw_portfolio_summary` WHERE `rm_status`='COMPLETED' AND `am_status`='COMPLETED' AND `st_status`='COMPLETED'";
 
             let cond = '';
             let page = { pageQuery: '' };
@@ -319,7 +371,7 @@ const transactionController = {
 
             /* ------------------ Base Query ------------------ */
             let query = `
-                SELECT 
+                 SELECT 
                     SUM(
                         CASE 
                             WHEN ot.transaction_type = 'BUY' THEN ot.quantity
@@ -328,7 +380,7 @@ const transactionController = {
                         END
                     ) AS remaining_quantity
                 FROM order_transactions ot
-                WHERE 1
+                WHERE ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'
             `;
 
             /* ------------------ Filters ------------------ */
@@ -355,8 +407,6 @@ const transactionController = {
             next(err);
         }
     },
-
-
 
     async getOrderDetails(req, res, next) {
         try {

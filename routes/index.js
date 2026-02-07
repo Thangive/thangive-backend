@@ -45,6 +45,7 @@ router.get('/advisor', auth, brokerAndAdvisorControler.getAdvisor);
 
 router.post('/buyStock', auth, forms, transactionController.addUpdateOrder);
 router.post('/sellStock', auth, forms, transactionController.addUpdateOrder);
+router.post('/updateOrderStatus', auth, forms, transactionController.updateOrderStatus);
 router.get('/holdedStockQuantity', auth, transactionController.getHoldingStockQuantity);
 
 
