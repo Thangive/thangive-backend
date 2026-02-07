@@ -213,6 +213,8 @@ const transactionController = {
                     ON ad.advisor_id = ot.advisor_id
                 JOIN broker bro
                     ON bro.broker_id = ot.broker_id
+                JOIN users users
+                    ON users.user_id = ot.user_id
                 JOIN stock_price sp
                     ON sp.stock_details_id = st.stock_details_id
                 JOIN (
@@ -229,9 +231,10 @@ const transactionController = {
 
             /* ------------------ Validation Schema ------------------ */
             const holdingSchema = Joi.object({
-                user_id: Joi.number().integer().required(),
+                user_id: Joi.number().integer().optional(),
                 stock_details_id: Joi.number().integer(),
                 broker_id: Joi.number().integer(),
+                rm_id: Joi.number().integer(),
                 transaction_type: Joi.string()
                     .valid('BUY', 'SELL')
                     .optional(),
@@ -244,10 +247,18 @@ const transactionController = {
             if (error) return next(error);
 
             /* ------------------ Filters ------------------ */
-            cond += ` AND ot.user_id = ${value.user_id}`;
+
+
+            if (value.user_id) {
+                cond += ` AND ot.user_id = ${value.user_id}`;
+            }
 
             if (value.stock_details_id) {
                 cond += ` AND ot.stock_details_id = ${value.stock_details_id}`;
+            }
+
+            if (value.rm_id) {
+                cond += ` AND users.assign_to = ${value.rm_id}`;
             }
 
             if (value.transaction_type) {
