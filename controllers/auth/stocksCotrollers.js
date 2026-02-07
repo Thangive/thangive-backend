@@ -1036,7 +1036,7 @@ const stocksControllers = {
     async getCompanyLogos(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = `SELECT stock_details_id,company_name,cmp_logo FROM stock_details WHERE stock_type='UNLISTED'`;
+            let query = `SELECT stock_details_id,company_name,cmp_logo FROM stock_details WHERE stock_type !='LISTED'`;
             let cond = '';
             let page = { pageQuery: '' };
 

@@ -193,6 +193,7 @@ const stocksGetController = {
             const stockSchema = Joi.object({
                 stock_details_id: Joi.number().integer(),
                 company_name: Joi.string(),
+                industry_name:Joi.string(),
                 script_name: Joi.string(),
                 isin_no: Joi.string(),
                 stock_type: Joi.valid('UNLISTED', 'PRE IPO', 'DELISTED', 'ANGEL INVESTING', 'THANGIV'),
@@ -223,6 +224,9 @@ const stocksGetController = {
 
             if (req.query.wishlist_id)
                 cond += ` AND ws.wishlist_id = '${req.query.wishlist_id}'`;
+
+            if (req.query.industry_name)
+                cond += ` AND sub.sub_industryName ='${req.query.industry_name}'`;
 
             // 🔹 Pagination
             if (req.query.pagination) {

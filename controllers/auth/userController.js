@@ -452,6 +452,7 @@ const userController = {
             /* ------------------ Validation Schema ------------------ */
             const userSchema = Joi.object({
                 user_id: Joi.number().integer(),
+                assign_to: Joi.number().integer(),
                 username: Joi.string(),
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
@@ -478,6 +479,10 @@ const userController = {
 
             if (req.query.phone_number) {
                 cond += ` AND phone_number LIKE '%${req.query.phone_number}%'`;
+            }
+
+            if (req.query.assign_to) {
+                cond += ` AND assign_to LIKE '%${req.query.assign_to}%'`;
             }
 
             /* ------------------ Pagination ------------------ */
