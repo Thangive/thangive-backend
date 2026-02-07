@@ -1,6 +1,7 @@
 import Joi from 'joi';
 import { getData, insertData } from '../../config/index.js';
 import { CustomErrorHandler } from "../../service/index.js";
+import paginationQuery from '../../helper/paginationQuery.js';
 
 const transactionController = {
     async addUpdateOrder(req, res, next) {
@@ -35,10 +36,64 @@ const transactionController = {
             /* ------------------ Insert / Update ------------------ */
             let query = '';
             if (dataObj.order_id) {
-                query = `UPDATE orders SET ? WHERE order_id = ${dataObj.order_id}`;
+                query = `UPDATE order_transactions SET ? WHERE order_id = ${dataObj.order_id}`;
                 dataObj.updated_on = new Date();
             } else {
-                query = `INSERT INTO orders SET ?`;
+                query = `INSERT INTO order_transactions SET ?`;
+                dataObj.created_at = new Date();
+            }
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.order_id = result.insertId;
+            }
+
+            return res.json({
+                success: true,
+                message: dataObj.order_id
+                    ? 'Order updated successfully'
+                    : 'Order placed successfully',
+                data: dataObj
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async addUpdateOrder(req, res, next) {
+        try {
+            /* ------------------ Validation Schema ------------------ */
+            const orderSchema = Joi.object({
+                order_id: Joi.number().integer().optional(),
+                employee_id: Joi.number().integer().required(),
+                advisor_id: Joi.number().integer().required(),
+                broker_id: Joi.number().integer().required(),
+                stock_details_id: Joi.number().integer().required(),
+
+                quantity: Joi.number().required(),
+                price_per_share: Joi.number().required(),
+
+                status: Joi.string()
+                    .valid('MARKET', 'LIMIT')
+                    .required(),
+            });
+
+            /* ------------------ Prepare Data ------------------ */
+            let dataObj = { ...req.body };
+
+            /* ------------------ Validate ------------------ */
+            const { error } = orderSchema.validate(dataObj);
+            if (error) return next(error);
+
+            /* ------------------ Insert / Update ------------------ */
+            let query = '';
+            if (dataObj.order_id) {
+                query = `UPDATE order_transactions SET ? WHERE order_id = ${dataObj.order_id}`;
+                dataObj.updated_on = new Date();
+            } else {
+                query = `INSERT INTO order_transactions SET ?`;
                 dataObj.created_at = new Date();
             }
 
@@ -64,7 +119,7 @@ const transactionController = {
     async getUserHoldigs(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = "SELECT * FROM `userholdings` WHERE 1";
+            let query = "SELECT * FROM `vw_portfolio_summary` WHERE 1";
 
             let cond = '';
             let page = { pageQuery: '' };
@@ -118,6 +173,115 @@ const transactionController = {
                 currentPage: page.currentPage || 1,
                 records: data.length,
                 data: data
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    async getStockOrderList(req, res, next) {
+        try {
+            /* ------------------ Base Query ------------------ */
+            let query = `
+                SELECT
+                    ot.order_id AS order_transaction_id,
+                    ot.stock_details_id,
+                    ot.user_id,
+                    ad.advisor_name,
+                    bro.broker_custom_id AS broker_id,
+                    bro.broker_name,
+                    st.company_name,
+                    sp.prev_price,
+                    sp.today_prices AS latest_price,
+                    ot.price_per_share AS stock_price,
+                    ot.quantity AS quantity,
+                    (ot.price_per_share * ot.quantity) AS investment_amount,
+                    (sp.today_prices * ot.quantity) AS market_value,
+                    (sp.today_prices * ot.quantity) - (ot.price_per_share * ot.quantity) AS overall_PL,
+                    ((sp.today_prices - sp.prev_price) * ot.quantity) AS daily_PL,
+                    ot.order_type,
+                    ot.rm_status,
+                    ot.am_status,
+                    ot.st_status,
+                    ot.payments_count,
+                    ot.created_at
+                FROM order_transactions ot
+                JOIN stock_details st
+                    ON ot.stock_details_id = st.stock_details_id
+                JOIN advisor ad
+                    ON ad.advisor_id = ot.advisor_id
+                JOIN broker bro
+                    ON bro.broker_id = ot.broker_id
+                JOIN stock_price sp
+                    ON sp.stock_details_id = st.stock_details_id
+                JOIN (
+                    SELECT stock_details_id, MAX(stock_price_id) AS latest_id
+                    FROM stock_price
+                    GROUP BY stock_details_id
+                ) latest
+                    ON latest.latest_id = sp.stock_price_id
+                WHERE 1
+            `;
+
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            /* ------------------ Validation Schema ------------------ */
+            const holdingSchema = Joi.object({
+                user_id: Joi.number().integer().required(),
+                stock_details_id: Joi.number().integer(),
+                broker_id: Joi.number().integer(),
+                transaction_type: Joi.string()
+                    .valid('BUY', 'SELL')
+                    .optional(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer(),
+            });
+
+            const { error, value } = holdingSchema.validate(req.query ?? {});
+            if (error) return next(error);
+
+            /* ------------------ Filters ------------------ */
+            cond += ` AND ot.user_id = ${value.user_id}`;
+
+            if (value.stock_details_id) {
+                cond += ` AND ot.stock_details_id = ${value.stock_details_id}`;
+            }
+
+            if (value.transaction_type) {
+                cond += ` AND ot.transaction_type = '${value.transaction_type}'`;
+            }
+
+            if (value.broker_id) {
+                cond += ` AND ot.broker_id = ${value.broker_id}`;
+            }
+
+            /* ------------------ Pagination ------------------ */
+            if (value.pagination) {
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    value.current_page,
+                    value.per_page_records
+                );
+            }
+
+            query += cond + page.pageQuery;
+
+            console.log("Holdings Query =>", query);
+
+            /* ------------------ Fetch Data ------------------ */
+            const data = await getData(query, next);
+
+            return res.json({
+                message: 'success',
+                total_records: page.total_rec ?? data.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: data.length,
+                data
             });
 
         } catch (err) {
