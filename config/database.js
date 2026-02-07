@@ -1,20 +1,21 @@
 import mysql from 'mysql';
 import CustomErrorHandler from '../service/CustomErrorHandler.js';
-import { isArray } from 'util';
 
 /**
  * ENV
  * SERVER_HOST=true  → server
  * SERVER_HOST=false → local
  */
-const isServer = (process.env.SERVER_HOST === true);
+const isServer = (process.env.SERVER_HOST !== true);
 
 const credentil = isServer
     ? {
-        host: "127.0.0.1",
-        user: "dbt",
-        password: "thangive@2026",
-        database: "thangi"
+        host: "194.164.151.204",
+        user: "thangiveTest",
+        password: "thangiveTest@@@123",
+        database: "thangiveTest",
+        port: 3306,
+        ssl: { rejectUnauthorized: false }
     }
     : {
         host: "localhost",
