@@ -525,7 +525,7 @@ const transactionController = {
             const bankData = await getData(bankQuery, next);
 
             /* ------------------ Payment Details ------------------ */
-            const paymentQuery = `SELECT DATE_FORMAT(pt.created_at, '%d-%m-%Y') AS date,b.bank_name,pt.amount,pt.transaction_ref,pt.remark,pt.rm_status,pt.am_status FROM payment_transaction pt LEFT JOIN bank_details b ON b.bank_id = pt.bank_id WHERE pt.order_id =  '${req.query.order_id}'`;
+            const paymentQuery = `SELECT DATE_FORMAT(pt.created_at, '%d-%m-%Y') AS date,b.bank_name,pt.amount,pt.remaining_amount,pt.transaction_ref,pt.remark,pt.rm_status,pt.am_status FROM payment_transactions pt LEFT JOIN bank_details b ON b.bank_id = pt.bank_id WHERE pt.order_id =  '${req.query.order_id}'`;
 
             const paymentData = await getData(paymentQuery, next);
 
