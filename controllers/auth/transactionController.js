@@ -217,8 +217,6 @@ const transactionController = {
 
             query += page.pageQuery;
 
-            console.log("Holdings Query =>", query);
-
             /* ------------------ Fetch Data ------------------ */
             const data = await getData(query, next);
 
@@ -290,7 +288,15 @@ const transactionController = {
                 user_id: Joi.number().integer().optional(),
                 stock_details_id: Joi.number().integer(),
                 broker_id: Joi.number().integer(),
-                rm_id: Joi.number().integer(),
+                employee_type: Joi.string()
+                    .valid('RM', 'AM', 'ST')
+                    .optional(),
+
+                employee_id: Joi.when('employee_type', {
+                    is: 'RM',
+                    then: Joi.number().integer().required(),
+                    otherwise: Joi.number().integer().optional()
+                }),
                 transaction_type: Joi.string()
                     .valid('BUY', 'SELL')
                     .optional(),
@@ -304,7 +310,6 @@ const transactionController = {
 
             /* ------------------ Filters ------------------ */
 
-
             if (value.user_id) {
                 cond += ` AND ot.user_id = ${value.user_id}`;
             }
@@ -313,8 +318,16 @@ const transactionController = {
                 cond += ` AND ot.stock_details_id = ${value.stock_details_id}`;
             }
 
-            if (value.rm_id) {
-                cond += ` AND users.assign_to = ${value.rm_id}`;
+            if (value.employee_id && value.employee_type == "RM") {
+                cond += `  AND ot.rm_status <> 'CANCEL' AND ot.rm_status <> 'COMPLETED' AND users.assign_to = ${value.employee_id}`;
+            }
+
+            if (value.employee_type == "AM") {
+                cond += ` AND ot.rm_status <> 'CANCEL' AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED'`;
+            }
+
+            if (value.employee_type == "ST") {
+                cond += ` AND ot.rm_status <> 'CANCEL' AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status != 'COMPLETED'`;
             }
 
             if (value.transaction_type) {
@@ -336,8 +349,6 @@ const transactionController = {
             }
 
             query += cond + page.pageQuery;
-
-            console.log("Holdings Query =>", query);
 
             /* ------------------ Fetch Data ------------------ */
             const data = await getData(query, next);
@@ -410,50 +421,117 @@ const transactionController = {
 
     async getOrderDetails(req, res, next) {
         try {
-            /* ------------------ Base Query ------------------ */
-            let query = "SELECT ot.order_id,ot.user_id, b.broker_name, ot.transaction_type, sd.isin_no, sd.company_name, ot.price_per_share, ot.quatity FROM order_transactions ot JOIN stock_details sd ON sd.stock_details_id = ot.stock_details_id JOIN broker b ON b.broker_id = ot.broker_id WHERE 1";
-
-            let cond = '';
-            var clientData;
-            let page = { pageQuery: '' };
-
             /* ------------------ Validation Schema ------------------ */
-            const holdingSchema = Joi.object({
+            const orderSchema = Joi.object({
                 order_id: Joi.number().integer().required()
             });
 
-            const { error } = holdingSchema.validate(req.query);
+            const { error } = orderSchema.validate(req.query ?? {});
             if (error) return next(error);
 
-            /* ------------------ Filters ------------------ */
-            cond += ` AND ot.order_id = ${req.query.order_id}`;
+            /* ------------------ Order Details Query ------------------ */
+            const orderQuery = `
+            SELECT 
+                ot.order_id,
+                ot.user_id,
+                ot.order_custom_id,
+                b.broker_name AS broker_name, 
+                sd.isin_no, 
+                sd.company_name, 
+                sd.script_name, 
+                ot.transaction_type, 
+                sp.today_prices,
+                ot.price_per_share AS buy_price, 
+                ot.quantity,
+                (ot.price_per_share * ot.quantity) AS deal_value, 
+                ot.rm_status,
+                DATE_FORMAT(
+                    CONVERT_TZ(ot.created_at, '+00:00', '+05:30'),
+                    '%d-%m-%Y'
+                ) AS order_date,
+                 DATE_FORMAT(
+                    CONVERT_TZ(ot.created_at, '+00:00', '+05:30'),
+                    '%H:%i:%s'
+                ) AS order_time
+            FROM order_transactions ot
+            JOIN stock_details sd 
+                ON sd.stock_details_id = ot.stock_details_id
+            JOIN broker b 
+                ON b.broker_id = ot.broker_id
+            JOIN users usr 
+                ON usr.user_id = ot.user_id
+            JOIN stock_price sp
+                ON sp.stock_details_id = ot.stock_details_id
+            JOIN (
+                SELECT stock_details_id, MAX(stock_price_id) AS latest_id
+                FROM stock_price
+                GROUP BY stock_details_id
+            ) latest
+                ON latest.latest_id = sp.stock_price_id
+            WHERE ot.order_id = ${req.query.order_id}
+        `;
 
-            query += cond + page.pageQuery;
+            const orderData = await getData(orderQuery, next);
 
-            console.log("Holdings Query =>", query);
-
-            /* ------------------ Fetch Data ------------------ */
-            const users = await getData(query, next);
-
-            /* ------------------ Client Fetch Data ------------------ */
-            if (users.length) {
-                const clientQuery = `SELECT user_id,username,user_custum_id,email,phone_number FROM users WHERE user_id='${users[0].user_id}';`;
-                clientData = await getData(clientQuery, next);
+            if (!orderData.length) {
+                return next(
+                    CustomErrorHandler.notFound('Order not found')
+                );
             }
 
-            /* ------------------ Bank  Details ------------------ */
-            if (users.length) {
-                const clientQuery = `SELECT user_id,username,user_custum_id,email,phone_number FROM users WHERE user_id='${users[0].user_id}';`;
-                clientData = await getData(clientQuery, next);
-            }
+            const userId = orderData[0].user_id;
 
+            /* ------------------ Client Details ------------------ */
+            const clientQuery = `
+                SELECT 
+                    user_id,
+                    username,
+                    user_custum_id,
+                    email,
+                    phone_number
+                FROM users
+                WHERE user_id = ${userId}
+            `;
+            const clientData = await getData(clientQuery, next);
+
+            /* ------------------ Broker Details ------------------ */
+            const brokerQuery = `
+                SELECT 
+                    br.broker_custom_id,
+                    br.broker_name,
+                    cmr.client_id,
+                    br.broker_email,
+                    br.broker_contact
+                FROM broker br
+                JOIN user_cmr_details cmr 
+                    ON cmr.broker_id = br.broker_id
+                WHERE br.is_deleted = 0
+                  AND cmr.user_id = ${userId}
+            `;
+            const brokerData = await getData(brokerQuery, next);
+
+            /* ------------------ Bank Details ------------------ */
+            const bankQuery = `
+                SELECT 
+                    bank_id,
+                    bank_name,
+                    account_type,
+                    account_no,
+                    ifsc_code
+                FROM user_bank_details
+                WHERE is_deleted = 0
+                  AND user_id = ${userId}
+            `;
+            const bankData = await getData(bankQuery, next);
 
             return res.json({
                 message: 'success',
-                records: data.length,
+                records: 1,
                 data: {
-                    clientDetails: clientData[0],
-                    transactionData: data[0]
+                    clientDetails: clientData[0] ?? {},
+                    brokerDetails: brokerData[0] ?? {},
+                    bankDetails: bankData[0] ?? {},
+                    transactionData: orderData[0]
                 }
             });
 
