@@ -319,7 +319,7 @@ const transactionController = {
             }
 
             if (value.employee_id && value.employee_type == "RM") {
-                cond += `  AND ot.rm_status <> 'CANCEL' AND ot.rm_status <> 'COMPLETED' AND users.assign_to = ${value.employee_id}`;
+                cond += ` AND users.assign_to = ${value.employee_id}`;
             }
 
             if (value.employee_type == "AM") {
