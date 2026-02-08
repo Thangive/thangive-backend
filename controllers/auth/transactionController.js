@@ -530,8 +530,9 @@ const transactionController = {
                 data: {
                     clientDetails: clientData[0] ?? {},
                     brokerDetails: brokerData[0] ?? {},
-                    bankDetails: bankData[0] ?? {},
-                    transactionData: orderData[0]
+                    bankDetails: bankData ?? {},
+                    paymentDetails: [],
+                    orderDetails: orderData[0]
                 }
             });
 
