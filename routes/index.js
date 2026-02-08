@@ -55,6 +55,9 @@ router.get('/stockOrderList', auth, forms, transactionController.getStockOrderLi
 router.get('/stockOrderDetails', auth, transactionController.getOrderDetails);
 router.get('/userHoldings', auth, transactionController.getUserHoldigs);
 
+// Payment APIS
+router.post('/addPaymentDetails', auth, forms, transactionController.addUpdatePayment);
+
 
 // Stock Details API
 router.get('/getCompanyLogos', stocksCotrollers.getCompanyLogos);

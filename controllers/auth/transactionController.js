@@ -524,6 +524,11 @@ const transactionController = {
             `;
             const bankData = await getData(bankQuery, next);
 
+            /* ------------------ Payment Details ------------------ */
+            const paymentQuery = `SELECT DATE_FORMAT(pt.created_at, '%d-%m-%Y') AS date,b.bank_name,pt.amount,pt.transaction_ref,pt.remark,pt.rm_status,pt.am_status FROM payment_transaction pt LEFT JOIN bank_details b ON b.bank_id = pt.bank_id WHERE pt.order_id =  '${req.query.order_id}'`;
+
+            const paymentData = await getData(paymentQuery, next);
+
             return res.json({
                 message: 'success',
                 records: 1,
@@ -531,7 +536,7 @@ const transactionController = {
                     clientDetails: clientData[0] ?? {},
                     brokerDetails: brokerData[0] ?? {},
                     bankDetails: bankData ?? {},
-                    paymentDetails: [],
+                    paymentDetails: paymentData ?? [],
                     orderDetails: orderData[0]
                 }
             });
@@ -539,7 +544,119 @@ const transactionController = {
         } catch (err) {
             next(err);
         }
+    },
+
+    async addUpdatePayment(req, res, next) {
+        try {
+            /* ------------------ Validation Schema ------------------ */
+            const paymentSchema = Joi.object({
+                payment_id: Joi.number().integer().optional(),
+                order_id: Joi.number().integer().required(),
+                bank_id: Joi.number().integer().required(),
+                transaction_ref: Joi.string().required(),
+                amount: Joi.number().positive().required(),
+                payment_mode: Joi.string()
+                    .valid('CASH', 'UPI', 'NEFT', 'RTGS', 'IMPS', 'CHEQUE')
+                    .required(),
+                payment_type: Joi.string()
+                    .valid('PARTIAL', 'FULL')
+                    .required(),
+                remark: Joi.string().allow('', null).optional()
+            });
+
+            const dataObj = { ...req.body };
+
+            /* ------------------ Validate ------------------ */
+            const { error } = paymentSchema.validate(dataObj);
+            if (error) return next(error);
+
+            /* ------------------ Fetch Order Total ------------------ */
+            const orderAmountQuery = `
+                SELECT 
+                    COALESCE(SUM(price_per_share * quantity), 0) AS order_amount
+                FROM order_transactions
+                WHERE order_id = ${dataObj.order_id}
+            `;
+
+            const orderAmountResult = await getData(orderAmountQuery, next);
+            const orderAmount = orderAmountResult?.[0]?.order_amount || 0;
+
+            if (!orderAmount) {
+                return next(
+                    CustomErrorHandler.badRequest('Invalid order or order amount not found')
+                );
+            }
+
+            /* ------------------ Already Paid Amount ------------------ */
+            let paidAmountQuery = `
+                SELECT 
+                    COALESCE(SUM(amount), 0) AS paid_amount
+                FROM payment_transactions
+                WHERE order_id = ${dataObj.order_id}
+                  AND rm_status = 'COMPLETED'
+                  AND am_status = 'COMPLETED'
+            `;
+
+            /* Exclude current payment while updating */
+            if (dataObj.payment_id) {
+                paidAmountQuery += ` AND payment_id <> ${dataObj.payment_id}`;
+            }
+
+            const paidAmountResult = await getData(paidAmountQuery, next);
+            const paidAmount = paidAmountResult?.[0]?.paid_amount || 0;
+
+            const remainingAmount = orderAmount - paidAmount;
+
+            /* ------------------ Amount Validation ------------------ */
+            if (dataObj.amount > remainingAmount) {
+                return next(
+                    CustomErrorHandler.badRequest(
+                        `Payment exceeds remaining amount. Remaining: ${remainingAmount}`
+                    )
+                );
+            }
+
+            /* ------------------ Prepare Data ------------------ */
+            dataObj.remaining_amount = remainingAmount - dataObj.amount;
+
+            let query = '';
+
+            if (dataObj.payment_id) {
+                /* ------------------ Update Payment ------------------ */
+                query = `
+                    UPDATE payment_transactions
+                    SET ?
+                    WHERE payment_id = ${dataObj.payment_id}
+                `;
+                dataObj.updated_on = new Date();
+            } else {
+                /* ------------------ Insert Payment ------------------ */
+                query = `INSERT INTO payment_transactions SET ?`;
+                dataObj.rm_status = 'PENDING';
+                dataObj.am_status = 'PENDING';
+                dataObj.created_at = new Date();
+            }
+
+            const result = await insertData(query, dataObj, next);
+
+            if (!dataObj.payment_id && result.insertId) {
+                dataObj.payment_id = result.insertId;
+            }
+
+            return res.json({
+                success: true,
+                message: dataObj.payment_id
+                    ? 'Payment updated successfully'
+                    : 'Payment added successfully',
+                data: dataObj
+            });
+
+        } catch (error) {
+            next(error);
+        }
     }
+
+
 
 
 };
