@@ -288,6 +288,7 @@ const transactionController = {
                 user_id: Joi.number().integer().optional(),
                 stock_details_id: Joi.number().integer(),
                 broker_id: Joi.number().integer(),
+                advisor_id: Joi.number().integer(),
                 employee_type: Joi.string()
                     .valid('RM', 'AM', 'ST')
                     .optional(),
@@ -336,6 +337,10 @@ const transactionController = {
 
             if (value.broker_id) {
                 cond += ` AND ot.broker_id = ${value.broker_id}`;
+            }
+
+            if(value.advisor_id){
+                cond += ` AND ot.advisor_id = ${value.advisor_id}`;
             }
 
             /* ------------------ Pagination ------------------ */
@@ -435,6 +440,7 @@ const transactionController = {
                 ot.order_id,
                 ot.user_id,
                 ot.order_custom_id,
+                ot.stock_details_id,
                 b.broker_name AS broker_name, 
                 sd.isin_no, 
                 sd.company_name, 
@@ -445,6 +451,8 @@ const transactionController = {
                 ot.quantity,
                 (ot.price_per_share * ot.quantity) AS deal_value, 
                 ot.rm_status,
+                ot.am_status,
+                ot.st_status,
                 DATE_FORMAT(
                     CONVERT_TZ(ot.created_at, '+00:00', '+05:30'),
                     '%d-%m-%Y'
