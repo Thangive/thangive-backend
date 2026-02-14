@@ -46,7 +46,7 @@ const wishlistController = {
             let query = '';
             if (dataObj.wishlist_id) {
                 query = `UPDATE wishlist SET ? WHERE wishlist_id = ${dataObj.wishlist_id}`;
-                dataObj.updated_at = new Date();
+                dataObj.updated_on = new Date();
             } else {
                 query = `INSERT INTO wishlist SET ?`;
                 dataObj.created_at = new Date();
@@ -149,7 +149,58 @@ const wishlistController = {
             next(error);
         }
     },
+    async removeStockFromWishlist(req, res, next) {
+        try {
 
+            /* ------------------ Validation Schema ------------------ */
+            const deleteSchema = Joi.object({
+                user_id: Joi.number().integer().required(),
+                stock_details_id: Joi.number().integer().required(),
+            });
+
+            let dataObj = { ...req.body };
+            console.log(req.body);
+            /* ------------------ Validate ------------------ */
+            const { error } = deleteSchema.validate(dataObj);
+            if (error) return next(error);
+
+            /* ------------------ Check Exists ------------------ */
+            const checkQuery = `
+            SELECT wishlist_stock_id
+            FROM wishlist_stock
+            WHERE user_id = ${dataObj.user_id}
+            AND stock_details_id = ${dataObj.stock_details_id}
+        `;
+
+            const exists = await getData(checkQuery, next);
+
+            if (exists.length === 0) {
+                return next(
+                    CustomErrorHandler.notFound(
+                        'Stock not found in wishlist'
+                    )
+                );
+            }
+
+            /* ------------------ Delete ------------------ */
+            const deleteQuery = `
+            DELETE FROM wishlist_stock
+            WHERE user_id = ${dataObj.user_id}
+            AND stock_details_id = ${dataObj.stock_details_id}
+        `;
+
+            await getData(deleteQuery, next);
+
+            return res.json({
+                success: true,
+                message: 'Stock removed from wishlist successfully',
+                data: dataObj
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
     async getWishlist(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */

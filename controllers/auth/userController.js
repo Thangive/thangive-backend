@@ -265,6 +265,7 @@ const userController = {
                 ifsc_code: Joi.string().required(),
                 account_status: Joi.string().required(),
                 phone_number: Joi.string().required(),
+                branch:Joi.string().required(),
 
                 statement: Joi.string()
                     .allow('')

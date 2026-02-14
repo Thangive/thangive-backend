@@ -185,6 +185,7 @@ const transactionController = {
                 user_id: Joi.number().integer().required(),
                 stock_details_id: Joi.number().integer(),
                 broker_id: Joi.number().integer(),
+                advisor_id: Joi.number().integer(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),
@@ -204,7 +205,10 @@ const transactionController = {
                 cond += ` AND broker_id = ${req.query.broker_id}`;
             }
 
-
+            if(req.query.advisor_id){
+                cond += ` AND advisor_id = ${req.query.advisor_id}`;
+            }
+            query += cond;
             /* ------------------ Pagination ------------------ */
             if (req.query.pagination) {
                 page = await paginationQuery(
@@ -216,7 +220,7 @@ const transactionController = {
             }
 
             query += page.pageQuery;
-
+            console.log(query);
             /* ------------------ Fetch Data ------------------ */
             const data = await getData(query, next);
 
@@ -343,17 +347,21 @@ const transactionController = {
                 cond += ` AND ot.advisor_id = ${value.advisor_id}`;
             }
 
+            query += cond;
+            query += ` ORDER BY ot.created_at DESC `;
+
             /* ------------------ Pagination ------------------ */
             if (value.pagination) {
                 page = await paginationQuery(
-                    query + cond,
+                    // query + cond,
+                    query,
                     next,
                     value.current_page,
                     value.per_page_records
                 );
             }
-
-            query += cond + page.pageQuery;
+            query += page.pageQuery;
+            // query += cond + page.pageQuery;
 
             /* ------------------ Fetch Data ------------------ */
             const data = await getData(query, next);

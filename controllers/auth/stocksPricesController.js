@@ -1769,6 +1769,124 @@ const PriceController = {
         } catch (err) {
             next(err);
         }
+    },
+    async uploadStockPriceExcel(req, res, next) {
+        try {
+
+            /* ---------- FILE CHECK ---------- */
+            if (!req.files || req.files.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Excel file required"
+                });
+            }
+
+            const file = req.files[0];
+
+            /* ---------- READ EXCEL ---------- */
+            const workbook = XLSX.read(file.buffer, { type: "buffer" });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+            const rows = XLSX.utils.sheet_to_json(sheet, {
+                defval: "",
+                raw: false
+            });
+
+            let inserted = [];
+            let skipped = [];
+
+            /* ---------- LOOP ROWS ---------- */
+            for (const row of rows) {
+
+                /* ---------- REQUIRED FIELD CHECK ---------- */
+                if (!row.date || !row.stock_details_id) {
+                    skipped.push({
+                        row,
+                        reason: "Date or stock_details_id missing"
+                    });
+                    continue;
+                }
+
+                /* ---------- DATE CONVERSION ---------- */
+                const parts = String(row.date).split("/");
+
+                if (parts.length !== 3) {
+                    skipped.push({
+                        row,
+                        reason: "Invalid date format"
+                    });
+                    continue;
+                }
+
+                let [month, day, year] = parts;
+
+                // Handle 2-digit year
+                if (year.length === 2) {
+                    year = "20" + year;
+                }
+
+                const formattedDate =
+                    `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+
+                /* ---------- NUMBER CONVERSION ---------- */
+                const stockId = Number(row.stock_details_id);
+                const today_prices = Number(row.share_price) || 0;
+                const lot = Number(row.lot) || 0;
+
+                if (!stockId) {
+                    skipped.push({
+                        row,
+                        reason: "Invalid stock_details_id"
+                    });
+                    continue;
+                }
+
+                /* ---------- CONVICTION LEVEL CAPITAL ---------- */
+                const conviction_level = row.conviction_level
+                    ? String(row.conviction_level).trim().toUpperCase()
+                    : "MEDIUM";
+
+                /* ---------- PAYLOAD ---------- */
+                const payload = {
+                    stock_details_id: stockId,
+                    prev_price: today_prices,
+                    today_prices: today_prices,
+                    partner_price: 0,
+                    conviction_level: conviction_level,
+                    availability: "AVAILABLE",
+                    lot: lot,
+                    present_date: formattedDate,
+                    created_at: new Date(),
+                    time: new Date(),
+                    update_date: new Date()
+                };
+
+                /* ---------- INSERT ---------- */
+                await insertData(
+                    `INSERT INTO stock_price SET ?`,
+                    payload,
+                    next
+                );
+
+                inserted.push({
+                    stock_details_id: stockId,
+                    date: formattedDate
+                });
+            }
+
+            /* ---------- RESPONSE ---------- */
+            return res.json({
+                success: true,
+                message: "Excel upload completed successfully",
+                total_rows: rows.length,
+                inserted_count: inserted.length,
+                skipped_count: skipped.length,
+                skipped
+            });
+
+        } catch (err) {
+            next(err);
+        }
     }
 }
 export default PriceController

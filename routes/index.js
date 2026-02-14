@@ -35,6 +35,7 @@ router.post('/logout', auth, serviceController.logout);
 // Wishlist API 
 router.post('/wishlist', auth, forms, wishlistController.addUpdateWishlist);
 router.post('/addStockToWishlist', auth, forms, wishlistController.addStockToWishlist);
+router.post('/removeStockFromWishlist', auth, forms, wishlistController.removeStockFromWishlist);
 router.get('/wishlist', auth, wishlistController.getWishlist);
 
 // Broker API
@@ -95,7 +96,7 @@ router.get("/stockDetailsByID/:id", sectorController.getStockDetailsById);
 router.get("/devident/:id", sectorController.getDivident);
 router.delete('/devident/:id', sectorController.deleteDividend);
 router.get("/AnnualReport/:id", sectorController.getAnualReport);
-router.post("/dailyPriceExcelUpdate", forms1, PriceController.updatePriceExcel)
+router.post("/dailyPriceExcelUpdate", forms1, PriceController.updatePriceExcel);
 router.get("/stockPriceChart", PriceController.getStockPriceChartData);
 router.get("/cashflowTemplates", PriceController.getCashFlowTemplates);
 router.post("/CashflowValues", forms, PriceController.addUpdateCashFlowValues);

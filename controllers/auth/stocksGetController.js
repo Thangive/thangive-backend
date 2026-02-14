@@ -164,7 +164,7 @@ const stocksGetController = {
                 ON s.sector_id = sec.sector_id
 
             LEFT JOIN wishlist_stock ws 
-                ON ws.wishlist_stock_id=s.stock_details_id
+                ON ws.stock_details_id=s.stock_details_id
 
             LEFT JOIN stock_subindustry sub 
                 ON s.subindustry_id = sub.subindustry_id
