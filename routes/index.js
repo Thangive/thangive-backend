@@ -54,7 +54,7 @@ router.get('/holdedStockQuantity', auth, transactionController.getHoldingStockQu
 router.post('/stockTransactionUpdate', auth, forms, transactionController.addUpdateOrder);
 router.get('/stockOrderList', auth, forms, transactionController.getStockOrderList);
 router.get('/stockOrderDetails', auth, transactionController.getOrderDetails);
-router.get('/userHoldings', auth, transactionController.getUserHoldigs);
+router.get('/userHoldings', auth, transactionController.getUserHoldings);
 
 // Payment APIS
 router.post('/addPaymentDetails', auth, forms, transactionController.addUpdatePayment);

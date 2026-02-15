@@ -1,4 +1,5 @@
 import fs from 'fs-extra'
+import crypto from "crypto";
 import { getData, insertData, SERVER_HOST } from '../config/index.js';
 import axios from 'axios';
 
@@ -121,7 +122,17 @@ const commonFunction = {
             if (typeof next === "function") return next(err);
             throw err;
         }
+    },
+
+    async generateOrderId(preFix = "") {
+        const timePart = Date.now().toString(36).toUpperCase(); // shorter time
+        const randomPart = crypto.randomBytes(3).toString("base64url").toUpperCase().slice(0, 4);
+
+        const unique = (timePart + randomPart).slice(-9); // ensure 9 chars only
+
+        return `${preFix}_${unique}`;
     }
+
 
 }
 

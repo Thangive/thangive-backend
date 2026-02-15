@@ -2,6 +2,7 @@ import Joi from 'joi';
 import { getData, insertData } from '../../config/index.js';
 import { CustomErrorHandler } from "../../service/index.js";
 import paginationQuery from '../../helper/paginationQuery.js';
+import commonFunction from '../../helper/commonFunction.js';
 
 const transactionController = {
     async addUpdateOrder(req, res, next) {
@@ -29,6 +30,9 @@ const transactionController = {
                 transaction_type: Joi.string()
                     .valid('BUY', 'SELL')
                     .required(),
+                markAsSold: Joi.boolean()
+                    .default(false)
+                    .optional()
             });
 
             const dataObj = { ...req.body };
@@ -40,6 +44,9 @@ const transactionController = {
             /* ------------------ MARKET price handling ------------------ */
             if (dataObj.order_type === 'MARKET') {
                 dataObj.price_per_share = dataObj.current_share_price;
+                dataObj.user_share_price = dataObj.current_share_price;
+            } else {
+                dataObj.user_share_price = dataObj.price_per_share;
             }
 
             /* ------------------ SELL Validation ------------------ */
@@ -66,7 +73,8 @@ const transactionController = {
                 const qtyResult = await getData(qtyQuery, next);
                 const remainingQty = qtyResult?.[0]?.remaining_quantity || 0;
 
-                if (remainingQty < dataObj.quantity) {
+                let check = dataObj.markAsSold ? true : dataObj.advisor_id != 2 ? true : false;
+                if ((remainingQty < dataObj.quantity) && check) {
                     return next(
                         CustomErrorHandler.badRequest(
                             `Insufficient quantity. Available: ${remainingQty}`
@@ -75,12 +83,19 @@ const transactionController = {
                 }
             }
 
+            if ((dataObj.transaction_type === 'BUY' && dataObj.advisor_id == 2) || (dataObj.transaction_type === 'SELL' && dataObj.markAsSold)) {
+                dataObj.rm_status = 'COMPLETED';
+                dataObj.am_status = 'COMPLETED';
+                dataObj.st_status = 'COMPLETED';
+            }
+
             /* ------------------ Insert / Update ------------------ */
             let query = '';
             if (dataObj.order_id) {
                 query = `UPDATE order_transactions SET ? WHERE order_id = ${dataObj.order_id}`;
                 dataObj.updated_on = new Date();
             } else {
+                dataObj.order_custom_id = await commonFunction.generateOrderId("Ord_B_");
                 query = `INSERT INTO order_transactions SET ?`;
                 dataObj.created_at = new Date();
             }
@@ -172,64 +187,105 @@ const transactionController = {
         }
     },
 
-    async getUserHoldigs(req, res, next) {
+    async getUserHoldings(req, res, next) {
         try {
-            /* ------------------ Base Query ------------------ */
-            let query = "SELECT * FROM `vw_portfolio_summary` WHERE `rm_status`='COMPLETED' AND `am_status`='COMPLETED' AND `st_status`='COMPLETED'";
-
-            let cond = '';
-            let page = { pageQuery: '' };
-
             /* ------------------ Validation Schema ------------------ */
             const holdingSchema = Joi.object({
                 user_id: Joi.number().integer().required(),
-                stock_details_id: Joi.number().integer(),
-                broker_id: Joi.number().integer(),
-                advisor_id: Joi.number().integer(),
-                pagination: Joi.boolean(),
-                current_page: Joi.number().integer(),
-                per_page_records: Joi.number().integer(),
+                stock_details_id: Joi.number().integer().optional(),
+                broker_id: Joi.number().integer().optional(),
+                advisor_id: Joi.number().integer().optional(),
+                pagination: Joi.boolean().default(false),
+                current_page: Joi.number().integer().min(1).default(1),
+                per_page_records: Joi.number().integer().min(1).default(10),
             });
 
-            const { error } = holdingSchema.validate(req.query);
+            const { error, value } = holdingSchema.validate(req.query);
             if (error) return next(error);
 
-            /* ------------------ Filters ------------------ */
-            cond += ` AND user_id = ${req.query.user_id}`;
+            /* ------------------ Base Query (The "View" Logic) ------------------ */
+            let selectClause = `
+                SELECT 
+                    ot.stock_details_id,
+                    ot.user_id,
+                    ad.advisor_name,
+                    bro.broker_custom_id AS broker_id,
+                    bro.broker_name,
+                    st.company_name,
+                    sp.prev_price,
+                    sp.today_prices AS latest_price,
+                    AVG(ot.price_per_share) AS avg_price,
+                    SUM(ot.quantity) AS total_quantity,
+                    SUM(ot.price_per_share * ot.quantity) AS investment_amount,
+                    SUM(sp.today_prices * ot.quantity) AS market_value,
+                    CAST((((SUM(sp.today_prices * ot.quantity) - SUM(ot.price_per_share * ot.quantity)) / NULLIF(SUM(ot.price_per_share * ot.quantity), 0)) * 100) AS DECIMAL(10,2)) AS overall_PL_percentage,
+                    (SUM(sp.today_prices * ot.quantity) - SUM(ot.price_per_share * ot.quantity)) AS overall_PL,
+                    SUM((sp.today_prices - sp.prev_price) * ot.quantity) AS daily_PL,
+                    CAST(((SUM((sp.today_prices - sp.prev_price) * ot.quantity) / NULLIF(SUM(sp.prev_price * ot.quantity), 0)) * 100) AS DECIMAL(10,2)) AS daily_PL_percentage,
+                    ot.rm_status,
+                    ot.am_status,
+                    ot.st_status,
+                    ot.payments_count
+                FROM thangiveTest.order_transactions ot
+                JOIN thangiveTest.stock_details st ON ot.stock_details_id = st.stock_details_id
+                JOIN thangiveTest.advisor ad ON ad.advisor_id = ot.advisor_id
+                JOIN thangiveTest.broker bro ON bro.broker_id = ot.broker_id
+                JOIN thangiveTest.stock_price sp ON sp.stock_details_id = st.stock_details_id
+                JOIN (
+                    SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
+                    FROM thangiveTest.stock_price 
+                    GROUP BY stock_details_id
+                ) latest ON latest.latest_id = sp.stock_price_id
+            `;
 
-            if (req.query.stock_details_id) {
-                cond += ` AND stock_details_id = ${req.query.stock_details_id}`;
+            /* ------------------ Dynamic Filters (WHERE Clause) ------------------ */
+            let whereClause = ` WHERE ot.rm_status='COMPLETED' AND ot.am_status='COMPLETED' AND ot.st_status='COMPLETED'`;
+            whereClause += ` AND ot.user_id = ${value.user_id}`;
+
+            if (value.stock_details_id) {
+                whereClause += ` AND ot.stock_details_id = ${value.stock_details_id}`;
+            }
+            if (value.broker_id) {
+                whereClause += ` AND ot.broker_id = ${value.broker_id}`;
+            }
+            if (value.advisor_id) {
+                whereClause += ` AND ot.advisor_id = ${value.advisor_id}`;
             }
 
-            if (req.query.broker_id) {
-                cond += ` AND broker_id = ${req.query.broker_id}`;
-            }
+            /* ------------------ Group By Clause ------------------ */
+            let groupByClause = `
+                GROUP BY 
+                    ot.stock_details_id, ot.user_id, ad.advisor_name, bro.broker_custom_id, 
+                    bro.broker_name, st.company_name, sp.prev_price, sp.today_prices, 
+                    ot.rm_status, ot.am_status, ot.st_status, ot.payments_count
+            `;
 
-            if(req.query.advisor_id){
-                cond += ` AND advisor_id = ${req.query.advisor_id}`;
-            }
-            query += cond;
+            // Combine parts
+            let fullQuery = selectClause + whereClause + groupByClause;
+
             /* ------------------ Pagination ------------------ */
-            if (req.query.pagination) {
+            let page = { pageQuery: '' };
+            if (value.pagination) {
                 page = await paginationQuery(
-                    query,
+                    fullQuery,
                     next,
-                    req.query.current_page,
-                    req.query.per_page_records
+                    value.current_page,
+                    value.per_page_records
                 );
             }
 
-            query += page.pageQuery;
-            console.log(query);
+            fullQuery += page.pageQuery;
+            console.log("Executing Query:", fullQuery);
+
             /* ------------------ Fetch Data ------------------ */
-            const data = await getData(query, next);
+            const data = await getData(fullQuery, next);
 
             return res.json({
+                status: 200,
                 message: 'success',
-                total_records: page.total_rec ? page.total_rec : data.length,
+                total_records: page.total_rec || data.length,
                 number_of_pages: page.number_of_pages || 1,
-                currentPage: page.currentPage || 1,
-                records: data.length,
+                currentPage: value.current_page,
                 data: data
             });
 
@@ -343,7 +399,7 @@ const transactionController = {
                 cond += ` AND ot.broker_id = ${value.broker_id}`;
             }
 
-            if(value.advisor_id){
+            if (value.advisor_id) {
                 cond += ` AND ot.advisor_id = ${value.advisor_id}`;
             }
 
