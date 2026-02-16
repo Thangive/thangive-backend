@@ -50,11 +50,15 @@ router.post('/updateOrderStatus', auth, forms, transactionController.updateOrder
 router.get('/holdedStockQuantity', auth, transactionController.getHoldingStockQuantity);
 
 
+router.get('/getOverview', auth, transactionController.getOverview);
+router.get('/getUnlistedCount', auth, transactionController.getUnlistedCount);
+
 // router.post('/stockTransactionUpdate', auth, forms, transactionController.addUpdateOrder);
 router.post('/stockTransactionUpdate', auth, forms, transactionController.addUpdateOrder);
 router.get('/stockOrderList', auth, forms, transactionController.getStockOrderList);
 router.get('/stockOrderDetails', auth, transactionController.getOrderDetails);
 router.get('/userHoldings', auth, transactionController.getUserHoldings);
+router.get('/orderStatement', auth, transactionController.getOrderStatement);
 
 // Payment APIS
 router.post('/addPaymentDetails', auth, forms, transactionController.addUpdatePayment);

@@ -726,6 +726,117 @@ const transactionController = {
         } catch (error) {
             next(error);
         }
+    },
+
+    async getOverview(req, res, next) {
+        try {
+            /* ------------------ Order Details Query ------------------ */
+            const query = `SELECT CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END AS Category, SUM(ot.price_per_share * ot.quantity) AS invested_amount, SUM(sp.today_prices * ot.quantity) AS market_value, SUM((sp.today_prices * ot.quantity) - (ot.price_per_share * ot.quantity)) AS overall_PL, SUM((sp.today_prices - sp.prev_price) * ot.quantity) AS todays_PL FROM order_transactions ot JOIN stock_details st ON ot.stock_details_id = st.stock_details_id JOIN stock_price sp ON sp.stock_details_id = st.stock_details_id JOIN (SELECT stock_details_id, MAX(stock_price_id) AS latest_id FROM stock_price GROUP BY stock_details_id) latest ON latest.latest_id = sp.stock_price_id GROUP BY CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END;`;
+
+            const data = await getData(query, next);
+            return res.json({
+                message: 'success',
+                records: 1,
+                data: data
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    async getUnlistedCount(req, res, next) {
+        try {
+            /* ------------------ Order Details Query ------------------ */
+            const query = `SELECT ad.advisor_id, ad.advisor_name, CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END AS Category, SUM(ot.price_per_share * ot.quantity) AS invested_amount, SUM(sp.today_prices * ot.quantity) AS market_value, SUM((sp.today_prices * ot.quantity) - (ot.price_per_share * ot.quantity)) AS overall_PL, SUM((sp.today_prices - sp.prev_price) * ot.quantity) AS todays_PL FROM order_transactions ot JOIN advisor ad ON ad.advisor_id = ot.advisor_id JOIN stock_details st ON ot.stock_details_id = st.stock_details_id JOIN stock_price sp ON sp.stock_details_id = st.stock_details_id JOIN (SELECT stock_details_id, MAX(stock_price_id) AS latest_id FROM stock_price GROUP BY stock_details_id) latest ON latest.latest_id = sp.stock_price_id WHERE ad.advisor_id IN (1, 2) GROUP BY ad.advisor_id, ad.advisor_name, CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END ORDER BY ad.advisor_id;`;
+
+            const data = await getData(query, next);
+            return res.json({
+                message: 'success',
+                records: 1,
+                data: data
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    async getOrderStatement(req, res, next) {
+        try {
+
+            let query = `
+                SELECT 
+                    CONCAT('INV-', ot.order_type, '-', ot.order_id) AS invoice_no,
+                    ot.order_type,
+                    ot.transaction_type,
+                    st.company_name AS stock,
+                    ot.quantity AS qty,
+                    ot.price_per_share AS share_price,
+                    (ot.price_per_share * ot.quantity) AS total,
+                    DATE_FORMAT(ot.created_at, '%d %b %Y, %H:%i') AS date
+                FROM order_transactions ot
+                JOIN stock_details st 
+                    ON ot.stock_details_id = st.stock_details_id
+                WHERE 1
+            `;
+
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            /* ------------------ Validation ------------------ */
+            const holdingSchema = Joi.object({
+                user_id: Joi.number().integer().required(),
+                transaction_type: Joi.string().valid('BUY', 'SELL').optional(),
+                sort_order: Joi.string().valid('ASC', 'DESC').default('DESC').required(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer(),
+            });
+
+            const { error, value } = holdingSchema.validate(req.query ?? {});
+            if (error) return next(error);
+
+            /* ------------------ Filters ------------------ */
+
+            cond += ` AND ot.user_id = ${value.user_id}`;
+
+            if (value.transaction_type) {
+                cond += ` AND ot.transaction_type = '${value.transaction_type}'`;
+            }
+
+            query += cond;
+
+            /* ------------------ Sorting ------------------ */
+            query += ` ORDER BY ot.created_at ${value.sort_order}`;
+
+            /* ------------------ Pagination ------------------ */
+            if (value.pagination) {
+                page = await paginationQuery(
+                    query,
+                    next,
+                    value.current_page,
+                    value.per_page_records
+                );
+            }
+
+            query += page.pageQuery;
+
+            /* ------------------ Fetch Data ------------------ */
+            const data = await getData(query, next);
+
+            return res.json({
+                message: 'success',
+                total_records: page.total_rec ?? data.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: data.length,
+                data
+            });
+
+        } catch (err) {
+            next(err);
+        }
     }
 
 
