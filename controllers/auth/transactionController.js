@@ -88,7 +88,7 @@ const transactionController = {
                 dataObj.am_status = 'COMPLETED';
                 dataObj.st_status = 'COMPLETED';
             }
-
+            delete dataObj.markAsSold;
             /* ------------------ Insert / Update ------------------ */
             let query = '';
             if (dataObj.order_id) {

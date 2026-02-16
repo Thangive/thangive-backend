@@ -123,6 +123,8 @@ router.get("/deletePeer", PriceController.getDeletePeer);
 router.get('/getStockData', stocksGetController.getStockData)
 router.get('/getStockCount', stocksGetController.getStockCounts)
 router.get("/searchStocks", stocksGetController.getSearchStock);
+router.get('/getWatchlist', stocksGetController.getWatchlist)
+
 
 // Chart Data APIS
 router.post("/chartBulkUpload", forms1, PriceController.chartBulkUpload)
