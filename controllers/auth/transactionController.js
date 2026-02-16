@@ -214,7 +214,7 @@ const transactionController = {
                     st.company_name,
                     sp.prev_price,
                     sp.today_prices AS latest_price,
-                    AVG(ot.price_per_share) AS avg_price,
+                    SUM(ot.price_per_share * ot.quantity) / NULLIF(SUM(ot.quantity),0) AS avg_price,
                     SUM(ot.quantity) AS total_quantity,
                     SUM(ot.price_per_share * ot.quantity) AS investment_amount,
                     SUM(sp.today_prices * ot.quantity) AS market_value,
@@ -404,7 +404,7 @@ const transactionController = {
             }
 
             query += cond;
-            query += ` ORDER BY ot.created_at DESC `;
+            query += ` ORDER BY ot.order_id DESC `;
 
             /* ------------------ Pagination ------------------ */
             if (value.pagination) {
