@@ -255,6 +255,41 @@ const wishlistController = {
         } catch (err) {
             next(err);
         }
+    },
+    async getWishlistStocks(req, res, next) {
+        try {
+
+            let query = `SELECT * FROM wishlist_stock WHERE 1`;
+            let cond = '';
+
+            const schema = Joi.object({
+                user_id: Joi.number().integer(),
+                wishlist_id: Joi.number().integer(),
+            });
+
+            const { error } = schema.validate(req.query);
+            if (error) return next(error);
+
+            if (req.query.user_id) {
+                cond += ` AND user_id = ${req.query.user_id}`;
+            }
+
+            if (req.query.wishlist_id) {
+                cond += ` AND wishlist_id = ${req.query.wishlist_id}`;
+            }
+
+            query += cond;
+
+            const data = await getData(query, next);
+
+            return res.json({
+                message: "success",
+                data: data
+            });
+
+        } catch (err) {
+            next(err);
+        }
     }
 
 

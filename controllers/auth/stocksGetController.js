@@ -291,7 +291,8 @@ const stocksGetController = {
     },
 
     //WATCHLIST
-    async getWatchlist(req, res, next) {
+    async getWatchlist(req, res, next) 
+    {
         try {
             let query = `
             SELECT 
@@ -301,9 +302,6 @@ const stocksGetController = {
                 s.cmp_logo,
                 sec.sector_name,
                 sub.sub_industryName,
-
-                IF(ws.wishlist_stock_id IS NULL, 0, 1) AS is_in_wishlist,
-                ws.user_id AS wishlist_user_id,
 
                 IFNULL(sp.today_prices, 0)      AS today_prices,
                 IFNULL(sp.prev_price, 0)        AS prev_price,
@@ -317,9 +315,6 @@ const stocksGetController = {
 
             LEFT JOIN stock_sector sec 
                 ON s.sector_id = sec.sector_id
-
-            LEFT JOIN wishlist_stock ws 
-                ON ws.stock_details_id=s.stock_details_id
 
             LEFT JOIN stock_subindustry sub 
                 ON s.subindustry_id = sub.subindustry_id
@@ -343,7 +338,7 @@ const stocksGetController = {
                 script_name: Joi.string(),
                 isin_no: Joi.string(),
                 stock_type: Joi.valid('UNLISTED', 'PRE IPO', 'DELISTED', 'ANGEL INVESTING', 'THANGIV'),
-                wishlist_id: Joi.string().optional(),
+                // wishlist_id: Joi.string().optional(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer()
@@ -368,8 +363,8 @@ const stocksGetController = {
             if (req.query.stock_type)
                 cond += ` AND s.stock_type = '${req.query.stock_type}'`;
 
-            if (req.query.wishlist_id)
-                cond += ` AND ws.wishlist_id = '${req.query.wishlist_id}'`;
+            // if (req.query.wishlist_id)
+            //     cond += ` AND ws.wishlist_id = '${req.query.wishlist_id}'`;
 
             if (req.query.industry_name)
                 cond += ` AND sub.sub_industryName ='${req.query.industry_name}'`;

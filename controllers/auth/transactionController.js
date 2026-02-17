@@ -730,13 +730,79 @@ const transactionController = {
 
     async getOverview(req, res, next) {
         try {
-            /* ------------------ Order Details Query ------------------ */
-            const query = `SELECT CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END AS Category, SUM(ot.price_per_share * ot.quantity) AS invested_amount, SUM(sp.today_prices * ot.quantity) AS market_value, SUM((sp.today_prices * ot.quantity) - (ot.price_per_share * ot.quantity)) AS overall_PL, SUM((sp.today_prices - sp.prev_price) * ot.quantity) AS todays_PL FROM order_transactions ot JOIN stock_details st ON ot.stock_details_id = st.stock_details_id JOIN stock_price sp ON sp.stock_details_id = st.stock_details_id JOIN (SELECT stock_details_id, MAX(stock_price_id) AS latest_id FROM stock_price GROUP BY stock_details_id) latest ON latest.latest_id = sp.stock_price_id GROUP BY CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END;`;
+            const holdingSchema = Joi.object({
+                user_id: Joi.number().integer().required(),
+            });
+            console.log(req.query);
+            const { error, value } = holdingSchema.validate(req.query ?? {});
+            if (error) return next(error);
+
+            const query = `
+            SELECT 
+                CASE 
+                    WHEN st.stock_type = 'ANGEL INVESTING' 
+                    THEN 'ANGEL INVESTING' 
+                    ELSE 'UNLISTED' 
+                END AS Category,
+
+                SUM(ot.price_per_share * ot.quantity) AS invested_amount,
+
+                SUM(sp.today_prices * ot.quantity) AS market_value,
+
+                SUM(
+                    (sp.today_prices * ot.quantity) - 
+                    (ot.price_per_share * ot.quantity)
+                ) AS overall_PL,
+
+                CAST(
+                    (
+                        (
+                            SUM(sp.today_prices * ot.quantity) - 
+                            SUM(ot.price_per_share * ot.quantity)
+                        )
+                        /
+                        NULLIF(SUM(ot.price_per_share * ot.quantity), 0)
+                    ) * 100
+                AS DECIMAL(10,2)) AS overall_PL_percentage,
+
+                SUM(
+                    (sp.today_prices - sp.prev_price) * ot.quantity
+                ) AS todays_PL
+
+            FROM order_transactions ot
+
+            JOIN stock_details st 
+                ON ot.stock_details_id = st.stock_details_id
+
+            JOIN stock_price sp 
+                ON sp.stock_details_id = st.stock_details_id
+
+            JOIN (
+                SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
+                FROM stock_price 
+                GROUP BY stock_details_id
+            ) latest 
+                ON latest.latest_id = sp.stock_price_id
+
+            WHERE 
+                ot.user_id = ${value.user_id}
+                AND ot.rm_status = 'COMPLETED'
+                AND ot.am_status = 'COMPLETED'
+                AND ot.st_status = 'COMPLETED'
+
+            GROUP BY 
+                CASE 
+                    WHEN st.stock_type = 'ANGEL INVESTING' 
+                    THEN 'ANGEL INVESTING' 
+                    ELSE 'UNLISTED' 
+                END
+        `;
 
             const data = await getData(query, next);
+
             return res.json({
                 message: 'success',
-                records: 1,
+                records: data.length,
                 data: data
             });
 
@@ -744,7 +810,83 @@ const transactionController = {
             next(err);
         }
     },
+    async getUnlistedAdvisorOverview(req, res, next) {
+        try {
+            const holdingSchema = Joi.object({
+                user_id: Joi.number().integer().required(),
+            });
 
+            const { error, value } = holdingSchema.validate(req.query ?? {});
+            if (error) return next(error);
+
+            const query = `
+            SELECT 
+                ad.advisor_name,
+
+                SUM(ot.price_per_share * ot.quantity) AS invested_amount,
+
+                SUM(sp.today_prices * ot.quantity) AS market_value,
+
+                SUM(
+                    (sp.today_prices * ot.quantity) - 
+                    (ot.price_per_share * ot.quantity)
+                ) AS overall_PL,
+
+                CAST(
+                    (
+                        (
+                            SUM(sp.today_prices * ot.quantity) - 
+                            SUM(ot.price_per_share * ot.quantity)
+                        )
+                        /
+                        NULLIF(SUM(ot.price_per_share * ot.quantity), 0)
+                    ) * 100
+                AS DECIMAL(10,2)) AS overall_PL_percentage,
+
+                SUM(
+                    (sp.today_prices - sp.prev_price) * ot.quantity
+                ) AS todays_PL
+
+            FROM order_transactions ot
+
+            JOIN advisor ad 
+                ON ad.advisor_id = ot.advisor_id
+
+            JOIN stock_details st 
+                ON ot.stock_details_id = st.stock_details_id
+
+            JOIN stock_price sp 
+                ON sp.stock_details_id = st.stock_details_id
+
+            JOIN (
+                SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
+                FROM stock_price 
+                GROUP BY stock_details_id
+            ) latest 
+                ON latest.latest_id = sp.stock_price_id
+
+            WHERE 
+                ot.user_id = ${value.user_id}
+                AND st.stock_type != 'ANGEL INVESTING'
+                AND ot.rm_status = 'COMPLETED'
+                AND ot.am_status = 'COMPLETED'
+                AND ot.st_status = 'COMPLETED'
+
+            GROUP BY ad.advisor_name ORDER BY ad.advisor_name DESC;
+        `;
+
+            const data = await getData(query, next);
+
+            return res.json({
+                message: 'success',
+                records: data.length,
+                data: data
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
     async getUnlistedCount(req, res, next) {
         try {
             /* ------------------ Order Details Query ------------------ */
@@ -767,7 +909,7 @@ const transactionController = {
 
             let query = `
                 SELECT 
-                    CONCAT('INV-', ot.order_type, '-', ot.order_id) AS invoice_no,
+                    CONCAT('INV-', ot.transaction_type, '-', ot.order_id) AS invoice_no,
                     ot.order_type,
                     ot.transaction_type,
                     st.company_name AS stock,
@@ -788,7 +930,8 @@ const transactionController = {
             const holdingSchema = Joi.object({
                 user_id: Joi.number().integer().required(),
                 transaction_type: Joi.string().valid('BUY', 'SELL').optional(),
-                sort_order: Joi.string().valid('ASC', 'DESC').default('DESC').required(),
+                sort_order: Joi.string().valid('ASC', 'DESC').default('DESC').optional(),
+                search: Joi.string().optional(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),
@@ -801,9 +944,25 @@ const transactionController = {
 
             cond += ` AND ot.user_id = ${value.user_id}`;
 
+            cond += `
+                AND ot.rm_status = 'COMPLETED'
+                AND ot.am_status = 'COMPLETED'
+                AND ot.st_status = 'COMPLETED'
+            `;
+
             if (value.transaction_type) {
                 cond += ` AND ot.transaction_type = '${value.transaction_type}'`;
             }
+
+            if (value.search) {
+                cond += `
+                    AND (
+                        st.company_name LIKE '%${value.search}%'
+                        OR ot.order_id LIKE '%${value.search}%'
+                    )
+                `;
+            }
+
 
             query += cond;
 
@@ -838,10 +997,6 @@ const transactionController = {
             next(err);
         }
     }
-
-
-
-
 };
 
 export default transactionController;

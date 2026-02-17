@@ -37,6 +37,7 @@ router.post('/wishlist', auth, forms, wishlistController.addUpdateWishlist);
 router.post('/addStockToWishlist', auth, forms, wishlistController.addStockToWishlist);
 router.post('/removeStockFromWishlist', auth, forms, wishlistController.removeStockFromWishlist);
 router.get('/wishlist', auth, wishlistController.getWishlist);
+router.get('/getWishlistStocks', auth, wishlistController.getWishlistStocks);
 
 // Broker API
 router.post('/broker', auth, forms, brokerAndAdvisorControler.addUpdateBroker);
@@ -51,6 +52,7 @@ router.get('/holdedStockQuantity', auth, transactionController.getHoldingStockQu
 
 
 router.get('/getOverview', auth, transactionController.getOverview);
+router.get('/getUnlistedOverview', auth, transactionController.getUnlistedAdvisorOverview);
 router.get('/getUnlistedCount', auth, transactionController.getUnlistedCount);
 
 // router.post('/stockTransactionUpdate', auth, forms, transactionController.addUpdateOrder);
