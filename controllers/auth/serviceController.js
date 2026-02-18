@@ -135,7 +135,7 @@ const serviceController = {
                         password
                     FROM users
                     WHERE is_deleted = 0
-                      AND username = '${value.username}'
+                      AND username = '${value.username}' OR phone_number = '${value.phone_number}
                 `;
 
             const data = await getData(query, next);

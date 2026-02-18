@@ -214,14 +214,126 @@ const transactionController = {
                     st.company_name,
                     sp.prev_price,
                     sp.today_prices AS latest_price,
-                    SUM(ot.price_per_share * ot.quantity) / NULLIF(SUM(ot.quantity),0) AS avg_price,
-                    SUM(ot.quantity) AS total_quantity,
-                    SUM(ot.price_per_share * ot.quantity) AS investment_amount,
-                    SUM(sp.today_prices * ot.quantity) AS market_value,
-                    CAST((((SUM(sp.today_prices * ot.quantity) - SUM(ot.price_per_share * ot.quantity)) / NULLIF(SUM(ot.price_per_share * ot.quantity), 0)) * 100) AS DECIMAL(10,2)) AS overall_PL_percentage,
-                    (SUM(sp.today_prices * ot.quantity) - SUM(ot.price_per_share * ot.quantity)) AS overall_PL,
-                    SUM((sp.today_prices - sp.prev_price) * ot.quantity) AS daily_PL,
-                    CAST(((SUM((sp.today_prices - sp.prev_price) * ot.quantity) / NULLIF(SUM(sp.prev_price * ot.quantity), 0)) * 100) AS DECIMAL(10,2)) AS daily_PL_percentage,
+                    SUM(
+                            CASE 
+                                WHEN ot.transaction_type = 'BUY' THEN ot.price_per_share * ot.quantity
+                                WHEN ot.transaction_type = 'SELL' THEN -(ot.price_per_share * ot.quantity)
+                                ELSE 0
+                            END
+                        )
+                        /
+                        NULLIF(
+                            SUM(
+                                CASE 
+                                    WHEN ot.transaction_type = 'BUY' THEN ot.quantity
+                                    WHEN ot.transaction_type = 'SELL' THEN -ot.quantity
+                                    ELSE 0
+                                END
+                            ), 0
+                        ) AS avg_price,
+                    SUM(
+                        CASE 
+                            WHEN ot.transaction_type = 'BUY' THEN ot.quantity
+                            WHEN ot.transaction_type = 'SELL' THEN -ot.quantity
+                            ELSE 0
+                        END
+                    ) AS total_quantity,
+                    SUM(
+                        CASE 
+                            WHEN ot.transaction_type = 'BUY' THEN ot.price_per_share * ot.quantity
+                            WHEN ot.transaction_type = 'SELL' THEN - (ot.price_per_share * ot.quantity)
+                            ELSE 0
+                        END
+                    ) AS investment_amount,
+                    SUM(
+                        sp.today_prices *
+                        CASE 
+                            WHEN ot.transaction_type = 'BUY' THEN ot.quantity
+                            WHEN ot.transaction_type = 'SELL' THEN -ot.quantity
+                            ELSE 0
+                        END
+                    ) AS market_value,
+                    (
+                        SUM(
+                            sp.today_prices *
+                            CASE 
+                                WHEN ot.transaction_type = 'BUY' THEN ot.quantity
+                                WHEN ot.transaction_type = 'SELL' THEN -ot.quantity
+                                ELSE 0
+                            END
+                        )
+                        -
+                        SUM(
+                            CASE 
+                                WHEN ot.transaction_type = 'BUY' THEN ot.price_per_share * ot.quantity
+                                WHEN ot.transaction_type = 'SELL' THEN -(ot.price_per_share * ot.quantity)
+                                ELSE 0
+                            END
+                        )
+                    ) AS overall_PL,
+                    CAST(
+                        (
+                            (
+                                SUM(
+                                    sp.today_prices *
+                                    CASE 
+                                        WHEN ot.transaction_type = 'BUY' THEN ot.quantity
+                                        WHEN ot.transaction_type = 'SELL' THEN -ot.quantity
+                                        ELSE 0
+                                    END
+                                )
+                                -
+                                SUM(
+                                    CASE 
+                                        WHEN ot.transaction_type = 'BUY' THEN ot.price_per_share * ot.quantity
+                                        WHEN ot.transaction_type = 'SELL' THEN -(ot.price_per_share * ot.quantity)
+                                        ELSE 0
+                                    END
+                                )
+                            )
+                            /
+                            NULLIF(
+                                SUM(
+                                    CASE 
+                                        WHEN ot.transaction_type = 'BUY' THEN ot.price_per_share * ot.quantity
+                                        WHEN ot.transaction_type = 'SELL' THEN -(ot.price_per_share * ot.quantity)
+                                        ELSE 0
+                                    END
+                                ), 0
+                            )
+                        ) * 100 AS DECIMAL(10,2)
+                    ) AS overall_PL_percentage,
+                    SUM(
+                        (sp.today_prices - sp.prev_price) *
+                        CASE 
+                            WHEN ot.transaction_type = 'BUY' THEN ot.quantity
+                            WHEN ot.transaction_type = 'SELL' THEN -ot.quantity
+                            ELSE 0
+                        END
+                    ) AS daily_PL,
+                    CAST(
+                        (
+                            SUM(
+                                (sp.today_prices - sp.prev_price) *
+                                CASE 
+                                    WHEN ot.transaction_type = 'BUY' THEN ot.quantity
+                                    WHEN ot.transaction_type = 'SELL' THEN -ot.quantity
+                                    ELSE 0
+                                END
+                            )
+                            /
+                            NULLIF(
+                                SUM(
+                                    sp.prev_price *
+                                    CASE 
+                                        WHEN ot.transaction_type = 'BUY' THEN ot.quantity
+                                        WHEN ot.transaction_type = 'SELL' THEN -ot.quantity
+                                        ELSE 0
+                                    END
+                                ), 0
+                            )
+                        ) * 100 AS DECIMAL(10,2)
+                    ) AS daily_PL_percentage,
                     ot.rm_status,
                     ot.am_status,
                     ot.st_status,
@@ -1000,3 +1112,7 @@ const transactionController = {
 };
 
 export default transactionController;
+
+
+
+// SELECT ot.stock_details_id, ot.user_id, ad.advisor_name, bro.broker_custom_id AS broker_id, bro.broker_name, st.company_name, sp.prev_price, sp.today_prices AS latest_price, SUM(ot.price_per_share * ot.quantity) / NULLIF(SUM(ot.quantity),0) AS avg_price, SUM(ot.quantity) AS total_quantity, SUM(ot.price_per_share * ot.quantity) AS investment_amount, SUM(sp.today_prices * ot.quantity) AS market_value, CAST((((SUM(sp.today_prices * ot.quantity) - SUM(ot.price_per_share * ot.quantity)) / NULLIF(SUM(ot.price_per_share * ot.quantity), 0)) * 100) AS DECIMAL(10,2)) AS overall_PL_percentage, (SUM(sp.today_prices * ot.quantity) - SUM(ot.price_per_share * ot.quantity)) AS overall_PL, SUM((sp.today_prices - sp.prev_price) * ot.quantity) AS daily_PL, CAST(((SUM((sp.today_prices - sp.prev_price) * ot.quantity) / NULLIF(SUM(sp.prev_price * ot.quantity), 0)) * 100) AS DECIMAL(10,2)) AS daily_PL_percentage, ot.rm_status, ot.am_status, ot.st_status, ot.payments_count FROM thangiveTest.order_transactions ot JOIN thangiveTest.stock_details st ON ot.stock_details_id = st.stock_details_id JOIN thangiveTest.advisor ad ON ad.advisor_id = ot.advisor_id JOIN thangiveTest.broker bro ON bro.broker_id = ot.broker_id JOIN thangiveTest.stock_price sp ON sp.stock_details_id = st.stock_details_id JOIN ( SELECT stock_details_id, MAX(stock_price_id) AS latest_id FROM thangiveTest.stock_price GROUP BY stock_details_id ) latest ON latest.latest_id = sp.stock_price_id ;
