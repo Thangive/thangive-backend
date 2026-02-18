@@ -291,8 +291,7 @@ const stocksGetController = {
     },
 
     //WATCHLIST
-    async getWatchlist(req, res, next) 
-    {
+    async getWatchlist(req, res, next) {
         try {
             let query = `
             SELECT 
@@ -337,6 +336,7 @@ const stocksGetController = {
                 industry_name: Joi.string(),
                 script_name: Joi.string(),
                 isin_no: Joi.string(),
+                search: Joi.string().allow(''),
                 stock_type: Joi.valid('UNLISTED', 'PRE IPO', 'DELISTED', 'ANGEL INVESTING', 'THANGIV'),
                 // wishlist_id: Joi.string().optional(),
                 pagination: Joi.boolean(),
@@ -362,6 +362,16 @@ const stocksGetController = {
 
             if (req.query.stock_type)
                 cond += ` AND s.stock_type = '${req.query.stock_type}'`;
+
+            if (req.query.search) {
+                cond += `
+                    AND (
+                        s.company_name LIKE '%${req.query.search}%'
+                        OR s.script_name LIKE '%${req.query.search}%'
+                        OR s.isin_no LIKE '%${req.query.search}%'
+                    )
+                `;
+            }
 
             // if (req.query.wishlist_id)
             //     cond += ` AND ws.wishlist_id = '${req.query.wishlist_id}'`;
