@@ -372,8 +372,19 @@ const transactionController = {
                     ot.rm_status, ot.am_status, ot.st_status, ot.payments_count
             `;
 
+            let havingClause = `
+                HAVING 
+                    SUM(
+                        CASE 
+                            WHEN ot.transaction_type = 'BUY' THEN ot.quantity
+                            WHEN ot.transaction_type = 'SELL' THEN -ot.quantity
+                            ELSE 0
+                        END
+                    ) > 0
+            `;
+            
             // Combine parts
-            let fullQuery = selectClause + whereClause + groupByClause;
+            let fullQuery = selectClause + whereClause + groupByClause + havingClause;
 
             /* ------------------ Pagination ------------------ */
             let page = { pageQuery: '' };
