@@ -32,7 +32,8 @@ const transactionController = {
                     .required(),
                 markAsSold: Joi.boolean()
                     .default(false)
-                    .optional()
+                    .optional(),
+                added_qty: Joi.number().optional()
             });
 
             const dataObj = { ...req.body };
@@ -41,13 +42,6 @@ const transactionController = {
             const { error } = orderSchema.validate(dataObj);
             if (error) return next(error);
 
-            /* ------------------ MARKET price handling ------------------ */
-            if (dataObj.order_type === 'MARKET') {
-                dataObj.price_per_share = dataObj.current_share_price;
-                dataObj.user_share_price = dataObj.current_share_price;
-            } else {
-                dataObj.user_share_price = dataObj.price_per_share;
-            }
             const posQuery = `
                 SELECT 
                     COALESCE(MAX(position_group), 1) AS last_group,
@@ -68,15 +62,50 @@ const transactionController = {
             `;
 
             const posResult = await getData(posQuery, next);
-            const remainingQty = posResult[0]?.remaining_quantity || 0;
-            const lastGroup = posResult[0]?.last_group || 1;
+            let remainingQty = posResult[0]?.remaining_quantity || 0;
+            let lastGroup = posResult[0]?.last_group || 1;
 
+            if (
+                dataObj.transaction_type === 'SELL' &&
+                Number(dataObj.advisor_id) === 2 &&
+                Number(dataObj.added_qty) > 0
+            ) {
+                const buyGroup = remainingQty === 0 ? lastGroup + 1 : lastGroup;
+                const buyBeforeSellObj = {
+                    user_id: dataObj.user_id,
+                    advisor_id: dataObj.advisor_id,
+                    broker_id: dataObj.broker_id,
+                    stock_details_id: dataObj.stock_details_id,
+                    quantity: Number(dataObj.added_qty),
+                    order_type: 'LIMIT',
+                    transaction_type: 'BUY',
+                    price_per_share: Number(dataObj.price_per_share),
+                    user_share_price: Number(dataObj.price_per_share),
+                    current_share_price:Number(dataObj.current_share_price),
+                    rm_status: 'COMPLETED',
+                    am_status: 'COMPLETED',
+                    st_status: 'COMPLETED',
+                    position_group: buyGroup,
+                    order_custom_id: await commonFunction.generateOrderId("Ord_B_"),
+                    created_at: new Date()
+                };
+
+                await insertData(`INSERT INTO order_transactions SET ?`, buyBeforeSellObj, next);
+                console.log(buyGroup)
+                lastGroup = buyGroup;
+                remainingQty += Number(dataObj.added_qty);
+                delete dataObj.added_qty;
+            }
+            /* ------------------ MARKET price handling ------------------ */
+            if (dataObj.order_type === 'MARKET') {
+                dataObj.price_per_share = dataObj.current_share_price;
+                dataObj.user_share_price = dataObj.current_share_price;
+            } else {
+                dataObj.user_share_price = dataObj.price_per_share;
+            }
             /* ------------------ SELL Validation ------------------ */
             if (dataObj.transaction_type === 'SELL') {
 
-                // const qtyResult = await getData(qtyQuery, next);
-                // const remainingQty = qtyResult?.[0]?.remaining_quantity || 0;
-                // const lastGroup = qtyResult[0].last_group;
                 let check = dataObj.markAsSold ? true : dataObj.advisor_id != 2 ? true : false;
                 if ((remainingQty < dataObj.quantity) && check) {
                     return next(
