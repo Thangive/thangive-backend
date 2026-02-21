@@ -250,7 +250,6 @@ const transactionController = {
                     ot.user_id,
                     ot.position_group,  /* ADDED POSITION GROUP HERE */
                     ad.advisor_name,
-                    bro.broker_custom_id AS broker_id,
                     bro.broker_name,
                     st.company_name,
                     sp.prev_price,
@@ -352,7 +351,7 @@ const transactionController = {
             /* ------------------ Group By Clause ------------------ */
             let groupByClause = `
                 GROUP BY 
-                    ot.stock_details_id, ot.user_id, ot.position_group, ad.advisor_name, bro.broker_custom_id, 
+                    ot.stock_details_id, ot.user_id, ot.position_group, ad.advisor_name, 
                     bro.broker_name, st.company_name, sp.prev_price, sp.today_prices, 
                     ot.rm_status, ot.am_status, ot.st_status, ot.payments_count
             `;
@@ -408,7 +407,6 @@ const transactionController = {
                     ot.stock_details_id,
                     ot.user_id,
                     ad.advisor_name,
-                    bro.broker_custom_id AS broker_id,
                     bro.broker_name,
                     st.company_name,
                     sp.prev_price,
@@ -674,7 +672,7 @@ const transactionController = {
             /* ------------------ Broker Details ------------------ */
             const brokerQuery = `
                 SELECT 
-                    br.broker_custom_id,
+                    cmr.broker_custom_id,
                     br.broker_name,
                     cmr.client_id,
                     br.broker_email,

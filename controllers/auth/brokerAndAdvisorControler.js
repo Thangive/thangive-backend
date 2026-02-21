@@ -129,7 +129,7 @@ const brokerAndAdvisorControler = {
             const brokerSchema = Joi.object({
                 broker_id: Joi.number().integer().optional(),
 
-                broker_custom_id: Joi.string().required(),
+                // broker_custom_id: Joi.string().required(),
                 broker_name: Joi.string().required(),
                 broker_email: Joi.string().email().required(),
                 broker_contact: Joi.string().required(),
@@ -153,8 +153,7 @@ const brokerAndAdvisorControler = {
                 SELECT broker_id
                 FROM broker
                 WHERE (
-                    broker_custom_id = '${dataObj.broker_custom_id}'
-                    OR broker_email = '${dataObj.broker_email}'
+                    broker_email = '${dataObj.broker_email}'
                     OR broker_contact = '${dataObj.broker_contact}'
                 )
                 ${condition}
@@ -164,7 +163,7 @@ const brokerAndAdvisorControler = {
             if (exists.length > 0) {
                 return next(
                     CustomErrorHandler.alreadyExist(
-                        'Broker already exists with same email, contact, or custom ID'
+                        'Broker already exists with same email, contact'
                     )
                 );
             }
@@ -208,7 +207,7 @@ const brokerAndAdvisorControler = {
             /* ------------------ Validation Schema ------------------ */
             const brokerSchema = Joi.object({
                 broker_id: Joi.number().integer(),
-                broker_custom_id: Joi.string(),
+                // broker_custom_id: Joi.string(),
                 broker_name: Joi.string(),
                 broker_email: Joi.string().email(),
                 broker_contact: Joi.string(),
@@ -225,9 +224,9 @@ const brokerAndAdvisorControler = {
                 cond += ` AND broker_id = ${req.query.broker_id}`;
             }
 
-            if (req.query.broker_custom_id) {
-                cond += ` AND broker_custom_id LIKE '%${req.query.broker_custom_id}%'`;
-            }
+            // if (req.query.broker_custom_id) {
+            //     cond += ` AND broker_custom_id LIKE '%${req.query.broker_custom_id}%'`;
+            // }
 
             if (req.query.broker_name) {
                 cond += ` AND broker_name LIKE '%${req.query.broker_name}%'`;

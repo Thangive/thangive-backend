@@ -360,6 +360,7 @@ const userController = {
                 user_id: Joi.number().integer().required(),
                 broker_id: Joi.string().required(),
                 client_id: Joi.string().required(),
+                broker_custom_id:Joi.string().required(),
                 cmr_document: Joi.string()
                     .allow('')
                     .optional()
@@ -531,7 +532,6 @@ const userController = {
                     const docQuery = `
                     SELECT 
                         cmr.*,
-                        broker.broker_custom_id,
                         broker.broker_name,
                         broker.broker_email,
                         broker.broker_contact
@@ -648,7 +648,6 @@ const userController = {
                     const docQuery = `
                     SELECT 
                         cmr.*,
-                        broker.broker_custom_id,
                         broker.broker_name,
                         broker.broker_email,
                         broker.broker_contact
