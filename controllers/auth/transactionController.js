@@ -81,12 +81,12 @@ const transactionController = {
                     transaction_type: 'BUY',
                     price_per_share: Number(dataObj.price_per_share),
                     user_share_price: Number(dataObj.price_per_share),
-                    current_share_price:Number(dataObj.current_share_price),
+                    current_share_price: Number(dataObj.current_share_price),
                     rm_status: 'COMPLETED',
                     am_status: 'COMPLETED',
                     st_status: 'COMPLETED',
                     position_group: buyGroup,
-                    order_custom_id: await commonFunction.generateOrderId("Ord_B_"),
+                    // order_custom_id: await commonFunction.generateOrderId("Ord_B_"),
                     created_at: new Date()
                 };
 
@@ -135,7 +135,7 @@ const transactionController = {
                 query = `UPDATE order_transactions SET ? WHERE order_id = ${dataObj.order_id}`;
                 dataObj.updated_on = new Date();
             } else {
-                dataObj.order_custom_id = await commonFunction.generateOrderId("Ord_B_");
+                // dataObj.order_custom_id = await commonFunction.generateOrderId("Ord_B_");
                 query = `INSERT INTO order_transactions SET ?`;
                 dataObj.created_at = new Date();
             }
@@ -407,6 +407,7 @@ const transactionController = {
                     ot.order_custom_id AS order_custom_id,
                     ot.stock_details_id,
                     ot.user_id,
+                    CONCAT(users.first_name, ' ', users.middle_name,' ', users.last_name) AS client_name,
                     ad.advisor_name,
                     bro.broker_name,
                     st.company_name,
