@@ -30,9 +30,19 @@ const transactionController = {
                 transaction_type: Joi.string()
                     .valid('BUY', 'SELL')
                     .required(),
+
                 markAsSold: Joi.boolean()
                     .default(false)
                     .optional(),
+
+                trasaction_date: Joi.string()
+                    .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+                    .when('markAsSold', {
+                        is: true,
+                        then: Joi.required(),
+                        otherwise: Joi.optional()
+                    }),
+
                 added_qty: Joi.number().optional()
             });
 
@@ -77,6 +87,7 @@ const transactionController = {
                     broker_id: dataObj.broker_id,
                     stock_details_id: dataObj.stock_details_id,
                     quantity: Number(dataObj.added_qty),
+                    user_quantity: Number(dataObj.added_qty),
                     order_type: 'LIMIT',
                     transaction_type: 'BUY',
                     price_per_share: Number(dataObj.price_per_share),
@@ -136,6 +147,7 @@ const transactionController = {
                 dataObj.updated_on = new Date();
             } else {
                 // dataObj.order_custom_id = await commonFunction.generateOrderId("Ord_B_");
+                dataObj.user_quantity = dataObj.quantity;
                 query = `INSERT INTO order_transactions SET ?`;
                 dataObj.created_at = new Date();
             }
@@ -167,6 +179,13 @@ const transactionController = {
                 user_id: Joi.number().integer().required(),
                 employee_id: Joi.number().integer().required(),
                 employee_type: Joi.string().valid('RM', 'AM', 'ST').required(),
+
+                rm_qty: Joi.number().optional(),
+                rm_price: Joi.number().optional(),
+                rm_Datetime: Joi.string()
+                    .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+                    .optional(),
+
                 stock_details_id: Joi.number().integer().required(),
                 status: Joi.string()
                     .valid('COMPLETED', 'PROCCESSING', 'HOLD', 'REJECTED', 'CANCEL', 'PENDING')
@@ -196,10 +215,24 @@ const transactionController = {
                 }
 
             }
+
             /* ------------------ UPDATE ORDER ------------------ */
             let updatedObject = {};
             // store status against employee type
             if (dataObj.employee_type === 'RM') {
+
+                if (dataObj.rm_qty != null) {
+                    updatedObject.quantity = dataObj.rm_qty;
+                }
+
+                if (dataObj.rm_price != null) {
+                    updatedObject.price_per_share = dataObj.rm_price;
+                }
+
+                // if (dataObj.rm_Datetime != null) {
+                //     updatedObject.rm_Datetime = dataObj.rm_Datetime;
+                // }
+
                 updatedObject.rm_status = dataObj.status;
             } else if (dataObj.employee_type === 'AM') {
                 updatedObject.am_status = dataObj.status;
@@ -219,7 +252,8 @@ const transactionController = {
 
             return res.json({
                 success: true,
-                message: "Order status updated successfully"
+                message: "Order status updated successfully",
+                data: updatedObject
             });
 
         } catch (error) {
@@ -414,7 +448,9 @@ const transactionController = {
                     sp.prev_price,
                     sp.today_prices AS latest_price,
                     ot.price_per_share AS stock_price,
+                    ot.current_share_price AS current_share_price,
                     ot.quantity AS quantity,
+                    ot.user_quantity AS quantity,
                     (ot.price_per_share * ot.quantity) AS investment_amount,
                     (sp.today_prices * ot.quantity) AS market_value,
                     (sp.today_prices * ot.quantity) - (ot.price_per_share * ot.quantity) AS overall_PL,
@@ -661,13 +697,22 @@ const transactionController = {
             /* ------------------ Client Details ------------------ */
             const clientQuery = `
                 SELECT 
-                    user_id,
-                    username,
-                    user_custum_id,
-                    email,
-                    phone_number
-                FROM users
-                WHERE user_id = ${userId}
+                u.user_id,
+                u.username,
+                u.user_custum_id,
+                u.email,
+                u.phone_number,
+                JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                        'document_name', d.document_name,
+                        'document_number', d.document_number
+                    )
+                ) AS documents
+            FROM users u
+            LEFT JOIN user_documents d 
+                ON u.user_id = d.user_id
+            WHERE u.user_id = ${userId}
+            GROUP BY u.user_id 
             `;
             const clientData = await getData(clientQuery, next);
 
@@ -694,7 +739,8 @@ const transactionController = {
                     bank_name,
                     account_type,
                     account_no,
-                    ifsc_code
+                    ifsc_code,
+                    branch
                 FROM user_bank_details
                 WHERE is_deleted = 0
                   AND user_id = ${userId}
