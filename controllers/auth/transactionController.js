@@ -404,6 +404,7 @@ const transactionController = {
             let query = `
                 SELECT
                     ot.order_id AS order_transaction_id,
+                    ot.order_custom_id AS order_custom_id,
                     ot.stock_details_id,
                     ot.user_id,
                     ad.advisor_name,
