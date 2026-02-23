@@ -185,7 +185,10 @@ const transactionController = {
                 rm_Datetime: Joi.string()
                     .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
                     .optional(),
-
+                st_datetime: Joi.string()
+                    .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+                    .optional(),
+                remark: Joi.string().allow('').optional(),
                 stock_details_id: Joi.number().integer().required(),
                 status: Joi.string()
                     .valid('COMPLETED', 'PROCCESSING', 'HOLD', 'REJECTED', 'CANCEL', 'PENDING')
@@ -197,7 +200,7 @@ const transactionController = {
             /* ------------------ Validate Request ------------------ */
             const { error } = orderSchema.validate(dataObj ?? {});
             if (error) return next(error);
-
+           
             /* ------------------ USER ↔ EMPLOYEE ASSIGNMENT CHECK ------------------ */
             const assignCheckQuery = ` SELECT user_id  FROM users WHERE user_id = '${dataObj.user_id}' AND assign_to = '${dataObj.employee_id}' AND is_deleted = 0 LIMIT 1 `;
             if (dataObj.employee_type == "RM") {
@@ -229,14 +232,21 @@ const transactionController = {
                     updatedObject.price_per_share = dataObj.rm_price;
                 }
 
-                // if (dataObj.rm_Datetime != null) {
-                //     updatedObject.rm_Datetime = dataObj.rm_Datetime;
-                // }
-
+                if (dataObj.rm_Datetime != null) {
+                    updatedObject.rm_Datetime = dataObj.rm_Datetime;
+                }
+                
                 updatedObject.rm_status = dataObj.status;
             } else if (dataObj.employee_type === 'AM') {
                 updatedObject.am_status = dataObj.status;
             } else if (dataObj.employee_type === 'ST') {
+
+                if (dataObj.st_datetime != null) {
+                    updatedObject.st_datetime = dataObj.st_datetime;
+                }
+                if (dataObj.remark != null) {
+                    updatedObject.remark = dataObj.remark;
+                }
                 updatedObject.st_status = dataObj.status;
             }
 
@@ -450,7 +460,7 @@ const transactionController = {
                     ot.price_per_share AS stock_price,
                     ot.current_share_price AS current_share_price,
                     ot.quantity AS quantity,
-                    ot.user_quantity AS quantity,
+                    ot.user_quantity AS user_quantity,
                     (ot.price_per_share * ot.quantity) AS investment_amount,
                     (sp.today_prices * ot.quantity) AS market_value,
                     (sp.today_prices * ot.quantity) - (ot.price_per_share * ot.quantity) AS overall_PL,
@@ -505,6 +515,14 @@ const transactionController = {
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),
+                status: Joi.string().valid(
+                    'PENDING',
+                    'RM_COMPLETED',
+                    'AM_COMPLETED',
+                    'REJECTED',
+                    'CANCEL',
+                    'COMPLETED'
+                ).optional(),
             });
 
             const { error, value } = holdingSchema.validate(req.query ?? {});
@@ -524,13 +542,33 @@ const transactionController = {
                 cond += ` AND users.assign_to = ${value.employee_id}`;
             }
 
-            if (value.employee_type == "AM") {
-                cond += ` AND ot.rm_status <> 'CANCEL' AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED'`;
+            // ---- ALL PENDING (Only RM PENDING) ----
+            if (value.status === "PENDING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
+                cond += ` AND ot.rm_status = 'PENDING' AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
             }
 
-            if (value.employee_type == "ST") {
-                cond += ` AND ot.rm_status <> 'CANCEL' AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status != 'COMPLETED'`;
+            // ---- COMPLETED (Only RM completed) ----
+            if (value.status === "RM_COMPLETED" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
             }
+
+            // ---- RM AND AM COMPLETED () ----
+            if (value.status === "AM_COMPLETED" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'PENDING'`;
+            }
+
+            // ---- RM AND AM COMPLETED () ----
+            if (value.status === "COMPLETED" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'`;
+            }
+
+            // if (value.employee_type == "AM") {
+            //     cond += ` AND ot.rm_status <> 'CANCEL' AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED'`;
+            // }
+
+            // if (value.employee_type == "ST") {
+            //     cond += ` AND ot.rm_status <> 'CANCEL' AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status != 'COMPLETED'`;
+            // }
 
             if (value.transaction_type) {
                 cond += ` AND ot.transaction_type = '${value.transaction_type}'`;
@@ -652,8 +690,11 @@ const transactionController = {
                 sd.script_name, 
                 ot.transaction_type, 
                 sp.today_prices,
-                ot.price_per_share AS buy_price, 
+                ot.price_per_share AS buy_price,
+                ot.current_share_price AS current_share_price,
+                ot.user_share_price AS user_share_price,
                 ot.quantity,
+                ot.user_quantity,
                 (ot.price_per_share * ot.quantity) AS deal_value, 
                 ot.rm_status,
                 ot.am_status,
@@ -662,10 +703,12 @@ const transactionController = {
                     CONVERT_TZ(ot.created_at, '+00:00', '+05:30'),
                     '%d-%m-%Y'
                 ) AS order_date,
-                 DATE_FORMAT(
+                DATE_FORMAT(
                     CONVERT_TZ(ot.created_at, '+00:00', '+05:30'),
                     '%H:%i:%s'
-                ) AS order_time
+                ) AS order_time,
+                ot.st_datetime,
+                ot.remark
             FROM order_transactions ot
             JOIN stock_details sd 
                 ON sd.stock_details_id = ot.stock_details_id
