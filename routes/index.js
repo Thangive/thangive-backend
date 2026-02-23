@@ -63,7 +63,7 @@ router.get('/userHoldings', auth, transactionController.getUserHoldings);
 router.get('/orderStatement', auth, transactionController.getOrderStatement);
 
 // Payment APIS
-router.post('/addPaymentDetails', auth, forms, transactionController.addUpdatePayment);
+router.post('/addPaymentDetails', auth, imageUpload, transactionController.addUpdatePayment);
 
 
 // Stock Details API
