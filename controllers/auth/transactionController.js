@@ -178,17 +178,48 @@ const transactionController = {
                 order_id: Joi.number().integer().required(),
                 user_id: Joi.number().integer().required(),
                 employee_id: Joi.number().integer().required(),
-                employee_type: Joi.string().valid('RM', 'AM', 'ST').required(),
+                employee_type: Joi.string()
+                    .valid('RM', 'AM', 'ST')
+                    .required(),
 
-                rm_qty: Joi.number().optional(),
-                rm_price: Joi.number().optional(),
-                rm_Datetime: Joi.string()
-                    .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
-                    .optional(),
-                st_datetime: Joi.string()
-                    .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
-                    .optional(),
-                remark: Joi.string().allow('').optional(),
+                rm_qty: Joi.when('employee_type', {
+                    is: 'RM',
+                    then: Joi.number().required(),
+                    otherwise: Joi.forbidden()
+                }),
+
+                rm_price: Joi.when('employee_type', {
+                    is: 'RM',
+                    then: Joi.number().required(),
+                    otherwise: Joi.forbidden()
+                }),
+
+                rm_Datetime: Joi.when('employee_type', {
+                    is: 'RM',
+                    then: Joi.string()
+                        .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+                        .required(),
+                    otherwise: Joi.forbidden()
+                }),
+
+                st_datetime: Joi.when('employee_type', {
+                    is: 'ST',
+                    then: Joi.string()
+                        .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+                        .required(),
+                    otherwise: Joi.forbidden()
+                }),
+
+                remark: Joi.when('employee_type', {
+                    is: 'ST',
+                    then: Joi.string().allow('').optional(),
+                    otherwise: Joi.forbidden()
+                }),
+                share_Debit: Joi.when('employee_type', {
+                    is: 'ST',
+                    then: Joi.string().allow('').optional(),
+                    otherwise: Joi.forbidden()
+                }),
                 stock_details_id: Joi.number().integer().required(),
                 status: Joi.string()
                     .valid('COMPLETED', 'PROCCESSING', 'HOLD', 'REJECTED', 'CANCEL', 'PENDING')
@@ -200,7 +231,7 @@ const transactionController = {
             /* ------------------ Validate Request ------------------ */
             const { error } = orderSchema.validate(dataObj ?? {});
             if (error) return next(error);
-           
+
             /* ------------------ USER ↔ EMPLOYEE ASSIGNMENT CHECK ------------------ */
             const assignCheckQuery = ` SELECT user_id  FROM users WHERE user_id = '${dataObj.user_id}' AND assign_to = '${dataObj.employee_id}' AND is_deleted = 0 LIMIT 1 `;
             if (dataObj.employee_type == "RM") {
@@ -235,11 +266,16 @@ const transactionController = {
                 if (dataObj.rm_Datetime != null) {
                     updatedObject.rm_Datetime = dataObj.rm_Datetime;
                 }
-                
+
                 updatedObject.rm_status = dataObj.status;
             } else if (dataObj.employee_type === 'AM') {
                 updatedObject.am_status = dataObj.status;
             } else if (dataObj.employee_type === 'ST') {
+
+                if (req.files?.share_Debit?.length > 0) {
+                    const file = req.files.share_Debit[0];
+                    dataObj.share_Debit_Path = `uploads/upload/${file.filename}`;
+                }
 
                 if (dataObj.st_datetime != null) {
                     updatedObject.st_datetime = dataObj.st_datetime;

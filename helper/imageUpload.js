@@ -27,6 +27,7 @@ const storage = multer.diskStorage({
         if (file.fieldname === "service_gallery") prefix = "gallery";
         if (file.fieldname === "cmr_document") prefix = `${req?.body?.broker_name}_`;
         if (file.fieldname === "ps_logo") prefix = `${req?.body?.stock_name}_`;
+        if (file.fieldname === "share_Debit") prefix = `${req?.body?.order_id}_`;
 
         cb(null, `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}${ext}`);
     }
@@ -61,6 +62,7 @@ const imageUpload = multer({
     { name: 'bank_document', maxCount: 1 },
     { name: 'cmr_document', maxCount: 1 },
     { name: 'ps_logo', maxCount: 1 },
+    { name: 'share_Debit', maxCount: 1 },
 ]);
 
 export default imageUpload;
