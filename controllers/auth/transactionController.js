@@ -217,7 +217,7 @@ const transactionController = {
                 }),
                 share_Debit: Joi.when('employee_type', {
                     is: 'ST',
-                    then: Joi.string().allow('').optional(),
+                    then: Joi.any().required(),
                     otherwise: Joi.forbidden()
                 }),
                 stock_details_id: Joi.number().integer().required(),
@@ -274,7 +274,7 @@ const transactionController = {
 
                 if (req.files?.share_Debit?.length > 0) {
                     const file = req.files.share_Debit[0];
-                    dataObj.share_Debit_Path = `uploads/upload/${file.filename}`;
+                    updatedObject.share_Debit_Path = `uploads/upload/${file.filename}`;
                 }
 
                 if (dataObj.st_datetime != null) {
