@@ -284,7 +284,7 @@ const transactionController = {
                 updatedObject.am_status = dataObj.status;
             } else if (dataObj.employee_type === 'ST') {
                 if (req.files?.share_Debit?.length > 0) {
-                    updatedObject.share_Debit_Path = `${dataObj.share_Debit_Path}_${file.filename}`;
+                    updatedObject.share_Debit_Path = dataObj.share_Debit_Path;
                 }
                 if (dataObj.st_datetime != null) {
                     updatedObject.st_datetime = dataObj.st_datetime;
@@ -864,13 +864,41 @@ const transactionController = {
                 payment_id: Joi.number().integer().optional(),
                 order_id: Joi.number().integer().required(),
                 bank_id: Joi.number().integer().required(),
-                transaction_ref: Joi.string().required(),
+                transaction_ref: Joi.string().optional(),
                 amount: Joi.number().positive().required(),
                 payment_mode: Joi.string()
                     .valid('CASH', 'UPI', 'NEFT', 'RTGS', 'IMPS', 'CHEQUE')
-                    .required(),
+                    .optional(),
                 payment_type: Joi.string()
                     .valid('PARTIAL', 'FULL')
+                    .required(),
+                employee_type: Joi.string()
+                    .valid('RM', 'AM')
+                    .required(),
+                user_Datetime: Joi.when('employee_type', {
+                    is: 'RM',
+                    then: Joi.string()
+                        .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+                        .required(),
+                    otherwise: Joi.forbidden()
+                }),
+                rm_Datetime: Joi.when('employee_type', {
+                    is: 'RM',
+                    then: Joi.string()
+                        .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+                        .required(),
+                    otherwise: Joi.forbidden()
+                }),
+
+                am_Datetime: Joi.when('employee_type', {
+                    is: 'AM',
+                    then: Joi.string()
+                        .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+                        .required(),
+                    otherwise: Joi.forbidden()
+                }),
+                status: Joi.string()
+                    .valid('RECEVIED', 'PENDING')
                     .required(),
                 remark: Joi.string().allow('', null).optional()
             });
@@ -929,38 +957,52 @@ const transactionController = {
 
             /* ------------------ Prepare Data ------------------ */
             dataObj.remaining_amount = remainingAmount - dataObj.amount;
+            if (dataObj.employee_type == 'RM') {
+                dataObj.rm_status = dataObj.status;
+                delete dataObj.employee_type;
+                delete dataObj.status;
+            }
+
+            if (dataObj.employee_type == 'AM') {
+                dataObj.am_status = dataObj.status;
+                delete dataObj.employee_type;
+                delete dataObj.status;
+            }
 
             let query = '';
 
-            if (dataObj.payment_id) {
-                /* ------------------ Update Payment ------------------ */
-                query = `
-                    UPDATE payment_transactions
-                    SET ?
-                    WHERE payment_id = ${dataObj.payment_id}
-                `;
-                dataObj.updated_on = new Date();
-            } else {
-                /* ------------------ Insert Payment ------------------ */
-                query = `INSERT INTO payment_transactions SET ?`;
-                dataObj.rm_status = 'PENDING';
-                dataObj.am_status = 'PENDING';
-                dataObj.created_at = new Date();
-            }
+            console.log("=========>", JSON.stringify(dataObj, null, 12));
 
-            const result = await insertData(query, dataObj, next);
 
-            if (!dataObj.payment_id && result.insertId) {
-                dataObj.payment_id = result.insertId;
-            }
+            // if (dataObj.payment_id) {
+            //     /* ------------------ Update Payment ------------------ */
+            //     query = `
+            //         UPDATE payment_transactions
+            //         SET ?
+            //         WHERE payment_id = ${dataObj.payment_id}
+            //     `;
+            //     dataObj.updated_on = new Date();
+            // } else {
+            //     /* ------------------ Insert Payment ------------------ */
+            //     query = `INSERT INTO payment_transactions SET ?`;
+            //     dataObj.rm_status = 'PENDING';
+            //     dataObj.am_status = 'PENDING';
+            //     dataObj.created_at = new Date();
+            // }
 
-            return res.json({
-                success: true,
-                message: dataObj.payment_id
-                    ? 'Payment updated successfully'
-                    : 'Payment added successfully',
-                data: dataObj
-            });
+            // const result = await insertData(query, dataObj, next);
+
+            // if (!dataObj.payment_id && result.insertId) {
+            //     dataObj.payment_id = result.insertId;
+            // }
+
+            // return res.json({
+            //     success: true,
+            //     message: dataObj.payment_id
+            //         ? 'Payment updated successfully'
+            //         : 'Payment added successfully',
+            //     data: dataObj
+            // });
 
         } catch (error) {
             next(error);
