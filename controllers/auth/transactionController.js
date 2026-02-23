@@ -215,9 +215,14 @@ const transactionController = {
                     then: Joi.string().allow('').optional(),
                     otherwise: Joi.forbidden()
                 }),
-                share_Debit: Joi.when('employee_type', {
+                share_Debit_Path: Joi.when('employee_type', {
                     is: 'ST',
-                    then: Joi.any().required(),
+                    then: Joi.string()
+                        .allow('')
+                        .optional()
+                        .messages({
+                            'any.required': 'Share Debit (share_Debit) is required',
+                        }),
                     otherwise: Joi.forbidden()
                 }),
                 stock_details_id: Joi.number().integer().required(),
@@ -227,6 +232,13 @@ const transactionController = {
             });
 
             const dataObj = { ...req.body };
+
+            if (dataObj.employee_type === 'ST') {
+                if (req.files?.share_Debit?.length > 0) {
+                    const file = req.files.share_Debit[0];
+                    dataObj.share_Debit_Path = `uploads/upload/${file.filename}`;
+                }
+            }
 
             /* ------------------ Validate Request ------------------ */
             const { error } = orderSchema.validate(dataObj ?? {});
@@ -271,12 +283,9 @@ const transactionController = {
             } else if (dataObj.employee_type === 'AM') {
                 updatedObject.am_status = dataObj.status;
             } else if (dataObj.employee_type === 'ST') {
-
                 if (req.files?.share_Debit?.length > 0) {
-                    const file = req.files.share_Debit[0];
-                    updatedObject.share_Debit_Path = `uploads/upload/${file.filename}`;
+                    updatedObject.share_Debit_Path = `${dataObj.share_Debit_Path}_${file.filename}`;
                 }
-
                 if (dataObj.st_datetime != null) {
                     updatedObject.st_datetime = dataObj.st_datetime;
                 }
