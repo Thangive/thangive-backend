@@ -182,15 +182,21 @@ const transactionController = {
                     .valid('RM', 'AM', 'ST')
                     .required(),
 
+                bank_id: Joi.when('employee_type', {
+                    is: 'RM',
+                    then: Joi.number().optional(),
+                    otherwise: Joi.forbidden()
+                }),
+
                 rm_qty: Joi.when('employee_type', {
                     is: 'RM',
-                    then: Joi.number().required(),
+                    then: Joi.number().optional(),
                     otherwise: Joi.forbidden()
                 }),
 
                 rm_price: Joi.when('employee_type', {
                     is: 'RM',
-                    then: Joi.number().required(),
+                    then: Joi.number().optional(),
                     otherwise: Joi.forbidden()
                 }),
 
@@ -216,7 +222,7 @@ const transactionController = {
                     otherwise: Joi.forbidden()
                 }),
                 share_Debit_Path: Joi.when('employee_type', {
-                    is: 'ST',
+                    is: Joi.valid('ST', 'RM'),
                     then: Joi.string()
                         .allow('')
                         .optional()
@@ -266,6 +272,10 @@ const transactionController = {
             let updatedObject = {};
             // store status against employee type
             if (dataObj.employee_type === 'RM') {
+
+                if (dataObj.bank_id != null) {
+                    updatedObject.bank_id = dataObj.bank_id;
+                }
 
                 if (dataObj.rm_qty != null) {
                     updatedObject.quantity = dataObj.rm_qty;
@@ -728,6 +738,7 @@ const transactionController = {
                 ot.order_id,
                 ot.user_id,
                 ot.order_custom_id,
+                ot.order_type,
                 ot.stock_details_id,
                 b.broker_name AS broker_name, 
                 sd.isin_no, 
@@ -754,7 +765,14 @@ const transactionController = {
                 ) AS order_time,
                 ot.st_datetime,
                 ot.remark,
-                ot.share_Debit_Path
+                ot.share_Debit_Path,
+                CONCAT(
+                    rm.first_name, ' ',
+                    IFNULL(rm.middle_name, ''), 
+                    IF(rm.middle_name IS NOT NULL AND rm.middle_name != '', ' ', ''),
+                    rm.last_name
+                ) AS rmName,
+                usr.assign_to AS rm_id
             FROM order_transactions ot
             JOIN stock_details sd 
                 ON sd.stock_details_id = ot.stock_details_id
@@ -762,6 +780,8 @@ const transactionController = {
                 ON b.broker_id = ot.broker_id
             JOIN users usr 
                 ON usr.user_id = ot.user_id
+            LEFT JOIN users rm                
+            ON rm.user_id = usr.assign_to
             JOIN stock_price sp
                 ON sp.stock_details_id = ot.stock_details_id
             JOIN (
@@ -837,7 +857,7 @@ const transactionController = {
             const bankData = await getData(bankQuery, next);
 
             /* ------------------ Payment Details ------------------ */
-            const paymentQuery = `SELECT DATE_FORMAT(pt.created_at, '%d-%m-%Y') AS date,b.bank_id,b.bank_name,pt.payment_id,pt.amount,pt.remaining_amount,pt.transaction_ref,pt.transaction_doc,pt.remark,pt.rm_status,pt.am_status,pt.payment_type,pt.user_Datetime,pt.rm_Datetime,pt.am_Datetime FROM payment_transactions pt LEFT JOIN user_bank_details b ON b.bank_id = pt.bank_id WHERE pt.order_id =  '${req.query.order_id}'`;
+            const paymentQuery = `SELECT pt.payment_custom_id, DATE_FORMAT(pt.created_at, '%d-%m-%Y') AS date,b.bank_id,b.bank_name,pt.payment_id,pt.amount,pt.remaining_amount,pt.transaction_ref,pt.transaction_doc,pt.remark,pt.rm_status,pt.am_status,pt.payment_type,pt.user_Datetime,pt.rm_Datetime,pt.am_Datetime FROM payment_transactions pt LEFT JOIN user_bank_details b ON b.bank_id = pt.bank_id WHERE pt.order_id =  '${req.query.order_id}'`;
 
             const paymentData = await getData(paymentQuery, next);
 
