@@ -753,7 +753,8 @@ const transactionController = {
                     '%H:%i:%s'
                 ) AS order_time,
                 ot.st_datetime,
-                ot.remark
+                ot.remark,
+                ot.share_Debit_Path
             FROM order_transactions ot
             JOIN stock_details sd 
                 ON sd.stock_details_id = ot.stock_details_id
@@ -836,7 +837,7 @@ const transactionController = {
             const bankData = await getData(bankQuery, next);
 
             /* ------------------ Payment Details ------------------ */
-            const paymentQuery = `SELECT DATE_FORMAT(pt.created_at, '%d-%m-%Y') AS date,b.bank_name,pt.amount,pt.remaining_amount,pt.transaction_ref,pt.transaction_doc,pt.remark,pt.rm_status,pt.am_status FROM payment_transactions pt LEFT JOIN bank_details b ON b.bank_id = pt.bank_id WHERE pt.order_id =  '${req.query.order_id}'`;
+            const paymentQuery = `SELECT DATE_FORMAT(pt.created_at, '%d-%m-%Y') AS date,b.bank_id,b.bank_name,pt.payment_id,pt.amount,pt.remaining_amount,pt.transaction_ref,pt.transaction_doc,pt.remark,pt.rm_status,pt.am_status,pt.payment_type,pt.user_Datetime,pt.rm_Datetime,pt.am_Datetime FROM payment_transactions pt LEFT JOIN user_bank_details b ON b.bank_id = pt.bank_id WHERE pt.order_id =  '${req.query.order_id}'`;
 
             const paymentData = await getData(paymentQuery, next);
 
@@ -1004,8 +1005,8 @@ const transactionController = {
             } else {
                 /* ------------------ Insert Payment ------------------ */
                 query = `INSERT INTO payment_transactions SET ?`;
-                dataObj.rm_status = 'PENDING';
-                dataObj.am_status = 'PENDING';
+                // dataObj.rm_status = 'PENDING';
+                // dataObj.am_status = 'PENDING';
                 dataObj.created_at = new Date();
             }
 
