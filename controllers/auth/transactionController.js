@@ -289,6 +289,12 @@ const transactionController = {
                     updatedObject.rm_Datetime = dataObj.rm_Datetime;
                 }
 
+                if (dataObj.remark != null) {
+                    updatedObject.remark = dataObj.remark;
+                }
+                if (req.files?.share_Debit?.length > 0) {
+                    updatedObject.share_Debit_Path = dataObj.share_Debit_Path;
+                }
                 updatedObject.rm_status = dataObj.status;
             } else if (dataObj.employee_type === 'AM') {
                 updatedObject.am_status = dataObj.status;
@@ -573,7 +579,9 @@ const transactionController = {
                 status: Joi.string().valid(
                     'PENDING',
                     'RM_COMPLETED',
+                    'RM_PROCCESSING',
                     'AM_COMPLETED',
+                    'ST_PROCCESSING',
                     'REJECTED',
                     'CANCEL',
                     'COMPLETED'
@@ -602,14 +610,24 @@ const transactionController = {
                 cond += ` AND ot.rm_status = 'PENDING' AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
             }
 
+            // ---- SALE PROCCESSING (Only RM PROCCESSING) ----
+            if (value.status === "RM_PROCCESSING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
+                cond += ` AND ot.rm_status = 'PROCCESSING' AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
+            }
+
             // ---- COMPLETED (Only RM completed) ----
             if (value.status === "RM_COMPLETED" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
                 cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
             }
 
-            // ---- RM AND AM COMPLETED () ----
+            // ---- ONLY BUY RM AND AM COMPLETED () ----
             if (value.status === "AM_COMPLETED" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
                 cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'PENDING'`;
+            }
+
+             // ---- ONLY SELL RM AND ST COMPLETED () ----
+            if (value.status === "ST_PROCCESSING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED'`;
             }
 
             // ---- RM AND AM COMPLETED () ----
@@ -750,6 +768,7 @@ const transactionController = {
                 ot.current_share_price AS current_share_price,
                 ot.user_share_price AS user_share_price,
                 ot.quantity,
+                ot.bank_id,
                 ot.user_quantity,
                 (ot.price_per_share * ot.quantity) AS deal_value, 
                 ot.rm_status,
@@ -764,6 +783,7 @@ const transactionController = {
                     '%H:%i:%s'
                 ) AS order_time,
                 ot.st_datetime,
+                ot.rm_datetime,
                 ot.remark,
                 ot.share_Debit_Path,
                 CONCAT(
@@ -972,8 +992,8 @@ const transactionController = {
                     COALESCE(SUM(amount), 0) AS paid_amount
                 FROM payment_transactions
                 WHERE order_id = ${dataObj.order_id}
-                  AND rm_status = 'RECEVIED'
-                  OR am_status = 'RECEVIED'
+                  AND (rm_status = 'RECEVIED'
+                  OR am_status = 'RECEVIED')
             `;
 
             /* Exclude current payment while updating */
