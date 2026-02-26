@@ -36,7 +36,7 @@ const transactionController = {
                     .optional(),
 
                 trasaction_date: Joi.string()
-                    .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+                    // .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
                     .when('markAsSold', {
                         is: true,
                         then: Joi.required(),
@@ -204,7 +204,7 @@ const transactionController = {
                     is: 'RM',
                     then: Joi.string()
                         // .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
-                        .required(),
+                        .optional(),
                     otherwise: Joi.forbidden()
                 }),
 
@@ -229,6 +229,12 @@ const transactionController = {
                         .messages({
                             'any.required': 'Share Debit (share_Debit) is required',
                         }),
+                    otherwise: Joi.forbidden()
+                }),
+                share_Debit_Datetime: Joi.when('employee_type', {
+                    is: 'RM',
+                    then: Joi.string()
+                        .optional(),
                     otherwise: Joi.forbidden()
                 }),
                 stock_details_id: Joi.number().integer().required(),
@@ -625,7 +631,7 @@ const transactionController = {
                 cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'PENDING'`;
             }
 
-             // ---- ONLY SELL RM AND ST COMPLETED () ----
+            // ---- ONLY SELL RM AND ST COMPLETED () ----
             if (value.status === "ST_PROCCESSING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
                 cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED'`;
             }
@@ -785,7 +791,9 @@ const transactionController = {
                 ot.st_datetime,
                 ot.rm_datetime,
                 ot.remark,
+                ot.share_Debit_Invoice,
                 ot.share_Debit_Path,
+                ot.share_Debit_Datetime,
                 CONCAT(
                     rm.first_name, ' ',
                     IFNULL(rm.middle_name, ''), 
