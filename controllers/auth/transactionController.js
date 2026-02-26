@@ -828,6 +828,12 @@ const transactionController = {
                 SELECT 
                 u.user_id,
                 u.username,
+                CONCAT(
+                    u.first_name, ' ',
+                    IFNULL(u.middle_name, ''), 
+                    IF(u.middle_name IS NOT NULL AND u.middle_name != '', ' ', ''),
+                    u.last_name
+                ) AS client_name,
                 u.user_custum_id,
                 u.email,
                 u.phone_number,
@@ -850,6 +856,7 @@ const transactionController = {
                 SELECT 
                     cmr.broker_custom_id,
                     br.broker_name,
+                    br.broker_id,
                     cmr.client_id,
                     br.broker_email,
                     br.broker_contact
@@ -886,7 +893,7 @@ const transactionController = {
                 records: 1,
                 data: {
                     clientDetails: clientData[0] ?? {},
-                    brokerDetails: brokerData[0] ?? {},
+                    brokerDetails: brokerData ?? [],
                     bankDetails: bankData ?? {},
                     paymentDetails: paymentData ?? [],
                     orderDetails: orderData[0]
