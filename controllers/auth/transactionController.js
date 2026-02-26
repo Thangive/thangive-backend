@@ -1308,7 +1308,7 @@ const transactionController = {
 
             let query = `
                 SELECT 
-                    CONCAT('INV-', ot.transaction_type, '-', ot.order_id) AS invoice_no,
+                    ot.share_Debit_Invoice AS invoice_no,
                     ot.order_type,
                     ot.transaction_type,
                     st.company_name AS stock,
