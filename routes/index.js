@@ -22,6 +22,7 @@ router.post('/userBankDetails', auth, imageUpload, userController.addUpdateUserB
 router.post('/userCMRDetails', auth, imageUpload, userController.addUpdateUserCMRDetails);
 router.get('/RMList', auth, userController.getRMList);
 router.post('/assignToRM', auth, forms, userController.assignToRM);
+router.post('/contact',forms, userController.addContact);
 
 
 router.post('/login', forms, serviceController.login);

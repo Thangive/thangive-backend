@@ -795,8 +795,65 @@ const userController = {
         } catch (err) {
             return next(err);
         }
-    }
+    },
 
+    async addContact(req, res, next) {
+        try {
+            const contactSchema = Joi.object({
+                contact_id: Joi.number().integer().optional(),
+                name: Joi.string().required(),
+                email: Joi.string().email().required(),
+                phone: Joi.string().pattern(/^[0-9]{10}$/).required(),
+                message: Joi.string().required(),
+                // is_deleted: Joi.number().integer().optional(),
+            });
+            let dataObj = { ...req.body };
+            const { error } = contactSchema.validate(dataObj);
+            if (error) return next(error);
+            let condition = "";
+            if (dataObj.contact_id) {
+                condition = `AND contact_id != ${dataObj.contact_id}`;
+            }
+            const checkQuery = `
+                SELECT contact_id 
+                FROM contact
+                WHERE (
+                    email = '${dataObj.email}'
+                    OR phone = '${dataObj.phone}'
+                )
+                ${condition}
+            `;
+            const exists = await getData(checkQuery, next);
+            if (exists.length > 0) {
+                return next(
+                    CustomErrorHandler.alreadyExist(
+                        "Same contact already exists"
+                    )
+                );
+            }
+            let query = "";
+            if (dataObj.contact_id) {
+                query = `UPDATE contact SET ? WHERE contact_id = ${dataObj.contact_id}`;
+                dataObj.updated_at = new Date();
+            } else {
+                query = `INSERT INTO contact SET ?`;
+                dataObj.created_at = new Date();
+            }
+            const result = await insertData(query, dataObj, next);
+            if (result.insertId) {
+                dataObj.contact_id = result.insertId;
+            }
+            return res.json({
+                success: true,
+                message: dataObj.contact_id
+                    ? "Contact updated successfully"
+                    : "Contact saved successfully",
+                data: dataObj
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 

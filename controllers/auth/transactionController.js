@@ -518,6 +518,7 @@ const transactionController = {
                     ot.order_custom_id AS order_custom_id,
                     ot.stock_details_id,
                     ot.user_id,
+                    ot.transaction_type,
                     CONCAT(users.first_name, ' ', users.middle_name,' ', users.last_name) AS client_name,
                     ad.advisor_name,
                     bro.broker_name,
@@ -592,6 +593,9 @@ const transactionController = {
                     'CANCEL',
                     'COMPLETED'
                 ).optional(),
+                from_date: Joi.string().optional(),
+                to_date: Joi.string().optional(),
+                company_name: Joi.string().optional(),
             });
 
             const { error, value } = holdingSchema.validate(req.query ?? {});
@@ -661,8 +665,20 @@ const transactionController = {
                 cond += ` AND ot.advisor_id = ${value.advisor_id}`;
             }
 
+            if (value.company_name) {
+                cond += ` AND st.company_name LIKE '%${value.company_name}%'`;
+            }
+
+            if (value.from_date) {
+                cond += ` AND DATE(ot.created_at) >= '${value.from_date}'`;
+            }
+
+            if (value.to_date) {
+                cond += ` AND DATE(ot.created_at) <= '${value.to_date}'`;
+            }
+
             query += cond;
-            query += ` ORDER BY ot.order_id DESC `;
+            query += ` ORDER BY ot.updated_on DESC, ot.order_id DESC `;
 
             /* ------------------ Pagination ------------------ */
             if (value.pagination) {
@@ -1312,7 +1328,10 @@ const transactionController = {
                     ot.order_type,
                     ot.transaction_type,
                     st.company_name AS stock,
+                    st.isin_no,
                     ot.quantity AS qty,
+                    ot.broker_id,
+                    ot.st_datetime,
                     ot.price_per_share AS share_price,
                     (ot.price_per_share * ot.quantity) AS total,
                     DATE_FORMAT(ot.created_at, '%d %b %Y, %H:%i') AS date
