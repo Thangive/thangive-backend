@@ -1414,20 +1414,154 @@ const transactionController = {
         } catch (err) {
             next(err);
         }
+    },
+    async getPayment(req, res, next) {
+        try {
+            /* ------------------ Validation Schema ------------------ */
+            const paymentSchema = Joi.object({
+                user_id: Joi.number().integer().optional(),
+                order_id: Joi.number().integer().optional(),
+                transaction_type: Joi.string().valid("BUY", "SELL").optional(),
+                order_type: Joi.string().optional(),
+
+                company_name: Joi.string().optional(),
+                am_status: Joi.string().valid("PENDING", "RECEVIED").optional(),
+                from_date: Joi.string().optional(),
+                to_date: Joi.string().optional(),
+
+                pagination: Joi.boolean().optional(),
+                current_page: Joi.number().integer().optional(),
+                per_page_records: Joi.number().integer().optional(),
+            });
+
+            const { error, value } = paymentSchema.validate(req.query ?? {});
+            if (error) return next(error);
+
+            /* ------------------ Base Query ------------------ */
+            let query = `
+            SELECT 
+                pt.payment_id,
+                pt.payment_custom_id,
+                pt.order_id,
+                
+                /* Order Info */
+                ot.user_id,
+                ot.order_type,
+                ot.transaction_type,
+                ot.order_custom_id,
+                ot.quantity,
+                ot.bank_id,
+                ot.st_status,
+                ot.user_quantity,
+                (ot.price_per_share * ot.quantity) AS deal_value,
+
+                st.company_name,
+
+                /* User Info */
+                u.user_custum_id,
+                CONCAT(
+                    u.first_name, ' ',
+                    IFNULL(u.middle_name, ''),
+                    IF(u.middle_name IS NOT NULL AND u.middle_name != '', ' ', ''),
+                    u.last_name
+                ) AS client_name,
+
+                /* Payment Info */
+                DATE_FORMAT(pt.rm_Datetime, '%d-%m-%Y %H:%i:%s') AS payment_date,
+                b.bank_id,
+                b.bank_name,
+                pt.amount,
+                pt.remaining_amount,
+                pt.payment_type,
+                pt.transaction_ref,
+                pt.transaction_doc,
+                pt.remark,
+                pt.rm_status,
+                pt.am_status,
+                pt.user_Datetime,
+                pt.rm_Datetime,
+                pt.am_Datetime
+
+            FROM payment_transactions pt
+            JOIN order_transactions ot 
+                ON ot.order_id = pt.order_id
+            LEFT JOIN users u
+                ON u.user_id = ot.user_id
+            LEFT JOIN user_bank_details b
+                ON b.bank_id = pt.bank_id
+            LEFT JOIN stock_details st
+                ON st.stock_details_id = ot.stock_details_id
+            WHERE 1 = 1
+        `;
+
+            /* ------------------ Filters ------------------ */
+            let cond = "";
+
+            if (value.user_id) {
+                cond += ` AND ot.user_id = ${value.user_id}`;
+            }
+
+            if (value.order_id) {
+                cond += ` AND pt.order_id = ${value.order_id}`;
+            }
+
+            if (value.transaction_type) {
+                cond += ` AND ot.transaction_type = '${value.transaction_type}'`;
+            }
+
+            if (value.order_type) {
+                cond += ` AND ot.order_type = '${value.order_type}'`;
+            }
+
+            if (value.company_name) {
+                cond += ` AND st.company_name LIKE '%${value.company_name}%'`;
+            }
+
+            if (value.am_status) {
+                cond += ` AND pt.am_status = '${value.am_status}'`;
+            }
+
+            if (value.from_date) {
+                cond += ` AND DATE(pt.rm_Datetime) >= '${value.from_date}'`;
+            }
+
+            if (value.to_date) {
+                cond += ` AND DATE(pt.rm_Datetime) <= '${value.to_date}'`;
+            }
+            query += cond;
+            // query += ` ORDER BY pt.payment_id DESC, pt.updated_on DESC `;
+            query += ` ORDER BY pt.payment_id ASC `;
+
+            /* ------------------ PAGINATION ------------------ */
+            let page = { pageQuery: "" };
+
+            if (value.pagination) {
+                page = await paginationQuery(
+                    query,
+                    next,
+                    value.current_page,
+                    value.per_page_records
+                );
+            }
+
+            query += page.pageQuery;
+
+            /* ------------------ Fetch Data ------------------ */
+            const data = await getData(query, next);
+
+            return res.json({
+                message: 'success',
+                total_records: page.total_rec ?? data.length,
+                number_of_pages: page.number_of_pages ?? 1,
+                currentPage: page.currentPage ?? 1,
+                records: data.length,
+                data
+            });
+
+        } catch (err) {
+            next(err);
+        }
     }
 };
 
 export default transactionController;
-
-
-
-//holdings
-// SELECT ot.stock_details_id, ot.user_id, ad.advisor_name, bro.broker_custom_id AS broker_id, bro.broker_name, st.company_name, sp.prev_price, sp.today_prices AS latest_price, SUM(ot.price_per_share * ot.quantity) / NULLIF(SUM(ot.quantity),0) AS avg_price, SUM(ot.quantity) AS total_quantity, SUM(ot.price_per_share * ot.quantity) AS investment_amount, SUM(sp.today_prices * ot.quantity) AS market_value, CAST((((SUM(sp.today_prices * ot.quantity) - SUM(ot.price_per_share * ot.quantity)) / NULLIF(SUM(ot.price_per_share * ot.quantity), 0)) * 100) AS DECIMAL(10,2)) AS overall_PL_percentage, (SUM(sp.today_prices * ot.quantity) - SUM(ot.price_per_share * ot.quantity)) AS overall_PL, SUM((sp.today_prices - sp.prev_price) * ot.quantity) AS daily_PL, CAST(((SUM((sp.today_prices - sp.prev_price) * ot.quantity) / NULLIF(SUM(sp.prev_price * ot.quantity), 0)) * 100) AS DECIMAL(10,2)) AS daily_PL_percentage, ot.rm_status, ot.am_status, ot.st_status, ot.payments_count FROM thangiveTest.order_transactions ot JOIN thangiveTest.stock_details st ON ot.stock_details_id = st.stock_details_id JOIN thangiveTest.advisor ad ON ad.advisor_id = ot.advisor_id JOIN thangiveTest.broker bro ON bro.broker_id = ot.broker_id JOIN thangiveTest.stock_price sp ON sp.stock_details_id = st.stock_details_id JOIN ( SELECT stock_details_id, MAX(stock_price_id) AS latest_id FROM thangiveTest.stock_price GROUP BY stock_details_id ) latest ON latest.latest_id = sp.stock_price_id ;
-
-
-//overview
-// const query = `SELECT CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END AS Category, SUM(ot.price_per_share * ot.quantity) AS invested_amount, SUM(sp.today_prices * ot.quantity) AS market_value, SUM((sp.today_prices * ot.quantity) - (ot.price_per_share * ot.quantity)) AS overall_PL, SUM((sp.today_prices - sp.prev_price) * ot.quantity) AS todays_PL FROM order_transactions ot JOIN stock_details st ON ot.stock_details_id = st.stock_details_id JOIN stock_price sp ON sp.stock_details_id = st.stock_details_id JOIN (SELECT stock_details_id, MAX(stock_price_id) AS latest_id FROM stock_price GROUP BY stock_details_id) latest ON latest.latest_id = sp.stock_price_id GROUP BY CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END;`;
-
-
-//unlisted count
-// const query = `SELECT ad.advisor_id, ad.advisor_name, CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END AS Category, SUM(ot.price_per_share * ot.quantity) AS invested_amount, SUM(sp.today_prices * ot.quantity) AS market_value, SUM((sp.today_prices * ot.quantity) - (ot.price_per_share * ot.quantity)) AS overall_PL, SUM((sp.today_prices - sp.prev_price) * ot.quantity) AS todays_PL FROM order_transactions ot JOIN advisor ad ON ad.advisor_id = ot.advisor_id JOIN stock_details st ON ot.stock_details_id = st.stock_details_id JOIN stock_price sp ON sp.stock_details_id = st.stock_details_id JOIN (SELECT stock_details_id, MAX(stock_price_id) AS latest_id FROM stock_price GROUP BY stock_details_id) latest ON latest.latest_id = sp.stock_price_id WHERE ad.advisor_id IN (1, 2) GROUP BY ad.advisor_id, ad.advisor_name, CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END ORDER BY ad.advisor_id;`;
