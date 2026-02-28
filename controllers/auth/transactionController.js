@@ -1468,6 +1468,7 @@ const transactionController = {
 
                 /* Payment Info */
                 DATE_FORMAT(pt.rm_Datetime, '%d-%m-%Y %H:%i:%s') AS payment_date,
+                DATE_FORMAT(pt.am_Datetime, '%d-%m-%Y %H:%i:%s') AS am_date,
                 b.bank_id,
                 b.bank_name,
                 pt.amount,
