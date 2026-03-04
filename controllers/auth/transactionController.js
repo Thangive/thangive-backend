@@ -929,170 +929,381 @@ const transactionController = {
         }
     },
 
+    // async addUpdatePayment(req, res, next) {
+    //     try {
+    //         /* ------------------ Validation Schema ------------------ */
+    //         const paymentSchema = Joi.object({
+    //             payment_id: Joi.number().integer().optional(),
+    //             order_id: Joi.number().integer().required(),
+    //             bank_id: Joi.number().integer().required(),
+    //             transaction_ref: Joi.string().optional(),
+    //             amount: Joi.number().positive().required(),
+    //             transaction_type: Joi.string()
+    //                 .valid('BUY', 'SELL')
+    //                 .optional(),
+    //             payment_mode: Joi.string()
+    //                 .valid('CASH', 'UPI', 'NEFT', 'RTGS', 'IMPS', 'CHEQUE')
+    //                 .optional(),
+    //             payment_type: Joi.string()
+    //                 .valid('PARTIAL', 'FULL')
+    //                 .required(),
+    //             employee_type: Joi.string()
+    //                 .valid('RM', 'AM')
+    //                 .required(),
+    //             user_Datetime: Joi.when('employee_type', {
+    //                 is: 'RM',
+    //                 then: Joi.string()
+    //                     // .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+    //                     .required(),
+    //                 otherwise: Joi.forbidden()
+    //             }),
+    //             rm_Datetime: Joi.when('employee_type', {
+    //                 is: 'RM',
+    //                 then: Joi.string()
+    //                     // .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+    //                     .required(),
+    //                 otherwise: Joi.forbidden()
+    //             }),
+    //             transaction_doc: Joi.when('employee_type', {
+    //                 is: Joi.valid('AM', 'RM'),
+    //                 then: Joi.string()
+    //                     .trim()
+    //                     .optional()
+    //                     .invalid(null, '')
+    //                     .messages({
+    //                         'string.empty': 'transaction_doc cannot be empty',
+    //                         'any.invalid': 'transaction_doc cannot be null',
+    //                         'string.base': 'transaction_doc must be a file'
+    //                     }),
+    //                 otherwise: Joi.forbidden()
+    //             }),
+    //             am_Datetime: Joi.when('employee_type', {
+    //                 is: 'AM',
+    //                 then: Joi.string()
+    //                     // .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+    //                     .required(),
+    //                 otherwise: Joi.forbidden()
+    //             }),
+    //             status: Joi.string()
+    //                 .valid('RECEVIED', 'PENDING')
+    //                 .required(),
+    //             remark: Joi.string().allow('', null).optional()
+    //         });
+
+    //         const dataObj = { ...req.body };
+
+    //         if (["AM", "RM"].includes(dataObj.employee_type)) {
+    //             if (req.files?.transaction_doc?.length > 0) {
+    //                 const file = req.files.transaction_doc[0];
+    //                 dataObj.transaction_doc = `uploads/upload/${file.filename}`;
+    //             }
+    //         }
+
+    //         /* ------------------ Validate ------------------ */
+    //         const { error } = paymentSchema.validate(dataObj);
+    //         if (error) return next(error);
+
+    //         /* ------------------ Fetch Order Total ------------------ */
+    //         const orderAmountQuery = `
+    //             SELECT 
+    //                 COALESCE(SUM(price_per_share * quantity), 0) AS order_amount
+    //             FROM order_transactions
+    //             WHERE order_id = ${dataObj.order_id}
+    //         `;
+
+    //         const orderAmountResult = await getData(orderAmountQuery, next);
+    //         const orderAmount = orderAmountResult?.[0]?.order_amount || 0;
+
+    //         if (!orderAmount) {
+    //             return next(
+    //                 CustomErrorHandler.badRequest('Invalid order or order amount not found')
+    //             );
+    //         }
+
+    //         /* ------------------ Already Paid Amount ------------------ */
+    //         let paidAmountQuery = `
+    //             SELECT 
+    //                 COALESCE(SUM(amount), 0) AS paid_amount
+    //             FROM payment_transactions
+    //             WHERE order_id = ${dataObj.order_id}
+    //               AND (rm_status = 'RECEVIED'
+    //               OR am_status = 'RECEVIED')
+    //         `;
+
+    //         /* Exclude current payment while updating */
+    //         if (dataObj.payment_id) {
+    //             paidAmountQuery += ` AND payment_id <> ${dataObj.payment_id}`;
+    //         }
+
+    //         const paidAmountResult = await getData(paidAmountQuery, next);
+    //         const paidAmount = paidAmountResult?.[0]?.paid_amount || 0;
+
+    //         const remainingAmount = orderAmount - paidAmount;
+
+    //         // /* ------------------ Amount Validation ------------------ */
+    //         if (dataObj.amount > remainingAmount) {
+    //             return next(
+    //                 CustomErrorHandler.badRequest(
+    //                     `Payment exceeds remaining amount. Remaining: ${remainingAmount}`
+    //                 )
+    //             );
+    //         }
+    //         /* ------------------ Prepare Data ------------------ */
+    //         dataObj.remaining_amount = remainingAmount - dataObj.amount;
+    //         if (dataObj.employee_type == 'RM') {
+    //             dataObj.rm_status = dataObj.status;
+    //             delete dataObj.employee_type;
+    //             delete dataObj.status;
+    //         }
+
+    //         if (dataObj.employee_type == 'AM') {
+    //             dataObj.am_status = dataObj.status;
+    //             delete dataObj.employee_type;
+    //             delete dataObj.status;
+    //         }
+
+    //         let query = '';
+
+    //         console.log("=========>", JSON.stringify(dataObj, null, 12));
+
+    //         if (dataObj.payment_id) {
+    //             /* ------------------ Update Payment ------------------ */
+    //             query = `
+    //                 UPDATE payment_transactions
+    //                 SET ?
+    //                 WHERE payment_id = ${dataObj.payment_id}
+    //             `;
+    //             dataObj.updated_on = new Date();
+    //         } else {
+    //             /* ------------------ Insert Payment ------------------ */
+    //             query = `INSERT INTO payment_transactions SET ?`;
+    //             // dataObj.rm_status = 'PENDING';
+    //             // dataObj.am_status = 'PENDING';
+    //             dataObj.created_at = new Date();
+    //         }
+
+    //         const result = await insertData(query, dataObj, next);
+
+    //         if (!dataObj.payment_id && result.insertId) {
+    //             dataObj.payment_id = result.insertId;
+    //         }
+
+    //         return res.json({
+    //             success: true,
+    //             message: dataObj.payment_id
+    //                 ? 'Payment updated successfully'
+    //                 : 'Payment added successfully',
+    //             data: dataObj
+    //         });
+
+    //     } catch (error) {
+    //         next(error);
+    //     }
+    // },
     async addUpdatePayment(req, res, next) {
         try {
-            /* ------------------ Validation Schema ------------------ */
+            /* ------------------ VALIDATION SCHEMA ------------------ */
             const paymentSchema = Joi.object({
                 payment_id: Joi.number().integer().optional(),
+                transaction_type: Joi.string()
+                    .valid('BUY', 'SELL')
+                    .required(),
                 order_id: Joi.number().integer().required(),
-                bank_id: Joi.number().integer().required(),
-                transaction_ref: Joi.string().optional(),
-                amount: Joi.number().positive().required(),
-                payment_mode: Joi.string()
-                    .valid('CASH', 'UPI', 'NEFT', 'RTGS', 'IMPS', 'CHEQUE')
-                    .optional(),
-                payment_type: Joi.string()
-                    .valid('PARTIAL', 'FULL')
-                    .required(),
-                employee_type: Joi.string()
-                    .valid('RM', 'AM')
-                    .required(),
+                employee_type: Joi.string().valid('RM', 'AM').required(),
+
+                /* BANK ID */
+                bank_id: Joi.when('employee_type', {
+                    is: 'RM',                             // BUY + RM
+                    then: Joi.number().integer().required(),
+                    otherwise: Joi.when('payment_id', {
+                        is: Joi.exist(),                 // SELL + AM (update)
+                        then: Joi.number().integer().optional(),
+                        otherwise: Joi.number().integer().required() // SELL + AM (insert)
+                    })
+                }),
+
+                /* AMOUNT */
+                amount: Joi.when('employee_type', {
+                    is: 'RM',                             // BUY + RM
+                    then: Joi.number().positive().required(),
+                    otherwise: Joi.when('payment_id', {
+                        is: Joi.exist(),                 // SELL + AM (update)
+                        then: Joi.number().positive().optional(),
+                        otherwise: Joi.number().positive().required() // SELL + AM (insert)
+                    })
+                }),
+
+                /* PAYMENT TYPE */
+                payment_type: Joi.when('employee_type', {
+                    is: 'RM',                             // BUY + RM
+                    then: Joi.string().valid('PARTIAL', 'FULL').required(),
+                    otherwise: Joi.when('payment_id', {
+                        is: Joi.exist(),                 // SELL + AM update
+                        then: Joi.string().optional(),
+                        otherwise: Joi.string().valid('PARTIAL', 'FULL').required()
+                    })
+                }),
+
+                /* DATE FIELDS */
                 user_Datetime: Joi.when('employee_type', {
                     is: 'RM',
-                    then: Joi.string()
-                        // .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
-                        .required(),
+                    then: Joi.string().required(),
                     otherwise: Joi.forbidden()
                 }),
+
                 rm_Datetime: Joi.when('employee_type', {
                     is: 'RM',
-                    then: Joi.string()
-                        // .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
-                        .required(),
+                    then: Joi.string().required(),
                     otherwise: Joi.forbidden()
                 }),
-                transaction_doc: Joi.when('employee_type', {
-                    is: Joi.valid('AM', 'RM'),
-                    then: Joi.string()
-                        .trim()
-                        .optional()
-                        .invalid(null, '')
-                        .messages({
-                            'string.empty': 'transaction_doc cannot be empty',
-                            'any.invalid': 'transaction_doc cannot be null',
-                            'string.base': 'transaction_doc must be a file'
-                        }),
-                    otherwise: Joi.forbidden()
-                }),
+
                 am_Datetime: Joi.when('employee_type', {
                     is: 'AM',
-                    then: Joi.string()
-                        // .pattern(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
-                        .required(),
+                    then: Joi.string().required(),
                     otherwise: Joi.forbidden()
                 }),
-                status: Joi.string()
-                    .valid('RECEVIED', 'PENDING')
-                    .required(),
+
+                /* STATUS */
+                status: Joi.string().valid('RECEVIED', 'PENDING').required(),
+
+                /* DOCUMENT */
+                transaction_doc: Joi.string().optional(),
+
+                /* ONLY AM CAN SEND TRANSACTION REF */
+                transaction_ref: Joi.when('employee_type', {
+                    is: 'AM',
+                    then: Joi.string().optional(),
+                    otherwise: Joi.forbidden()
+                }),
+
                 remark: Joi.string().allow('', null).optional()
             });
 
             const dataObj = { ...req.body };
-
-            if (["AM", "RM"].includes(dataObj.employee_type)) {
-                if (req.files?.transaction_doc?.length > 0) {
-                    const file = req.files.transaction_doc[0];
-                    dataObj.transaction_doc = `uploads/upload/${file.filename}`;
-                }
+            /* ------------------ FILE UPLOAD ------------------ */
+            if (req.files?.transaction_doc?.length > 0) {
+                const file = req.files.transaction_doc[0];
+                dataObj.transaction_doc = `uploads/upload/${file.filename}`;
             }
 
-            /* ------------------ Validate ------------------ */
+            /* ------------------ VALIDATE INPUT ------------------ */
             const { error } = paymentSchema.validate(dataObj);
             if (error) return next(error);
 
-            /* ------------------ Fetch Order Total ------------------ */
+            /* ------------------ FETCH ORDER TOTAL ------------------ */
             const orderAmountQuery = `
-                SELECT 
-                    COALESCE(SUM(price_per_share * quantity), 0) AS order_amount
-                FROM order_transactions
-                WHERE order_id = ${dataObj.order_id}
-            `;
-
+            SELECT COALESCE(SUM(price_per_share * quantity), 0) AS order_amount
+            FROM order_transactions
+            WHERE order_id = ${dataObj.order_id}
+        `;
             const orderAmountResult = await getData(orderAmountQuery, next);
             const orderAmount = orderAmountResult?.[0]?.order_amount || 0;
-
             if (!orderAmount) {
-                return next(
-                    CustomErrorHandler.badRequest('Invalid order or order amount not found')
-                );
+                return next(CustomErrorHandler.badRequest("Invalid order"));
             }
 
-            /* ------------------ Already Paid Amount ------------------ */
+            /* ------------------ PAID AMOUNT ------------------ */
             let paidAmountQuery = `
-                SELECT 
-                    COALESCE(SUM(amount), 0) AS paid_amount
-                FROM payment_transactions
-                WHERE order_id = ${dataObj.order_id}
-                  AND (rm_status = 'RECEVIED'
-                  OR am_status = 'RECEVIED')
-            `;
-
-            /* Exclude current payment while updating */
+            SELECT COALESCE(SUM(amount), 0) AS paid_amount
+            FROM payment_transactions
+            WHERE order_id = ${dataObj.order_id}
+              AND (rm_status = 'RECEVIED' OR am_status = 'RECEVIED')
+        `;
             if (dataObj.payment_id) {
                 paidAmountQuery += ` AND payment_id <> ${dataObj.payment_id}`;
             }
 
             const paidAmountResult = await getData(paidAmountQuery, next);
             const paidAmount = paidAmountResult?.[0]?.paid_amount || 0;
-
             const remainingAmount = orderAmount - paidAmount;
 
-            /* ------------------ Amount Validation ------------------ */
-            if (dataObj.amount > remainingAmount) {
-                return next(
-                    CustomErrorHandler.badRequest(
-                        `Payment exceeds remaining amount. Remaining: ${remainingAmount}`
-                    )
-                );
+            /* BLOCK OVERPAYMENT FOR INSERT */
+            // if (!dataObj.payment_id && dataObj.amount && dataObj.amount > remainingAmount) {
+            //     return next(CustomErrorHandler.badRequest(
+            //         `Payment exceeds remaining amount. Remaining: ${remainingAmount}`
+            //     ));
+            // }
+
+            /* ------------------ PREPARE FINAL OBJECT ------------------ */
+            let finalObj = {};
+            const isInsert = !dataObj.payment_id;
+
+            /* ============================
+               BUY + RM  (Insert / Update)
+            ============================ */
+            if (dataObj.employee_type === "RM") {
+                finalObj = {
+                    order_id: dataObj.order_id,
+                    bank_id: dataObj.bank_id,
+                    amount: dataObj.amount,
+                    payment_type: dataObj.payment_type,
+                    remark: dataObj.remark,
+                    user_Datetime: dataObj.user_Datetime,
+                    rm_Datetime: dataObj.rm_Datetime,
+                    rm_status: dataObj.status,
+                    transaction_doc: dataObj.transaction_doc || null
+                };
             }
 
-            /* ------------------ Prepare Data ------------------ */
-            dataObj.remaining_amount = remainingAmount - dataObj.amount;
-            if (dataObj.employee_type == 'RM') {
-                dataObj.rm_status = dataObj.status;
-                delete dataObj.employee_type;
-                delete dataObj.status;
+            /* ============================
+               BUY + AM (Only Update)
+            ============================ */
+            if (dataObj.employee_type === "AM" && dataObj.transaction_type === "BUY") {
+                finalObj = {
+                    am_status: dataObj.status,
+                    am_Datetime: dataObj.am_Datetime,
+                    transaction_ref: dataObj.transaction_ref || null
+                };
             }
 
-            if (dataObj.employee_type == 'AM') {
-                dataObj.am_status = dataObj.status;
-                delete dataObj.employee_type;
-                delete dataObj.status;
+            /* ============================
+               SELL + AM (Insert / Update)
+            ============================ */
+            if (dataObj.employee_type === "AM" && dataObj.transaction_type === "SELL") {
+                finalObj = {
+                    order_id: dataObj.order_id,
+                    bank_id: dataObj.bank_id,
+                    amount: dataObj.amount,
+                    payment_type: dataObj.payment_type,
+                    remark: dataObj.remark,
+                    am_status: dataObj.status,
+                    am_Datetime: dataObj.am_Datetime,
+                    transaction_ref: dataObj.transaction_ref || null,
+                    transaction_doc: dataObj.transaction_doc || null
+                };
             }
 
-            let query = '';
+            /* Remaining Amount Logic */
+            if (dataObj.amount) {
+                finalObj.remaining_amount = remainingAmount - dataObj.amount;
+            }
 
-            console.log("=========>", JSON.stringify(dataObj, null, 12));
-
-
-            if (dataObj.payment_id) {
-                /* ------------------ Update Payment ------------------ */
-                query = `
-                    UPDATE payment_transactions
-                    SET ?
-                    WHERE payment_id = ${dataObj.payment_id}
-                `;
-                dataObj.updated_on = new Date();
-            } else {
-                /* ------------------ Insert Payment ------------------ */
+            if (!dataObj.transaction_doc) {
+                delete finalObj.transaction_doc;
+            }
+            /* ------------------ INSERT / UPDATE QUERY ------------------ */
+            let query = "";
+            if (isInsert) {
+                finalObj.created_at = new Date();
                 query = `INSERT INTO payment_transactions SET ?`;
-                // dataObj.rm_status = 'PENDING';
-                // dataObj.am_status = 'PENDING';
-                dataObj.created_at = new Date();
+            } else {
+                finalObj.updated_on = new Date();
+                query = `UPDATE payment_transactions SET ? WHERE payment_id = ${dataObj.payment_id}`;
             }
 
-            const result = await insertData(query, dataObj, next);
+            const result = await insertData(query, finalObj, next);
 
-            if (!dataObj.payment_id && result.insertId) {
-                dataObj.payment_id = result.insertId;
+            if (isInsert) {
+                finalObj.payment_id = result.insertId;
+            } else {
+                finalObj.payment_id = dataObj.payment_id;
             }
 
+            /* ------------------ RESPONSE ------------------ */
             return res.json({
                 success: true,
-                message: dataObj.payment_id
-                    ? 'Payment updated successfully'
-                    : 'Payment added successfully',
-                data: dataObj
+                message: isInsert ? "Payment added successfully" : "Payment updated successfully",
+                data: finalObj
             });
 
         } catch (error) {
@@ -1530,8 +1741,8 @@ const transactionController = {
                 cond += ` AND DATE(pt.rm_Datetime) <= '${value.to_date}'`;
             }
             query += cond;
-            // query += ` ORDER BY pt.payment_id DESC, pt.updated_on DESC `;
-            query += ` ORDER BY pt.payment_id ASC `;
+            query += ` ORDER BY pt.payment_id DESC, pt.updated_on ASC `;
+            // query += ` ORDER BY pt.payment_id ASC `;
 
             /* ------------------ PAGINATION ------------------ */
             let page = { pageQuery: "" };
