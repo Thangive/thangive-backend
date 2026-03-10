@@ -301,6 +301,9 @@ const transactionController = {
                 if (req.files?.share_Debit?.length > 0) {
                     updatedObject.share_Debit_Path = dataObj.share_Debit_Path;
                 }
+                if (dataObj.share_Debit_Datetime != null) {
+                    updatedObject.share_Debit_Datetime = dataObj.share_Debit_Datetime;
+                }
                 updatedObject.rm_status = dataObj.status;
             } else if (dataObj.employee_type === 'AM') {
                 updatedObject.am_status = dataObj.status;
