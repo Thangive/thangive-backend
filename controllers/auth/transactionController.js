@@ -599,6 +599,10 @@ const transactionController = {
                 from_date: Joi.string().optional(),
                 to_date: Joi.string().optional(),
                 company_name: Joi.string().optional(),
+                searchUser: Joi.string().optional(),
+                order_id: Joi.string().optional(),
+                sort_field: Joi.string().optional(),
+                sort_order: Joi.string().optional(),
             });
 
             const { error, value } = holdingSchema.validate(req.query ?? {});
@@ -612,6 +616,10 @@ const transactionController = {
 
             if (value.stock_details_id) {
                 cond += ` AND ot.stock_details_id = ${value.stock_details_id}`;
+            }
+
+            if (value.order_id) {
+                cond += ` AND ot.order_custom_id = '${value.order_id}'`;
             }
 
             if (value.employee_id && value.employee_type == "RM") {
@@ -643,18 +651,21 @@ const transactionController = {
                 cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED'`;
             }
 
-            // ---- RM AND AM COMPLETED () ----
-            if (value.status === "COMPLETED" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
-                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'`;
+            if (
+                value.status === "COMPLETED" &&
+                (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")
+            ) {
+                cond += ` 
+                    AND ot.rm_status = 'COMPLETED' 
+                    AND ot.am_status = 'COMPLETED' 
+                    AND ot.st_status = 'COMPLETED'
+                    AND ot.markAsSold <> 1
+                `;
+
+                if (value.transaction_type === "BUY") {
+                    cond += ` AND ot.advisor_id <> 2 `;
+                }
             }
-
-            // if (value.employee_type == "AM") {
-            //     cond += ` AND ot.rm_status <> 'CANCEL' AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED'`;
-            // }
-
-            // if (value.employee_type == "ST") {
-            //     cond += ` AND ot.rm_status <> 'CANCEL' AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status != 'COMPLETED'`;
-            // }
 
             if (value.transaction_type) {
                 cond += ` AND ot.transaction_type = '${value.transaction_type}'`;
@@ -672,6 +683,13 @@ const transactionController = {
                 cond += ` AND st.company_name LIKE '%${value.company_name}%'`;
             }
 
+            if (value.searchUser) {
+                cond += ` 
+                    AND CONCAT(users.first_name,' ',users.middle_name,' ',users.last_name) 
+                    LIKE '%${value.searchUser}%'
+                `;
+            }
+
             if (value.from_date) {
                 cond += ` AND DATE(ot.created_at) >= '${value.from_date}'`;
             }
@@ -681,7 +699,12 @@ const transactionController = {
             }
 
             query += cond;
-            query += ` ORDER BY ot.updated_on DESC, ot.order_id DESC `;
+            // query += ` ORDER BY ot.updated_on DESC, ot.order_id DESC `;
+            if (value.sort_field && value.sort_order) {
+                query += ` ORDER BY ${value.sort_field} ${value.sort_order}`;
+            } else {
+                query += ` ORDER BY ot.updated_on DESC, ot.order_id DESC`;
+            }
 
             /* ------------------ Pagination ------------------ */
             if (value.pagination) {
@@ -1323,81 +1346,167 @@ const transactionController = {
             const { error, value } = holdingSchema.validate(req.query ?? {});
             if (error) return next(error);
 
+            // const query = `
+            //     SELECT 
+            //         CASE 
+            //             WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' 
+            //             ELSE 'UNLISTED' 
+            //         END AS Category,
+
+            //         /* CORRECTED INVESTED AMOUNT: Weighted Average Cost of Remaining Shares */
+            //         SUM(
+            //             ((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0)
+            //             FROM order_transactions ot2 
+            //             WHERE ot2.stock_details_id = ot.stock_details_id 
+            //             AND ot2.user_id = ot.user_id 
+            //             AND ot2.position_group = ot.position_group
+            //             AND UPPER(ot2.transaction_type) = 'BUY'))
+            //             *
+            //             CASE 
+            //                 WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+            //                 WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity
+            //                 ELSE 0
+            //             END
+            //         ) AS invested_amount,
+
+            //         /* MARKET VALUE */
+            //         SUM(sp.today_prices * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) AS market_value,
+
+            //         /* OVERALL P/L: Market Value - Corrected Invested Amount */
+            //         (
+            //             SUM(sp.today_prices * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) -
+            //             SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
+            //         ) AS overall_PL,
+
+            //         /* 4. OVERALL P/L %*/
+            //         CAST(
+            //             (
+            //                 (
+            //                     SUM(sp.today_prices * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) -
+            //                     SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
+            //                 )
+            //                 /
+            //                 NULLIF(
+            //                     SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
+            //                 , 0)
+            //             ) * 100 
+            //         AS DECIMAL(10,2)) AS overall_PL_percentage,
+
+            //         /* TODAYS P/L */
+            //         SUM((sp.today_prices - sp.prev_price) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) AS todays_PL,
+            //         /* 6. DAILY P/L % */
+            //         CAST(
+            //             (
+            //                 SUM((sp.today_prices - sp.prev_price) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
+            //                 /
+            //                 NULLIF(SUM(sp.prev_price * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END), 0)
+            //             ) * 100 
+            //         AS DECIMAL(10,2)) AS daily_PL_percentage
+
+            //     FROM order_transactions ot
+            //     JOIN stock_details st ON ot.stock_details_id = st.stock_details_id
+            //     JOIN stock_price sp ON sp.stock_details_id = st.stock_details_id
+            //     JOIN (
+            //         SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
+            //         FROM stock_price 
+            //         GROUP BY stock_details_id
+            //     ) latest ON latest.latest_id = sp.stock_price_id
+            //     WHERE 
+            //         ot.user_id = ${value.user_id}
+            //         AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'
+            //         AND ot.position_group = (
+            //             SELECT MAX(position_group) FROM order_transactions 
+            //             WHERE user_id = ot.user_id AND stock_details_id = ot.stock_details_id AND broker_id = ot.broker_id
+            //         )
+            //     GROUP BY 
+            //         CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END;
+            //     `;
             const query = `
+            SELECT 
+                sub.Category,
+                SUM(sub.investment_amount)  AS invested_amount,
+                SUM(sub.market_value)       AS market_value,
+                SUM(sub.overall_PL)         AS overall_PL,
+                CAST(
+                    (SUM(sub.overall_PL) / NULLIF(SUM(sub.investment_amount), 0) * 100)
+                AS DECIMAL(10,2))           AS overall_PL_percentage,
+                SUM(sub.daily_PL)           AS todays_PL,
+                CAST(
+                    (SUM(sub.daily_PL) / NULLIF(SUM(sub.market_value - sub.daily_PL), 0) * 100)
+                AS DECIMAL(10,2))           AS daily_PL_percentage
+
+            FROM (
                 SELECT 
                     CASE 
                         WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' 
                         ELSE 'UNLISTED' 
                     END AS Category,
+                    ot.stock_details_id,
+                    ot.broker_id,
 
-                    /* CORRECTED INVESTED AMOUNT: Weighted Average Cost of Remaining Shares */
-                    SUM(
-                        ((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0)
-                        FROM order_transactions ot2 
-                        WHERE ot2.stock_details_id = ot.stock_details_id 
-                        AND ot2.user_id = ot.user_id 
-                        AND ot2.position_group = ot.position_group
-                        AND UPPER(ot2.transaction_type) = 'BUY'))
+                    /* INVESTMENT AMOUNT — avg_price * net_qty (same as getUserHoldings) */
+                    (
+                        (SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.price_per_share * ot.quantity ELSE 0 END) /
+                        NULLIF(SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity ELSE 0 END), 0))
                         *
-                        CASE 
-                            WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
-                            WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity
-                            ELSE 0
-                        END
-                    ) AS invested_amount,
+                        SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+                                WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
+                    ) AS investment_amount,
 
                     /* MARKET VALUE */
-                    SUM(sp.today_prices * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) AS market_value,
-
-                    /* OVERALL P/L: Market Value - Corrected Invested Amount */
                     (
-                        SUM(sp.today_prices * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) -
-                        SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
+                        MAX(sp.today_prices) *
+                        SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+                                WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
+                    ) AS market_value,
+
+                    /* OVERALL PL */
+                    (
+                        (MAX(sp.today_prices) *
+                        SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+                                WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END))
+                        -
+                        ((SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.price_per_share * ot.quantity ELSE 0 END) /
+                        NULLIF(SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity ELSE 0 END), 0))
+                        *
+                        SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+                                WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END))
                     ) AS overall_PL,
-                    
-                    /* 4. OVERALL P/L %*/
-                    CAST(
-                        (
-                            (
-                                SUM(sp.today_prices * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) -
-                                SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
-                            )
-                            /
-                            NULLIF(
-                                SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
-                            , 0)
-                        ) * 100 
-                    AS DECIMAL(10,2)) AS overall_PL_percentage,
 
-                    /* TODAYS P/L */
-                    SUM((sp.today_prices - sp.prev_price) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) AS todays_PL,
-                    /* 6. DAILY P/L % */
-                    CAST(
-                        (
-                            SUM((sp.today_prices - sp.prev_price) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
-                            /
-                            NULLIF(SUM(sp.prev_price * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END), 0)
-                        ) * 100 
-                    AS DECIMAL(10,2)) AS daily_PL_percentage
+                    /* DAILY PL */
+                    SUM(
+                        (sp.today_prices - sp.prev_price) *
+                        CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+                            WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END
+                    ) AS daily_PL
 
-                FROM order_transactions ot
-                JOIN stock_details st ON ot.stock_details_id = st.stock_details_id
-                JOIN stock_price sp ON sp.stock_details_id = st.stock_details_id
+                FROM thangiveTest.order_transactions ot
+                JOIN thangiveTest.stock_details st ON ot.stock_details_id = st.stock_details_id
+                JOIN thangiveTest.stock_price sp   ON sp.stock_details_id = st.stock_details_id
                 JOIN (
                     SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
-                    FROM stock_price 
+                    FROM thangiveTest.stock_price 
                     GROUP BY stock_details_id
                 ) latest ON latest.latest_id = sp.stock_price_id
-                WHERE 
-                    ot.user_id = ${value.user_id}
-                    AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'
-                    AND ot.position_group = (
-                        SELECT MAX(position_group) FROM order_transactions 
-                        WHERE user_id = ot.user_id AND stock_details_id = ot.stock_details_id AND broker_id = ot.broker_id
-                    )
-                GROUP BY 
-                    CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END;
-                `;
+
+                WHERE ot.user_id = ${value.user_id}
+                AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'
+                AND ot.position_group = (
+                    SELECT MAX(position_group) FROM thangiveTest.order_transactions 
+                    WHERE user_id = ot.user_id 
+                        AND stock_details_id = ot.stock_details_id 
+                        AND broker_id = ot.broker_id
+                )
+
+                -- ✅ Same GROUP BY granularity as getUserHoldings
+                GROUP BY ot.stock_details_id, ot.user_id, ot.broker_id, ot.position_group,
+                        CASE WHEN st.stock_type = 'ANGEL INVESTING' THEN 'ANGEL INVESTING' ELSE 'UNLISTED' END
+
+                HAVING SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+                                WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) > 0
+
+            ) AS sub
+            GROUP BY sub.Category;`;
             const data = await getData(query, next);
 
             return res.json({
@@ -1418,92 +1527,168 @@ const transactionController = {
 
             const { error, value } = holdingSchema.validate(req.query ?? {});
             if (error) return next(error);
+            // const query = `
+            // SELECT 
+            //     ad.advisor_name,
 
+            //     /* 1. INVESTED AMOUNT: (Avg Buy Price) * (Current Net Quantity) */
+            //     SUM(
+            //         ((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0)
+            //           FROM order_transactions ot2 
+            //           WHERE ot2.stock_details_id = ot.stock_details_id 
+            //           AND ot2.user_id = ot.user_id 
+            //           AND ot2.position_group = ot.position_group
+            //           AND UPPER(ot2.transaction_type) = 'BUY'))
+            //         *
+            //         CASE 
+            //             WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+            //             WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity
+            //             ELSE 0
+            //         END
+            //     ) AS invested_amount,
+
+            //     /* 2. MARKET VALUE: Today's Price * Current Net Quantity */
+            //     SUM(
+            //         sp.today_prices *
+            //         CASE 
+            //             WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+            //             WHEN UPPER(ot.transaction_type) = 'SELL' THEN -(ot.quantity)
+            //             ELSE 0
+            //         END
+            //     ) AS market_value,
+
+            //     /* 3. OVERALL P/L: Market Value - Invested Amount */
+            //     (
+            //         SUM(sp.today_prices * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -(ot.quantity) ELSE 0 END) 
+            //         -
+            //         SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
+            //     ) AS overall_PL,
+
+            //     /* 4. OVERALL P/L % */
+            //     CAST(
+            //         ((SUM(sp.today_prices * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -(ot.quantity) ELSE 0 END) 
+            //           - SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END))
+            //         /
+            //         NULLIF(SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END), 0)) 
+            //         * 100 
+            //         AS DECIMAL(10,2)
+            //     ) AS overall_PL_percentage,
+
+            //     /* 5. TODAY'S P/L */
+            //     SUM(
+            //         (sp.today_prices - sp.prev_price) *
+            //         CASE 
+            //             WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+            //             WHEN UPPER(ot.transaction_type) = 'SELL' THEN -(ot.quantity)
+            //             ELSE 0
+            //         END
+            //     ) AS todays_PL
+
+            // FROM order_transactions ot
+            // JOIN advisor ad ON ad.advisor_id = ot.advisor_id
+            // JOIN stock_details st ON ot.stock_details_id = st.stock_details_id
+            // JOIN stock_price sp ON sp.stock_details_id = st.stock_details_id
+            // JOIN (
+            //     SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
+            //     FROM stock_price 
+            //     GROUP BY stock_details_id
+            // ) latest ON latest.latest_id = sp.stock_price_id
+
+            // WHERE 
+            //     ot.user_id = ${value.user_id}
+            //     AND st.stock_type != 'ANGEL INVESTING'
+            //     AND ot.rm_status = 'COMPLETED'
+            //     AND ot.am_status = 'COMPLETED'
+            //     AND ot.st_status = 'COMPLETED'
+            //     /* CRITICAL: Limit to the latest active holding group per stock/broker */
+            //     AND ot.position_group = (
+            //         SELECT MAX(position_group) 
+            //         FROM order_transactions 
+            //         WHERE user_id = ot.user_id 
+            //         AND stock_details_id = ot.stock_details_id 
+            //         AND broker_id = ot.broker_id
+            //     )
+
+            // GROUP BY ad.advisor_name 
+            // ORDER BY ad.advisor_name DESC;
+            // `;
             const query = `
-            SELECT 
-                ad.advisor_name,
+                SELECT 
+                    sub.advisor_name,
+                    SUM(sub.investment_amount)   AS invested_amount,
+                    SUM(sub.market_value)        AS market_value,
+                    SUM(sub.overall_PL)          AS overall_PL,
+                    CAST(
+                        (SUM(sub.overall_PL) / NULLIF(SUM(sub.investment_amount), 0) * 100)
+                    AS DECIMAL(10,2))            AS overall_PL_percentage,
+                    SUM(sub.daily_PL)            AS todays_PL
+                FROM (
+                    SELECT 
+                        ad.advisor_name,
+                        ot.stock_details_id,
+                        bro.broker_id,
 
-                /* 1. INVESTED AMOUNT: (Avg Buy Price) * (Current Net Quantity) */
-                SUM(
-                    ((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0)
-                      FROM order_transactions ot2 
-                      WHERE ot2.stock_details_id = ot.stock_details_id 
-                      AND ot2.user_id = ot.user_id 
-                      AND ot2.position_group = ot.position_group
-                      AND UPPER(ot2.transaction_type) = 'BUY'))
-                    *
-                    CASE 
-                        WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
-                        WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity
-                        ELSE 0
-                    END
-                ) AS invested_amount,
+                        /* INVESTMENT AMOUNT — same formula as getUserHoldings */
+                        (
+                            (SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.price_per_share * ot.quantity ELSE 0 END) /
+                            NULLIF(SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity ELSE 0 END), 0))
+                            *
+                            SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                    WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
+                        ) AS investment_amount,
 
-                /* 2. MARKET VALUE: Today's Price * Current Net Quantity */
-                SUM(
-                    sp.today_prices *
-                    CASE 
-                        WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
-                        WHEN UPPER(ot.transaction_type) = 'SELL' THEN -(ot.quantity)
-                        ELSE 0
-                    END
-                ) AS market_value,
+                        /* MARKET VALUE */
+                        (MAX(sp.today_prices) * SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                                        WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
+                        ) AS market_value,
 
-                /* 3. OVERALL P/L: Market Value - Invested Amount */
-                (
-                    SUM(sp.today_prices * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -(ot.quantity) ELSE 0 END) 
-                    -
-                    SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END)
-                ) AS overall_PL,
+                        /* OVERALL PL */
+                        (
+                            (MAX(sp.today_prices) * SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                                            WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END))
+                            -
+                            ((SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.price_per_share * ot.quantity ELSE 0 END) /
+                            NULLIF(SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity ELSE 0 END), 0))
+                            * SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                        WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END))
+                        ) AS overall_PL,
 
-                /* 4. OVERALL P/L % */
-                CAST(
-                    ((SUM(sp.today_prices * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -(ot.quantity) ELSE 0 END) 
-                      - SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END))
-                    /
-                    NULLIF(SUM(((SELECT SUM(ot2.price_per_share * ot2.quantity) / NULLIF(SUM(ot2.quantity), 0) FROM order_transactions ot2 WHERE ot2.stock_details_id = ot.stock_details_id AND ot2.user_id = ot.user_id AND ot2.position_group = ot.position_group AND UPPER(ot2.transaction_type) = 'BUY')) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END), 0)) 
-                    * 100 
-                    AS DECIMAL(10,2)
-                ) AS overall_PL_percentage,
+                        /* DAILY PL */
+                        SUM((sp.today_prices - sp.prev_price) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                                                    WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END
+                        ) AS daily_PL
 
-                /* 5. TODAY'S P/L */
-                SUM(
-                    (sp.today_prices - sp.prev_price) *
-                    CASE 
-                        WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
-                        WHEN UPPER(ot.transaction_type) = 'SELL' THEN -(ot.quantity)
-                        ELSE 0
-                    END
-                ) AS todays_PL
+                    FROM thangiveTest.order_transactions ot
+                    JOIN thangiveTest.advisor ad       ON ad.advisor_id = ot.advisor_id
+                    JOIN thangiveTest.broker bro       ON bro.broker_id = ot.broker_id
+                    JOIN thangiveTest.stock_details st ON ot.stock_details_id = st.stock_details_id
+                    JOIN thangiveTest.stock_price sp   ON sp.stock_details_id = st.stock_details_id
+                    JOIN (
+                        SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
+                        FROM thangiveTest.stock_price 
+                        GROUP BY stock_details_id
+                    ) latest ON latest.latest_id = sp.stock_price_id
 
-            FROM order_transactions ot
-            JOIN advisor ad ON ad.advisor_id = ot.advisor_id
-            JOIN stock_details st ON ot.stock_details_id = st.stock_details_id
-            JOIN stock_price sp ON sp.stock_details_id = st.stock_details_id
-            JOIN (
-                SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
-                FROM stock_price 
-                GROUP BY stock_details_id
-            ) latest ON latest.latest_id = sp.stock_price_id
+                    WHERE ot.user_id = ${value.user_id}
+                    AND st.stock_type != 'ANGEL INVESTING'
+                    AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'
+                    AND ot.position_group = (
+                        SELECT MAX(position_group) FROM thangiveTest.order_transactions 
+                        WHERE user_id = ot.user_id 
+                            AND stock_details_id = ot.stock_details_id 
+                            AND broker_id = ot.broker_id
+                    )
 
-            WHERE 
-                ot.user_id = ${value.user_id}
-                AND st.stock_type != 'ANGEL INVESTING'
-                AND ot.rm_status = 'COMPLETED'
-                AND ot.am_status = 'COMPLETED'
-                AND ot.st_status = 'COMPLETED'
-                /* CRITICAL: Limit to the latest active holding group per stock/broker */
-                AND ot.position_group = (
-                    SELECT MAX(position_group) 
-                    FROM order_transactions 
-                    WHERE user_id = ot.user_id 
-                    AND stock_details_id = ot.stock_details_id 
-                    AND broker_id = ot.broker_id
-                )
+                    -- ✅ Matches holdings GROUP BY exactly (includes broker)
+                    GROUP BY ot.stock_details_id, ot.user_id, ot.position_group, 
+                            ot.advisor_id, ad.advisor_name, bro.broker_id
 
-            GROUP BY ad.advisor_name 
-            ORDER BY ad.advisor_name DESC;
-            `;
+                    HAVING SUM(CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                    WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) > 0
+
+                ) AS sub
+                GROUP BY sub.advisor_name
+                ORDER BY sub.advisor_name DESC;`;
             const data = await getData(query, next);
 
             return res.json({
