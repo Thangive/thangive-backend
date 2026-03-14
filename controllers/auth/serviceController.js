@@ -10,12 +10,57 @@ const serviceController = {
         try {
             // ---------- Validation ----------
             const loginSchema = Joi.object({
-                username: Joi.string().required(),
-                password: Joi.string().required(),
-            });
+                username: Joi.string().optional(),
+                password: Joi.string().optional(),
+                phone_number: Joi.string().optional(),
+                otp: Joi.number().optional(),
+                user_type: Joi.valid('user', 'employee').optional(),
+            }).or('username', 'phone_number').messages({ 'object.missing': 'Either username or phone_number is required' });
 
             const { error, value } = loginSchema.validate(req.body ?? {});
             if (error) return next(error);
+
+            const isOtpLogin = !!value.phone_number && !!value.otp;
+            if (isOtpLogin) {
+                const userQuery = `SELECT user_id, username, email, phone_number, user_type as Role,password FROM users WHERE is_deleted = 0 AND phone_number = '${value.phone_number}'`;
+                const users = await getData(userQuery, next);
+                if (!users || users.length === 0) {
+                    return next(CustomErrorHandler.doesNotExist("Mobile number not registered"));
+                }
+                const user = users[0];
+                const otpQuery = `
+                    SELECT otp_id, created_at
+                    FROM otp
+                    WHERE phone_number = '${user.phone_number}'
+                    AND otp = ${value.otp}
+                    ORDER BY otp_id DESC
+                    LIMIT 1
+                `;
+                const otpData = await getData(otpQuery, next);
+                if (!otpData || otpData.length === 0) {
+                    return next(CustomErrorHandler.wrongCredentials("Invalid OTP"));
+                }
+                // const diffMinutes = (new Date() - new Date(otpData[0].created_at)) / (1000 * 60);
+                // if (diffMinutes > 1) {
+                //     return next(CustomErrorHandler.badRequest("OTP has expired. Please request a new one."));
+                // }
+                const accessToken = JwtService.sign(
+                    { _id: user.user_id, role: user.Role },
+                    '1d'
+                );
+                await commonFunction.saveLoginHistory(user.user_id, 'LOGIN', next);
+
+                return res.json({
+                    status: true,
+                    message: "Logged in successfully via OTP",
+                    accessToken,
+                    data: user
+                });
+            }
+
+            if (!value.username || !value.password) {
+                return next(CustomErrorHandler.badRequest("Username and password are required"));
+            }
 
             // ---------- Get user ----------
             const query = `SELECT user_id,username,email,phone_number,user_type as Role,password FROM users WHERE is_deleted=0 AND username='${value.username}'`;
