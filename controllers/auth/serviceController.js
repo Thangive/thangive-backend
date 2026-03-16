@@ -40,10 +40,10 @@ const serviceController = {
                 if (!otpData || otpData.length === 0) {
                     return next(CustomErrorHandler.wrongCredentials("Invalid OTP"));
                 }
-                // const diffMinutes = (new Date() - new Date(otpData[0].created_at)) / (1000 * 60);
-                // if (diffMinutes > 1) {
-                //     return next(CustomErrorHandler.badRequest("OTP has expired. Please request a new one."));
-                // }
+                const diffMinutes = (new Date() - new Date(otpData[0].created_at)) / (1000 * 60);
+                if (diffMinutes > 1) {
+                    return next(CustomErrorHandler.badRequest("OTP has expired. Please request a new one."));
+                }
                 const accessToken = JwtService.sign(
                     { _id: user.user_id, role: user.Role },
                     '1d'
