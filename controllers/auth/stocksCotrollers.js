@@ -31,7 +31,8 @@ const stocksControllers = {
                 registration_date: Joi.string().required(),
 
                 cmp_logo: Joi.string().allow("").optional(),
-                stock_type: Joi.string().required()
+                stock_type: Joi.string().required(),
+                is_deleted: Joi.number().integer().optional(),
             });
 
             // ------------------ Validate ------------------

@@ -119,15 +119,16 @@ const stocksGetController = {
     async getStockCounts(req, res, next) {
         try {
             const query = `
-            SELECT 
-                COUNT(*) AS total,
-                SUM(stock_type = 'UNLISTED') AS unlisted,
-                SUM(stock_type = 'PRE IPO') AS pre_ipo,
-                SUM(stock_type = 'DELISTED') AS delisted,
-                SUM(stock_type = 'LISTED') AS listed,
-                 SUM(stock_type = 'ANGEL INVESTING') AS angel_investing,
-                  SUM(stock_type = 'THANGIV') AS thangiv
-            FROM stock_details
+        SELECT 
+            COUNT(*) AS total,
+            SUM(stock_type = 'UNLISTED'        AND (is_deleted != 1 OR is_deleted IS NULL)) AS unlisted,
+            SUM(stock_type = 'PRE IPO'         AND (is_deleted != 1 OR is_deleted IS NULL)) AS pre_ipo,
+            SUM(stock_type = 'DELISTED'        AND (is_deleted != 1 OR is_deleted IS NULL)) AS delisted,
+            SUM(stock_type = 'LISTED'          AND (is_deleted != 1 OR is_deleted IS NULL)) AS listed,
+            SUM(stock_type = 'ANGEL INVESTING' AND (is_deleted != 1 OR is_deleted IS NULL)) AS angel_investing,
+            SUM(stock_type = 'THANGIV'         AND (is_deleted != 1 OR is_deleted IS NULL)) AS thangiv,
+            COUNT(CASE WHEN is_deleted = 1 THEN 1 END)                                     AS hidden
+        FROM stock_details
         `;
 
             const result = await getData(query, next);
@@ -192,6 +193,7 @@ const stocksGetController = {
 
             const stockSchema = Joi.object({
                 stock_details_id: Joi.number().integer(),
+                is_deleted: Joi.number().integer(),
                 company_name: Joi.string(),
                 industry_name: Joi.string(),
                 script_name: Joi.string(),
@@ -207,6 +209,12 @@ const stocksGetController = {
             if (error) return next(error);
 
             // 🔹 Filters
+            if (req.query.is_deleted !== undefined) {
+                cond += ` AND s.is_deleted = '${req.query.is_deleted}'`;
+            } else {
+                cond += ` AND s.is_deleted = 0`;
+            }
+
             if (req.query.stock_details_id)
                 cond += ` AND s.stock_details_id ='${req.query.stock_details_id}'`;
 
@@ -275,7 +283,7 @@ const stocksGetController = {
                     isin_no,
                     cmp_logo
                 FROM stock_details
-                WHERE stock_type != 'LISTED' AND company_name LIKE '%${query}%'
+                WHERE stock_type != 'LISTED' AND is_deleted != 1 AND  company_name LIKE '%${query}%'
                 ORDER BY company_name ASC
                 LIMIT 20
             `;
@@ -332,6 +340,7 @@ const stocksGetController = {
 
             const stockSchema = Joi.object({
                 stock_details_id: Joi.number().integer(),
+                is_deleted: Joi.number().integer(),
                 company_name: Joi.string(),
                 industry_name: Joi.string(),
                 script_name: Joi.string(),
@@ -348,6 +357,12 @@ const stocksGetController = {
             if (error) return next(error);
 
             // 🔹 Filters
+            if (req.query.is_deleted !== undefined) {
+                cond += ` AND s.is_deleted = '${req.query.is_deleted}'`;
+            } else {
+                cond += ` AND s.is_deleted = 0`;
+            }
+
             if (req.query.stock_details_id)
                 cond += ` AND s.stock_details_id ='${req.query.stock_details_id}'`;
 

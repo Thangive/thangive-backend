@@ -291,7 +291,7 @@ const userController = {
                 dataObj.statement = file.path;
             }
 
-            console.log(JSON.stringify(dataObj, null, 4));
+            // console.log(JSON.stringify(dataObj, null, 4));
 
             /* ------------------ Validate ------------------ */
             const { error } = bankSchema.validate(dataObj);
