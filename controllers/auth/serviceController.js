@@ -135,7 +135,7 @@ const serviceController = {
 
             return res.json({
                 success: true,
-                otp: otp,
+                // otp: otp,
                 message: "OTP sent successfully"
             });
 
