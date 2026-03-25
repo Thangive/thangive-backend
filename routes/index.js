@@ -3,6 +3,7 @@ import multer from 'multer';
 import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
+import faqController from '../controllers/auth/faqController.js';
 
 
 
@@ -138,5 +139,7 @@ router.get('/getWatchlist', stocksGetController.getWatchlist)
 router.post("/chartBulkUpload", forms1, PriceController.chartBulkUpload)
 router.post("/chartSingleUpload", forms1, PriceController.chartSingleUpload)
 
-
+// FAQ APIS
+router.post('/faq', auth, forms, faqController.addUpdateFaq);
+router.get('/faq', auth, faqController.getFaq);
 export default router;
