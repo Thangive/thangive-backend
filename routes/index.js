@@ -141,5 +141,5 @@ router.post("/chartSingleUpload", forms1, PriceController.chartSingleUpload)
 
 // FAQ APIS
 router.post('/faq', auth, forms, faqController.addUpdateFaq);
-router.get('/faq', auth, faqController.getFaq);
+router.get('/faq', faqController.getFaq);
 export default router;
