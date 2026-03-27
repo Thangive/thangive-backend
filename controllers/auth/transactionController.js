@@ -828,7 +828,7 @@ const transactionController = {
                 ) AS order_date,
                 DATE_FORMAT(
                     CONVERT_TZ(ot.created_at, '+00:00', '+05:30'),
-                    '%H:%i:%s'
+                    '%h:%i:%s %p'
                 ) AS order_time,
                 ot.st_datetime,
                 ot.rm_datetime,
