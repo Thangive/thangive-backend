@@ -7,3 +7,5 @@ export { default as wishlistController } from './auth/wishlistController.js';
 export { default as brokerAndAdvisorControler } from './auth/brokerAndAdvisorControler.js';
 export { default as transactionController } from './auth/transactionController.js'
 export { default as serviceController } from './auth/serviceController.js'
+export { default as faqController } from './auth/faqController.js'
+export { default as blogController } from './auth/blogController.js'

@@ -1,10 +1,8 @@
 import express from 'express';
 import multer from 'multer';
-import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController } from '../controllers/index.js';
+import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
-import faqController from '../controllers/auth/faqController.js';
-
 
 
 const forms = multer().array();
@@ -142,4 +140,11 @@ router.post("/chartSingleUpload", forms1, PriceController.chartSingleUpload)
 // FAQ APIS
 router.post('/faq', auth, forms, faqController.addUpdateFaq);
 router.get('/faq', faqController.getFaq);
+
+// Blog APIS
+router.post('/blog', auth, imageUpload, blogController.addUpdateBlog);
+router.get('/blog', blogController.getBlog);
+router.post('/Keyword', auth,forms, blogController.addUpdateKeyword);
+router.get('/Keyword', blogController.getKeywords);
+
 export default router;

@@ -15,6 +15,7 @@ const faqController = {
                     .uri({ scheme: ['http', 'https'] })
                     .required(),
                 role_id: Joi.number().integer().required(),
+                is_deleted: Joi.number().integer().optional(),
             });
 
             /* ------------------ Prepare Data ------------------ */
