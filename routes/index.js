@@ -146,5 +146,8 @@ router.post('/blog', auth, imageUpload, blogController.addUpdateBlog);
 router.get('/blog', blogController.getBlog);
 router.post('/Keyword', auth,forms, blogController.addUpdateKeyword);
 router.get('/Keyword', blogController.getKeywords);
+router.get('/relatedBloags', blogController.RelatedBlog);
+router.post('/blogBanner', auth, imageUpload, blogController.addBlogBanner);
+router.get('/blogBanner', blogController.getLatestBlogBanner);
 
 export default router;

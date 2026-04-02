@@ -298,6 +298,170 @@ const BlogController = {
         } catch (err) {
             next(err);
         }
+    },
+    async RelatedBlog(req, res, next) {
+        try {
+            const schema = Joi.object({
+                blog_id: Joi.number().integer().required(),
+            });
+
+            const { error } = schema.validate(req.query);
+            if (error) return next(error);
+
+            const blog_id = req.query.blog_id;
+
+            /* ------------------ Get Keywords ------------------ */
+            const blogQuery = `
+            SELECT keyword 
+            FROM blogArticle 
+            WHERE blog_id = ${blog_id} AND is_deleted = 0
+        `;
+
+            const blogData = await getData(blogQuery, next);
+
+            if (!blogData.length) {
+                return res.json({ message: "No blog found", data: [] });
+            }
+
+            let keywords = blogData[0].keyword;
+
+            if (!keywords) {
+                return res.json({ message: "No keywords found", data: [] });
+            }
+
+            let keywordArray = [];
+
+            try {
+                keywordArray = JSON.parse(keywords);
+            } catch (e) {
+                return res.json({
+                    message: "Invalid keyword format",
+                    data: []
+                });
+            }
+
+            if (!keywordArray.length) {
+                return res.json({
+                    message: "No related keywords found",
+                    data: []
+                });
+            }
+
+            /* ------------------ Build Condition ------------------ */
+            let keywordCond = keywordArray.map(k =>
+                `JSON_CONTAINS(b.keyword, '"${k}"')`
+            ).join(' OR ');
+
+            /* ------------------ Final Query ------------------ */
+            const query = `
+            SELECT 
+                b.blog_id,
+                b.title,
+                b.description,
+                b.keyword,
+                b.publishdate,
+                b.blogImages,
+                s.company_name
+            FROM blogArticle b
+            LEFT JOIN stock_details s 
+                ON b.stockID = s.stock_details_id
+            WHERE 
+                b.is_deleted = 0
+                AND b.blog_id != ${blog_id}
+                AND (${keywordCond})
+            ORDER BY b.blog_id DESC
+            LIMIT 10
+        `;
+
+            const data = await getData(query, next);
+
+            return res.json({
+                message: "success",
+                records: data.length,
+                data: data
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+    async addBlogBanner(req, res, next) {
+        try {
+            /* ---------------- VALIDATION ---------------- */
+            const schema = Joi.object({
+                // user sirf banner bhejega (file)
+            });
+
+            const { error } = schema.validate(req.body);
+            if (error) return next(error);
+
+            /* ---------------- FILE CHECK ---------------- */
+            if (!req.files || !req.files.banner || req.files.banner.length === 0) {
+                return res.json({
+                    success: false,
+                    message: "Banner image is required"
+                });
+            }
+
+            const dataObj = {
+                created_at: new Date()
+            };
+
+            /* ---------------- GET FILE PATH ---------------- */
+            if (req.files && req.files.banner?.length > 0) {
+                dataObj.banner = `uploads/upload/${req.files.banner[0].filename}`;
+            }
+
+            /* ---------------- DATA OBJECT ---------------- */
+
+            /* ---------------- INSERT ---------------- */
+            const query = `INSERT INTO blogADBanner SET ?`;
+
+            await insertData(query, dataObj, next);
+
+            return res.json({
+                success: true,
+                message: "Banner uploaded successfully"
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+    async getLatestBlogBanner(req, res, next) {
+        try {
+            /* ---------------- QUERY ---------------- */
+            const query = `
+            SELECT 
+                blog_banenr_id,
+                banner,
+                created_at
+            FROM blogADBanner
+            WHERE is_deleted = 0
+            ORDER BY blog_banenr_id DESC
+            LIMIT 1
+        `;
+
+            const data = await getData(query, next);
+
+            /* ---------------- RESPONSE ---------------- */
+            if (!data.length) {
+                return res.json({
+                    success: false,
+                    message: "No banner found",
+                    data: null
+                });
+            }
+
+            return res.json({
+                success: true,
+                message: "Banner fetched successfully",
+                data: data[0]
+            });
+
+        } catch (error) {
+            next(error);
+        }
     }
 }
 export default BlogController;

@@ -31,6 +31,7 @@ const storage = multer.diskStorage({
         if (file.fieldname === "transaction_doc") prefix = `${req?.body?.order_id}_`;
         if (file.fieldname === "blogImages") prefix = "blogImage";
         if (file.fieldname === "sourceAttachment") prefix = "blogAttachment";
+        if (file.fieldname === "banner") prefix = "blogBanner";
 
         cb(null, `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}${ext}`);
     }
@@ -69,6 +70,7 @@ const imageUpload = multer({
     { name: 'transaction_doc', maxCount: 1 },
     { name: 'blogImages', maxCount: 3 },
     { name: 'sourceAttachment', maxCount: 1 },
+    { name: 'banner', maxCount: 1 },
 
 ]);
 
