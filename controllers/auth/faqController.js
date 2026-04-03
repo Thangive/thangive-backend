@@ -32,12 +32,12 @@ const faqController = {
             }
 
             const checkQuery = `
-            SELECT faq_id
-            FROM faq
-            WHERE quation = '${dataObj.quation}'
-            AND role_id = ${dataObj.role_id}
-            ${condition}
-        `;
+                SELECT faq_id
+                FROM faq
+                WHERE quation = '${dataObj.quation}'
+                AND role_id = ${dataObj.role_id}
+                ${condition}
+            `;
 
             const exists = await getData(checkQuery, next);
             if (exists.length > 0) {

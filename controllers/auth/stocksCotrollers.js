@@ -364,7 +364,7 @@ const stocksControllers = {
                 year: Joi.string().required(),
                 report_date: Joi.date().optional(),
                 heading: Joi.string().required(),
-                document: Joi.string().allow("").required(),
+                document: Joi.string().allow("").optional(),
                 created_date: Joi.date().optional(),
                 update_date: Joi.date().optional()
             });
@@ -378,12 +378,12 @@ const stocksControllers = {
                 : '';
 
             const checkQuery = `
-            SELECT anual_report_id 
-            FROM anual_report
-            WHERE stock_details_id='${dataObj.stock_details_id}'
-            AND year='${dataObj.year}'
-            ${condition}
-        `;
+                SELECT anual_report_id 
+                FROM anual_report
+                WHERE stock_details_id='${dataObj.stock_details_id}'
+                AND heading='${dataObj.heading}'
+                ${condition}
+            `;
 
             const exists = await getData(checkQuery, next);
             if (exists.length > 0) {

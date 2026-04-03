@@ -136,12 +136,52 @@ const BlogController = {
                 const keyword_id = existingKeyword[0].keyword_id;
 
                 query = `
-                UPDATE blogArticleKeyword 
-                SET ? 
-                WHERE keyword_id='${keyword_id}'
-            `;
+                    UPDATE blogArticleKeyword 
+                    SET ? 
+                    WHERE keyword_id='${keyword_id}'
+                `;
 
                 await insertData(query, dataObj, next);
+
+                if (dataObj.is_deleted == 1) {
+
+                    /* ---------------- REMOVE KEYWORD FROM BLOGS ---------------- */
+                    const keywordName = name;
+
+                    const blogQuery = `
+                        SELECT blog_id, keyword 
+                        FROM blogArticle 
+                        WHERE is_deleted = 0 
+                        AND JSON_CONTAINS(keyword, JSON_QUOTE('${keywordName}'))
+                    `;
+
+                    const blogs = await getData(blogQuery, next);
+
+                    for (let blog of blogs) {
+                        let keywordArray = [];
+
+                        try {
+                            keywordArray = JSON.parse(blog.keyword);
+                        } catch (e) {
+                            continue;
+                        }
+
+                        // Remove keyword (case insensitive)
+                        keywordArray = keywordArray.filter(
+                            k => k.toLowerCase() !== keywordName.toLowerCase()
+                        );
+
+                        const updatedKeywords = JSON.stringify(keywordArray).replace(/'/g, "\\'");
+
+                        const updateQuery = `
+                            UPDATE blogArticle 
+                            SET keyword = '${updatedKeywords}'
+                            WHERE blog_id = ${blog.blog_id}
+                        `;
+
+                        await insertData(updateQuery, {}, next);
+                    }
+                }
 
                 return res.json({
                     success: true,
