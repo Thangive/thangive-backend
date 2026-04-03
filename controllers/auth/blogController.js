@@ -93,6 +93,33 @@ const BlogController = {
             next(error);
         }
     },
+    async draftUndraftBlog(req, res, next) {
+        try {
+            const { blog_id, draft } = req.body;
+
+            if (!blog_id) {
+                return res.json({ success: false, message: "Blog ID required" });
+            }
+
+            const query = `
+            UPDATE blogArticle 
+            SET draft='${draft}', updated_at=NOW() 
+            WHERE blog_id='${blog_id}'
+        `;
+
+            await insertData(query, {}, next);
+
+            res.json({
+                success: true,
+                message: draft == 1
+                    ? "Blog moved to draft"
+                    : "Blog published successfully"
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
 
     async addUpdateKeyword(req, res, next) {
         try {
@@ -227,7 +254,8 @@ const BlogController = {
         }
     },
 
-    async getBlog(req, res, next) {
+    async getBlog(req, res, next) 
+    {
         try {
             /* ------------------ Base Query ------------------ */
             let query = `
@@ -261,6 +289,7 @@ const BlogController = {
             /* ------------------ Validation ------------------ */
             const schema = Joi.object({
                 blog_id: Joi.number().integer(),
+                draft: Joi.number().valid(0, 1),
                 title: Joi.string(),
                 role_id: Joi.number().integer(),
                 stockID: Joi.number().integer(),
@@ -273,10 +302,14 @@ const BlogController = {
 
             const { error } = schema.validate(req.query);
             if (error) return next(error);
-
             /* ------------------ Filters ------------------ */
             if (req.query.blog_id) {
                 cond += ` AND b.blog_id = ${req.query.blog_id}`;
+            }
+
+            if (req.query.draft) 
+            {
+                cond += ` AND b.draft = ${req.query.draft}`;
             }
 
             if (req.query.title) {
@@ -354,7 +387,7 @@ const BlogController = {
             const blogQuery = `
             SELECT keyword 
             FROM blogArticle 
-            WHERE blog_id = ${blog_id} AND is_deleted = 0
+            WHERE blog_id = ${blog_id} AND is_deleted = 0 AND draft = 0
         `;
 
             const blogData = await getData(blogQuery, next);

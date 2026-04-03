@@ -143,6 +143,7 @@ router.get('/faq', faqController.getFaq);
 
 // Blog APIS
 router.post('/blog', auth, imageUpload, blogController.addUpdateBlog);
+router.post('/draftUndraftBlog', auth,blogController.draftUndraftBlog);
 router.get('/blog', blogController.getBlog);
 router.post('/Keyword', auth,forms, blogController.addUpdateKeyword);
 router.get('/Keyword', blogController.getKeywords);
