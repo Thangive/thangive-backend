@@ -159,6 +159,105 @@ const userController = {
             next(error);
         }
     },
+    async rmCreateUpdateUser(req, res, next) {
+        try {
+            // ------------------ Validation Schema ------------------
+            const schema = Joi.object({
+                user_id: Joi.number().integer().optional(),  // 👈 optional for update
+                username: Joi.string().required(),
+                user_type: Joi.valid('user').required(),
+                assign_to: Joi.number().integer().required(),
+                created_id: Joi.number().integer().required(),
+                residency_status: Joi.string().required(),
+                first_name: Joi.string().required(),
+                middle_name: Joi.string().allow("").optional(),
+                last_name: Joi.string().required(),
+                email: Joi.string().email().required(),
+                whatsapp_number: Joi.string().allow("").optional(),
+                phone_number: Joi.string().required(),
+                profile: Joi.string().optional(),
+            });
+
+            var dataObj = { ...req.body };
+            if (req.files?.profile?.length > 0) {
+                const file = req.files.profile[0];
+                dataObj.profile = `uploads/upload/${file.filename}`;
+            }
+
+            // ------------------ Validate ------------------
+            const { error } = schema.validate(dataObj ?? {});
+            if (error) return next(error);
+
+            const isUpdate = !!dataObj.user_id;  // 👈 true if user_id present
+            const condition = isUpdate ? ` AND user_id != '${dataObj.user_id}'` : "";
+
+            // ------------------ Duplicate Email / Phone Check ------------------
+            const checkQuery = `
+                SELECT user_id, is_deleted
+                FROM users 
+                WHERE (email='${dataObj.email}' OR phone_number='${dataObj.phone_number}')
+                AND user_type = 'user'
+                ${condition}
+            `;
+            const exists = await getData(checkQuery, next);
+            if (exists.length > 0 && exists[0].is_deleted == '0') {
+                return next(CustomErrorHandler.alreadyExist("Email or phone number already exists"));
+            }
+
+            // ------------------ Duplicate Username Check ------------------
+            const usernameCheck = await getData(
+                `SELECT user_id, is_deleted FROM users WHERE username = '${dataObj.username}' ${condition}`,
+                next
+            );
+            if (usernameCheck.length > 0 && usernameCheck[0].is_deleted == '0') {
+                return next(CustomErrorHandler.alreadyExist(`${dataObj.username} Username already exists`));
+            }
+
+            // ------------------ Password & OTP (only on CREATE) ------------------
+            if (!isUpdate) {
+                const phone = String(dataObj.phone_number).trim();
+                dataObj.password = md5(phone);
+
+                // const otp = await commonFunction.setOtp({ phoneNumber: dataObj.phone_number }, next);
+                // const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`;
+                // await commonFunction.sendSMS(dataObj.phone_number, message);
+
+                dataObj.is_deleted = 0;
+            }
+
+            // ------------------ Insert / Update ------------------
+            let query;
+            if (isUpdate) {
+                // 👉 RM updating existing user
+                query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
+                delete dataObj.user_id; // remove from SET clause
+            } else if (exists.length > 0 && exists[0].is_deleted != '0') {
+                // 👉 Soft-deleted user → reactivate
+                query = `UPDATE users SET ? WHERE user_id='${exists[0].user_id}'`;
+                dataObj.user_id = exists[0].user_id;
+            } else {
+                // 👉 Fresh insert
+                query = `INSERT INTO users SET ?`;
+            }
+
+            const result = await insertData(query, dataObj, next);
+
+            if (result.insertId) {
+                dataObj.user_id = result.insertId;
+            }
+
+            delete dataObj.password;
+
+            return res.json({
+                success: true,
+                message: isUpdate ? "User updated successfully" : "User registered successfully",
+                data: dataObj
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
 
     async addUpdateUserDocument(req, res, next) {
         try {
@@ -176,6 +275,7 @@ const userController = {
                         'any.required': 'Document (user_document) is required',
                     }),
                 document_pass: Joi.string().allow("").optional(),
+                created_id: Joi.number().integer().optional(),
             }).when(Joi.object({ doc_id: Joi.exist() }).unknown(), {
                 then: Joi.object({
                     document_path: Joi.string().required(),
@@ -265,7 +365,7 @@ const userController = {
                 ifsc_code: Joi.string().required(),
                 account_status: Joi.string().required(),
                 phone_number: Joi.string().required(),
-                branch:Joi.string().required(),
+                branch: Joi.string().required(),
 
                 statement: Joi.string()
                     .allow('')
@@ -275,6 +375,7 @@ const userController = {
                     }),
 
                 doc_pass: Joi.string().allow('').optional(),
+                created_id: Joi.number().integer().optional(),
             }).when(Joi.object({ bank_id: Joi.exist() }).unknown(), {
                 then: Joi.object({
                     statement: Joi.string().required(),
@@ -360,7 +461,7 @@ const userController = {
                 user_id: Joi.number().integer().required(),
                 broker_id: Joi.string().required(),
                 client_id: Joi.string().required(),
-                broker_custom_id:Joi.string().required(),
+                broker_custom_id: Joi.string().required(),
                 cmr_document: Joi.string()
                     .allow('')
                     .optional()
