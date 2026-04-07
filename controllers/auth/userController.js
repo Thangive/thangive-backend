@@ -469,6 +469,7 @@ const userController = {
                         'any.required': 'CMR document (cmr_document) is required',
                     }),
 
+                created_id: Joi.number().integer().optional(),
             }).when(Joi.object({ cmr_id: Joi.exist() }).unknown(), {
                 then: Joi.object({
                     cmr_document: Joi.string().optional(),
@@ -532,12 +533,23 @@ const userController = {
                 dataObj.cmr_id = result.insertId;
             }
 
+            const getQuery = `
+                SELECT 
+                    c.*,
+                    b.broker_name
+                FROM user_cmr_details c
+                LEFT JOIN broker b ON b.broker_id = c.broker_id
+                WHERE c.cmr_id = ${dataObj.cmr_id}
+            `;
+
+            const latestData = await getData(getQuery, next);
+
             return res.json({
                 success: true,
                 message: dataObj.cmr_id
                     ? 'User CMR details saved successfully'
                     : 'User CMR details updated successfully',
-                data: dataObj,
+                data: latestData[0],
             });
 
         } catch (error) {
@@ -647,6 +659,92 @@ const userController = {
                 }
             }
 
+            return res.json({
+                message: 'success',
+                total_records: page.total_rec ?? users.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: users.length,
+                data: users
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    },
+
+    async RMuserList(req, res, next) {
+        try {
+            /* ------------------ Base Query ------------------ */
+            let query = "SELECT * FROM users WHERE 1 AND user_type='user' AND is_deleted = 0 AND user_type != 'ADMIN'";
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            /* ------------------ Validation Schema ------------------ */
+            const userSchema = Joi.object({
+                user_id: Joi.number().integer(),
+                assign_to: Joi.number().integer(),
+                username: Joi.string(),
+                email: Joi.string().email(),
+                phone_number: Joi.string(),
+                search: Joi.string(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer(),
+            });
+
+            const { error } = userSchema.validate(req.query);
+            if (error) return next(error);
+
+            /* ------------------ Filters ------------------ */
+            if (req.query.user_id) {
+                cond += ` AND user_id = ${req.query.user_id}`;
+            }
+
+            if (req.query.username) {
+                cond += ` AND username LIKE '%${req.query.username}%'`;
+            }
+
+            if (req.query.email) {
+                cond += ` AND email LIKE '%${req.query.email}%'`;
+            }
+
+            if (req.query.phone_number) {
+                cond += ` AND phone_number LIKE '%${req.query.phone_number}%'`;
+            }
+
+            if (req.query.assign_to) {
+                cond += ` AND assign_to LIKE '%${req.query.assign_to}%'`;
+            }
+
+            if (req.query.search) {
+                const search = req.query.search;
+
+                cond += ` AND (
+                    username LIKE '%${search}%'
+                    OR phone_number LIKE '%${search}%'
+                    OR CONCAT(
+                        COALESCE(first_name, ''), ' ',
+                        COALESCE(middle_name, ''), ' ',
+                        COALESCE(last_name, '')
+                    ) LIKE '%${search}%'
+                )`;
+            }
+
+            /* ------------------ Pagination ------------------ */
+            if (req.query.pagination) {
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+            }
+
+            query += cond + page.pageQuery;
+
+            /* ------------------ Fetch Users ------------------ */
+            const users = await getData(query, next);
             return res.json({
                 message: 'success',
                 total_records: page.total_rec ?? users.length,

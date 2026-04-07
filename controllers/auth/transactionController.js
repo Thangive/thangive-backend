@@ -16,7 +16,7 @@ const transactionController = {
                 stock_details_id: Joi.number().integer().required(),
                 quantity: Joi.number().positive().required(),
                 current_share_price: Joi.number().required(),
-
+                addedUserId: Joi.number().integer().optional(),
                 order_type: Joi.string()
                     .valid('MARKET', 'LIMIT')
                     .required(),
@@ -97,8 +97,8 @@ const transactionController = {
                     am_status: 'COMPLETED',
                     st_status: 'COMPLETED',
                     position_group: buyGroup,
-                    // order_custom_id: await commonFunction.generateOrderId("Ord_B_"),
-                    created_at: new Date()
+                    created_at: new Date(),
+                    addedUserId: dataObj.addedUserId || null
                 };
 
                 await insertData(`INSERT INTO order_transactions SET ?`, buyBeforeSellObj, next);
@@ -348,12 +348,13 @@ const transactionController = {
                 user_id: Joi.number().integer().required(),
                 stock_details_id: Joi.number().integer().optional(),
                 broker_id: Joi.number().integer().optional(),
+                company_name: Joi.string().optional(),
                 advisor_id: Joi.number().integer().optional(),
                 pagination: Joi.boolean().default(false),
                 current_page: Joi.number().integer().min(1).default(1),
                 per_page_records: Joi.number().integer().min(1).default(10),
             });
-
+            
             const { error, value } = holdingSchema.validate(req.query);
             if (error) return next(error);
 
@@ -454,6 +455,9 @@ const transactionController = {
 
             if (value.stock_details_id) {
                 whereClause += ` AND ot.stock_details_id = ${value.stock_details_id}`;
+            }
+            if (value.company_name) {
+                whereClause += ` AND st.company_name LIKE '%${value.company_name}%'`;
             }
             if (value.broker_id) {
                 whereClause += ` AND ot.broker_id = ${value.broker_id}`;
