@@ -826,6 +826,7 @@ const transactionController = {
                 ot.rm_status,
                 ot.am_status,
                 ot.st_status,
+                ot.addedUserId,
                 DATE_FORMAT(
                     CONVERT_TZ(ot.created_at, '+00:00', '+05:30'),
                     '%d-%m-%Y'

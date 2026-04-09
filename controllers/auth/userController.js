@@ -730,7 +730,7 @@ const userController = {
                     ) LIKE '%${search}%'
                 )`;
             }
-
+            cond += `ORDER BY user_id DESC`;
             /* ------------------ Pagination ------------------ */
             if (req.query.pagination) {
                 page = await paginationQuery(
@@ -1057,3 +1057,30 @@ const userController = {
 
 
 export default userController;
+
+
+// BEGIN
+//     DECLARE total_watchlists INT;
+
+//     IF OLD.is_deleted = 1 
+//        AND NEW.is_deleted = 0 
+//        AND NEW.user_type = 'user' THEN
+
+//         -- Count existing watchlists
+//         SELECT COUNT(*) 
+//         INTO total_watchlists
+//         FROM wishlist
+//         WHERE user_id = NEW.user_id;
+
+//         -- Only insert if less than 4
+//         IF total_watchlists = 0 THEN
+//             INSERT INTO wishlist (user_id, wishlist_name, created_at)
+//             VALUES 
+//                 (NEW.user_id, 'Watchlist 1', NOW()),
+//                 (NEW.user_id, 'Watchlist 2', NOW()),
+//                 (NEW.user_id, 'Watchlist 3', NOW()),
+//                 (NEW.user_id, 'Watchlist 4', NOW());
+//         END IF;
+
+//     END IF;
+// END
