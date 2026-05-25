@@ -14,7 +14,7 @@ const serviceController = {
                 password: Joi.string().optional(),
                 phone_number: Joi.string().optional(),
                 otp: Joi.number().optional(),
-                user_type: Joi.valid('user', 'employee').optional(),
+                user_type: Joi.valid('user', 'PARTNER').optional(),
             }).or('username', 'phone_number').messages({ 'object.missing': 'Either username or phone_number is required' });
 
             const { error, value } = loginSchema.validate(req.body ?? {});
@@ -105,7 +105,7 @@ const serviceController = {
             const schema = Joi.object({
                 username: Joi.string().optional(),
                 phone_number: Joi.number().optional(),
-                user_type: Joi.valid('user', 'employee').required(),
+                user_type: Joi.valid('user', 'PARTNER').required(),
             })
                 .or('username', 'phone_number')
                 .messages({
@@ -115,9 +115,18 @@ const serviceController = {
 
             const { error, value } = schema.validate(req.body ?? {});
             if (error) return next(error);
-            let cond = (value.user_type == 'user') ? `AND user_type = 'user'` : `AND user_type != 'user'`;
-            const userQuery = `SELECT user_id, phone_number FROM users WHERE  is_deleted = 0 ${cond} AND  username = '${value.username}' OR phone_number = '${value.phone_number}'`;
+            // let cond = (value.user_type == 'user') ? `AND user_type = 'user'` : `AND user_type != 'user'`;
+            // const userQuery = `SELECT user_id, phone_number FROM users WHERE  is_deleted = 0 ${cond} AND  username = '${value.username}' OR phone_number = '${value.phone_number}'`;
 
+            let cond = '';
+
+            if (value.user_type == 'user') {
+                cond = (value.user_type == 'user') ? `AND user_type = 'user'` : `AND user_type != 'user'`;
+            }
+            else {
+               cond = (value.user_type == 'PARTNER') ? `AND user_type = 'PARTNER'` : `AND user_type != 'PARTNER'`;
+            }
+            const userQuery = `SELECT user_id, phone_number FROM users WHERE  is_deleted = 0 ${cond} AND  username = '${value.username}' OR phone_number = '${value.phone_number}'`;
 
             const users = await getData(userQuery, next);
 
