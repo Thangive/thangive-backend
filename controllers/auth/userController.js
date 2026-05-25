@@ -10,7 +10,7 @@ const userController = {
         try {
             // ------------------ Validation Schema ------------------
             const baseSchema = {
-                user_type: Joi.valid('user', 'RM', 'ADMIN', 'AM', 'SM', 'ST').required(),
+                user_type: Joi.valid('user', 'PARTNER', 'RM', 'ADMIN', 'AM', 'SM', 'ST').required(),
                 user_id: Joi.number().integer().optional(),
                 employee_id: Joi.string().allow(""),
                 profile: Joi.string().allow(""),
@@ -49,7 +49,28 @@ const userController = {
                             }),
                         }),
                 })
-                .when(Joi.object({ user_type: Joi.invalid('user') }).unknown(), {
+                .when(Joi.object({ user_type: Joi.valid('PARTNER') }).unknown(), {
+                    then: Joi.object()
+                        .when(Joi.object({ user_id: Joi.exist() }).unknown(), {
+                            then: Joi.object({
+                                first_name: Joi.string().required(),
+                                middle_name: Joi.string().optional(),
+                                last_name: Joi.string().required(),
+                                email: Joi.string().email().optional(),
+                                phone_number: Joi.string().optional(),
+                                whatsapp_number: Joi.string().optional(),
+                                profile: Joi.string().optional(),
+                                password: Joi.string().optional(),
+                            }),
+                            otherwise: Joi.object({
+                                username: Joi.string().required(),
+                                email: Joi.string().email().required(),
+                                phone_number: Joi.string().required(),
+                                user_type: Joi.string().required(),
+                            }),
+                        }),
+                })
+                .when(Joi.object({ user_type: Joi.invalid('user', 'PARTNER') }).unknown(), {
                     // 👉 USER TYPE ≠ user (Admin / Staff / Employee etc.)
                     then: Joi.object({
                         first_name: Joi.string().required(),
@@ -80,14 +101,14 @@ const userController = {
                 return next(error);
             }
 
-            if (dataObj.user_type != 'user') {
+            if (!['user', 'PARTNER'].includes(dataObj.user_type)) {
                 dataObj.user_custum_id = dataObj.employee_id;
                 delete dataObj.employee_id;
             }
 
             // ------------------ Duplicate Email / Phone Check ------------------
             let condition = "";
-            if ((dataObj.user_id && dataObj.user_type == 'user') || (dataObj.user_type != 'user')) {
+            if ((dataObj.user_id && ['user', 'PARTNER'].includes(dataObj.user_type)) || !['user', 'PARTNER'].includes(dataObj.user_type)) {
                 if (dataObj?.password) {
                     dataObj.password = md5(dataObj?.password);
                 }
@@ -124,13 +145,13 @@ const userController = {
                 );
             }
             // Send OTP only when creating new USER (no user_id)
-            if (dataObj.user_type == 'user' && !dataObj.user_id) {
+            if (['user', 'PARTNER'].includes(dataObj.user_type) && !dataObj.user_id) {
                 const otp = await commonFunction.setOtp({ phoneNumber: dataObj.phone_number }, next);
                 const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`;
                 await commonFunction.sendSMS(dataObj.phone_number, message);
             }
 
-            if (dataObj.user_type !== "user") {
+            if (!['user', 'PARTNER'].includes(dataObj.user_type)) {
                 dataObj["is_deleted"] = 0;
             }
             // ------------------ Insert / Update ------------------
@@ -1062,12 +1083,12 @@ export default userController;
 // BEGIN
 //     DECLARE total_watchlists INT;
 
-//     IF OLD.is_deleted = 1 
-//        AND NEW.is_deleted = 0 
+//     IF OLD.is_deleted = 1
+//        AND NEW.is_deleted = 0
 //        AND NEW.user_type = 'user' THEN
 
 //         -- Count existing watchlists
-//         SELECT COUNT(*) 
+//         SELECT COUNT(*)
 //         INTO total_watchlists
 //         FROM wishlist
 //         WHERE user_id = NEW.user_id;
@@ -1075,7 +1096,7 @@ export default userController;
 //         -- Only insert if less than 4
 //         IF total_watchlists = 0 THEN
 //             INSERT INTO wishlist (user_id, wishlist_name, created_at)
-//             VALUES 
+//             VALUES
 //                 (NEW.user_id, 'Watchlist 1', NOW()),
 //                 (NEW.user_id, 'Watchlist 2', NOW()),
 //                 (NEW.user_id, 'Watchlist 3', NOW()),

@@ -218,7 +218,7 @@ const serviceController = {
             const schema = Joi.object({
                 username: Joi.string().optional(),
                 phone_number: Joi.string().optional(),
-                user_type: Joi.valid('user', 'employee').required(),
+                user_type: Joi.valid('user', 'PARTNER').required(),
                 otp: Joi.number().required()
             }).or('username', 'phone_number').or('username', 'phone_number')
                 .messages({
@@ -227,8 +227,15 @@ const serviceController = {
 
             const { error, value } = schema.validate(req.body ?? {});
             if (error) return next(error);
-
-            let cond = (value.user_type == 'user') ? `AND user_type = 'user'` : `AND is_deleted = 0 AND user_type != 'user'`;
+            
+            if(value.user_type == 'user')
+            {
+                let cond = (value.user_type == 'user') ? `AND user_type = 'user'` : `AND is_deleted = 0 AND user_type != 'user'`;
+            }else
+            {
+                let cond = (value.user_type == 'PARTNER') ? `AND user_type = 'PARTNER'` : `AND is_deleted = 0 AND user_type != 'PARTNER'`;
+            }
+            
             const userQuery = `SELECT user_id, phone_number FROM users WHERE username = '${value.username}' OR phone_number = '${value.phone_number}' ${cond}`;
 
             console.log(userQuery);
