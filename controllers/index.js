@@ -9,3 +9,4 @@ export { default as transactionController } from './auth/transactionController.j
 export { default as serviceController } from './auth/serviceController.js'
 export { default as faqController } from './auth/faqController.js'
 export { default as blogController } from './auth/blogController.js'
+export { default as partnerController } from './auth/partnerController.js'

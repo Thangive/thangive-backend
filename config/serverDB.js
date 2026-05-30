@@ -87,7 +87,7 @@ export const insertData = (query, data, next) =>
                 if (typeof next === "function") return next(err);
                 return reject(err);
             }
-            resolve(result);
+            resolve(result);    
         };
 
         // ✔ If params is Array (bulk insert / positional values)

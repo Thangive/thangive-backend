@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController } from '../controllers/index.js';
+import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
 
@@ -153,4 +153,13 @@ router.get('/relatedBloags', blogController.RelatedBlog);
 router.post('/blogBanner', auth, imageUpload, blogController.addBlogBanner);
 router.get('/blogBanner', blogController.getLatestBlogBanner);
 
+//Partner APIS
+router.get('/Partners', auth, partnerController.getPartners);
+router.post('/partnerProfileUpdate', auth, imageUpload, partnerController.updatePartnerProfile);
+router.get('/PartnersFinancialInfo', auth, partnerController.getPartnersFinancialInfo);
+router.post('/partnerFinancialInformation', auth,imageUpload, partnerController.updatePartnerFinancialInformation);
+router.post('/updatePartnerBankInformation', auth,forms, partnerController.updatePartnerBankInformation);
+router.post('/updatePartnerProspectInformation', auth,imageUpload, partnerController.updatePartnerProspectInformation);
+router.get('/getPartnerProspects',auth, partnerController.getPartnerProspects);
+router.get('/getPartnerProspectsIndividual',auth, partnerController.getPartnerProspectsIndividual);
 export default router;

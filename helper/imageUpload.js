@@ -33,6 +33,20 @@ const storage = multer.diskStorage({
         if (file.fieldname === "sourceAttachment") prefix = "blogAttachment";
         if (file.fieldname === "banner") prefix = "blogBanner";
 
+        if (file.fieldname === "company_logo") prefix = "company_logo";
+        if (file.fieldname === "pancard_copy") prefix = "pancard";
+        if (file.fieldname === "aadharcard_copy") prefix = "aadharcard";
+        if (file.fieldname === "cmr_copy") prefix = "cmr_copy";
+        if (file.fieldname === "cancelled_cheque") prefix = "cancelled_cheque";
+        if (file.fieldname === "franchise_agreement") prefix = "franchise_agreement";
+        if (file.fieldname === "stamp_signature") prefix = "stamp_signature";
+
+        if (file.fieldname === "scanned_cmr_copy") prefix = "scanned_cmr_copy";
+        if (file.fieldname === "scanned_pancard_copy") prefix = "scanned_pancard_copy";
+        if (file.fieldname === "scanned_aadharcard_copy") prefix = "scanned_aadharcard_copy";
+        if (file.fieldname === "cancel_cheque_copy") prefix = "cancel_cheque_copy";
+        if (file.fieldname === "fund_transfer_document") prefix = "fund_transfer_document";
+
         cb(null, `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}${ext}`);
     }
 });
@@ -71,7 +85,19 @@ const imageUpload = multer({
     { name: 'blogImages', maxCount: 3 },
     { name: 'sourceAttachment', maxCount: 1 },
     { name: 'banner', maxCount: 1 },
+    { name: 'company_logo', maxCount: 1 },
+    { name: 'aadharcard_copy', maxCount: 1 },
+    { name: 'pancard_copy', maxCount: 1 },
+    { name: 'cmr_copy', maxCount: 1 },
+    { name: 'cancelled_cheque', maxCount: 1 },
+    { name: 'franchise_agreement', maxCount: 1 },
+    { name: 'stamp_signature', maxCount: 1 },
 
+    { name: 'scanned_cmr_copy', maxCount: 1 },
+    { name: 'scanned_pancard_copy', maxCount: 1 },
+    { name: 'scanned_aadharcard_copy', maxCount: 1 },
+    { name: 'cancel_cheque_copy', maxCount: 1 },
+    { name: 'fund_transfer_document', maxCount: 1 },
 ]);
 
 export default imageUpload;
