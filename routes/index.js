@@ -162,4 +162,6 @@ router.post('/updatePartnerBankInformation', auth,forms, partnerController.updat
 router.post('/updatePartnerProspectInformation', auth,imageUpload, partnerController.updatePartnerProspectInformation);
 router.get('/getPartnerProspects',auth, partnerController.getPartnerProspects);
 router.get('/getPartnerProspectsIndividual',auth, partnerController.getPartnerProspectsIndividual);
+router.post('/createPartnerOrder', auth, forms, partnerController.createPartnerOrder);
+router.get('/getPartnerOrders', auth, partnerController.getPartnerOrders);
 export default router;

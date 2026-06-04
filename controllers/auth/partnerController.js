@@ -1015,6 +1015,172 @@ const partnerController = {
         }
     },
 
+    async createPartnerOrder(req, res, next) {
+        try {
+
+            const orderSchema = Joi.object({
+                user_id: Joi.number().integer().required(),
+                partner_prospect_id: Joi.number().integer().required(),
+                stock_details_id: Joi.number().integer().required(),
+
+                order_type: Joi.string()
+                    .valid('Buy', 'Sell')
+                    .required(),
+
+                quantity: Joi.number().required(),
+                price: Joi.number().required(),
+                broker_price: Joi.number().required(),
+            });
+
+            const dataObj = { ...req.body };
+
+            const { error } = orderSchema.validate(dataObj);
+
+            if (error) {
+                return next(error);
+            }
+
+            dataObj.created_at = new Date();
+
+            const result = await insertData(
+                `INSERT INTO partner_stock_orders SET ?`,
+                dataObj,
+                next
+            );
+
+            return res.json({
+                success: true,
+                message: "Order created successfully",
+                order_id: result.insertId,
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async getPartnerOrders(req, res, next) {
+        try {
+            /* ------------------ Validation ------------------ */
+            const schema = Joi.object({
+                partener_order_id: Joi.number().integer().optional(),
+                user_id: Joi.number().integer().optional(),
+                partner_prospect_id: Joi.number().integer().optional(),
+                stock_details_id: Joi.number().integer().optional(),
+                order_type: Joi.string().valid('Buy', 'Sell').optional(),
+                pagination: Joi.boolean().optional(),
+                current_page: Joi.number().integer().optional(),
+                per_page_records: Joi.number().integer().optional(),
+            });
+
+            const { error } = schema.validate(req.query);
+
+            if (error) {
+                return next(error);
+            }
+
+            /* ------------------ Base Query ------------------ */
+
+            let query = `
+            SELECT
+                pso.*,
+
+                pp.client_firm_name,
+                pp.phone,
+                pp.email,
+                sd.company_name
+
+            FROM partner_stock_orders pso
+
+            LEFT JOIN partner_prospects pp
+                ON pp.partner_prospect_id = pso.partner_prospect_id
+
+            LEFT JOIN stock_details sd
+                ON sd.stock_details_id = pso.stock_details_id
+
+            WHERE 1 = 1
+        `;
+
+            let cond = '';
+            let page = { pageQuery: '' };
+
+            /* ------------------ Filters ------------------ */
+
+            if (req.query.partener_order_id) {
+                cond += `
+                AND pso.partener_order_id =
+                ${req.query.partener_order_id}
+            `;
+            }
+
+            if (req.query.user_id) {
+                cond += `
+                AND pso.user_id =
+                ${req.query.user_id}
+            `;
+            }
+
+            if (req.query.partner_prospect_id) {
+                cond += `
+                AND pso.partner_prospect_id =
+                ${req.query.partner_prospect_id}
+            `;
+            }
+
+            if (req.query.stock_details_id) {
+                cond += `
+                AND pso.stock_details_id =
+                ${req.query.stock_details_id}
+            `;
+            }
+
+            if (req.query.order_type) {
+                cond += `
+                AND pso.order_type =
+                '${req.query.order_type}'
+            `;
+            }
+
+            /* ------------------ Pagination ------------------ */
+
+            if (req.query.pagination) {
+
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+
+            }
+
+            query += `
+            ${cond}
+            ORDER BY pso.partener_order_id DESC
+            ${page.pageQuery}
+        `;
+
+            /* ------------------ Get Orders ------------------ */
+
+            const orders = await getData(query, next);
+
+            /* ------------------ Response ------------------ */
+
+            return res.json({
+                success: true,
+                message: "success",
+                total_records: page.total_rec ?? orders.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: orders.length,
+                data: orders
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    }
+
     // async RMuserList(req, res, next) 
     // {
     //     try {
