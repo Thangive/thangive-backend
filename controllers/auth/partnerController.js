@@ -23,7 +23,9 @@ const partnerController = {
             /* ------------------ Validation Schema ------------------ */
             const userSchema = Joi.object({
                 user_id: Joi.number().integer(),
+                assign_to: Joi.number().integer(),
                 username: Joi.string(),
+                search: Joi.string(),
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
                 pagination: Joi.boolean(),
@@ -43,6 +45,10 @@ const partnerController = {
                 cond += ` AND user_id = ${req.query.user_id}`;
             }
 
+            if (req.query.assign_to) {
+                cond += ` AND assign_to = ${req.query.assign_to}`;
+            }
+
             if (req.query.username) {
                 cond += ` AND username LIKE '%${req.query.username}%'`;
             }
@@ -53,6 +59,20 @@ const partnerController = {
 
             if (req.query.phone_number) {
                 cond += ` AND phone_number LIKE '%${req.query.phone_number}%'`;
+            }
+
+            if (req.query.search) {
+                const search = req.query.search;
+
+                cond += ` AND (
+                    username LIKE '%${search}%'
+                    OR phone_number LIKE '%${search}%'
+                    OR CONCAT(
+                        COALESCE(first_name, ''), ' ',
+                        COALESCE(middle_name, ''), ' ',
+                        COALESCE(last_name, '')
+                    ) LIKE '%${search}%'
+                )`;
             }
 
             /* ------------------ Pagination ------------------ */
@@ -1180,93 +1200,6 @@ const partnerController = {
             next(err);
         }
     }
-
-    // async RMuserList(req, res, next) 
-    // {
-    //     try {
-    //         /* ------------------ Base Query ------------------ */
-    //         let query = "SELECT * FROM users WHERE 1 AND user_type='user' AND is_deleted = 0 AND user_type != 'ADMIN'";
-    //         let cond = '';
-    //         let page = { pageQuery: '' };
-
-    //         /* ------------------ Validation Schema ------------------ */
-    //         const userSchema = Joi.object({
-    //             user_id: Joi.number().integer(),
-    //             assign_to: Joi.number().integer(),
-    //             username: Joi.string(),
-    //             email: Joi.string().email(),
-    //             phone_number: Joi.string(),
-    //             search: Joi.string(),
-    //             pagination: Joi.boolean(),
-    //             current_page: Joi.number().integer(),
-    //             per_page_records: Joi.number().integer(),
-    //         });
-
-    //         const { error } = userSchema.validate(req.query);
-    //         if (error) return next(error);
-
-    //         /* ------------------ Filters ------------------ */
-    //         if (req.query.user_id) {
-    //             cond += ` AND user_id = ${req.query.user_id}`;
-    //         }
-
-    //         if (req.query.username) {
-    //             cond += ` AND username LIKE '%${req.query.username}%'`;
-    //         }
-
-    //         if (req.query.email) {
-    //             cond += ` AND email LIKE '%${req.query.email}%'`;
-    //         }
-
-    //         if (req.query.phone_number) {
-    //             cond += ` AND phone_number LIKE '%${req.query.phone_number}%'`;
-    //         }
-
-    //         if (req.query.assign_to) {
-    //             cond += ` AND assign_to LIKE '%${req.query.assign_to}%'`;
-    //         }
-
-    //         if (req.query.search) {
-    //             const search = req.query.search;
-
-    //             cond += ` AND (
-    //                     username LIKE '%${search}%'
-    //                     OR phone_number LIKE '%${search}%'
-    //                     OR CONCAT(
-    //                         COALESCE(first_name, ''), ' ',
-    //                         COALESCE(middle_name, ''), ' ',
-    //                         COALESCE(last_name, '')
-    //                     ) LIKE '%${search}%'
-    //                 )`;
-    //         }
-    //         cond += `ORDER BY user_id DESC`;
-    //         /* ------------------ Pagination ------------------ */
-    //         if (req.query.pagination) {
-    //             page = await paginationQuery(
-    //                 query + cond,
-    //                 next,
-    //                 req.query.current_page,
-    //                 req.query.per_page_records
-    //             );
-    //         }
-
-    //         query += cond + page.pageQuery;
-
-    //         /* ------------------ Fetch Users ------------------ */
-    //         const users = await getData(query, next);
-    //         return res.json({
-    //             message: 'success',
-    //             total_records: page.total_rec ?? users.length,
-    //             number_of_pages: page.number_of_pages || 1,
-    //             currentPage: page.currentPage || 1,
-    //             records: users.length,
-    //             data: users
-    //         });
-
-    //     } catch (err) {
-    //         next(err);
-    //     }
-    // },
 }
 
 export default partnerController;

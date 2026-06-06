@@ -147,6 +147,7 @@ const PriceController = {
                 const todayCell = row["PRICE"];
                 const prevCell = row["__EMPTY"];
                 const actionCell = row["ACTION"];
+                const partnerPriceCell = row["PARTNER PRICE"];
 
                 let today_prices = null;
                 let prev_price = null;
@@ -207,7 +208,7 @@ const PriceController = {
                     stock_details_id,
                     prev_price,
                     today_prices,
-                    partner_price: 0,
+                    partner_price: partnerPriceCell || 0,
                     conviction_level: row["CONVICTION LEVEL"] || "MEDIUM",
                     availability: availability,
                     lot: row["LOT SIZE"] || 0,
