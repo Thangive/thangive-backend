@@ -106,7 +106,7 @@ router.get("/devident/:id", sectorController.getDivident);
 router.delete('/devident/:id', sectorController.deleteDividend);
 router.get("/AnnualReport/:id", sectorController.getAnualReport);
 router.post("/dailyPriceExcelUpdate", forms1, PriceController.updatePriceExcel);
-router.get("/stockPriceChart", PriceController.getStockPriceChartData);
+
 router.get("/cashflowTemplates", PriceController.getCashFlowTemplates);
 router.post("/CashflowValues", forms, PriceController.addUpdateCashFlowValues);
 router.get("/CashflowValues", PriceController.getCashFlowValues);
@@ -138,6 +138,8 @@ router.get('/getWatchlist', stocksGetController.getWatchlist)
 // Chart Data APIS
 router.post("/chartBulkUpload", forms1, PriceController.chartBulkUpload)
 router.post("/chartSingleUpload", forms1, PriceController.chartSingleUpload)
+router.get("/stockPriceChart", PriceController.getStockPriceChartData);
+router.get("/getStockLatestPrice", PriceController.getStockLatestPrice);
 
 // FAQ APIS
 router.post('/faq', auth, forms, faqController.addUpdateFaq);

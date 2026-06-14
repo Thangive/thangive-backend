@@ -388,7 +388,7 @@ const partnerController = {
                 gst_number: Joi.string().allow('').optional(),
                 cin_number: Joi.string().allow('').optional(),
                 company_website: Joi.string().allow('').optional(),
-
+                franchise_upload_date: Joi.string().allow('').optional(),
                 gst_compliant: Joi.string()
                     .valid('Yes', 'No')
                     .allow('')
@@ -1039,17 +1039,61 @@ const partnerController = {
         try {
 
             const orderSchema = Joi.object({
-                user_id: Joi.number().integer().required(),
-                partner_prospect_id: Joi.number().integer().required(),
-                stock_details_id: Joi.number().integer().required(),
+                partener_order_id: Joi.number().integer().optional(),
+                // user_id: Joi.number().integer().required(),
+                // partner_prospect_id: Joi.number().integer().required(),
+                // stock_details_id: Joi.number().integer().required(),
+                user_id: Joi.when('partener_order_id', {
+                    is: Joi.exist(),
+                    then: Joi.optional(),
+                    otherwise: Joi.required()
+                }),
 
-                order_type: Joi.string()
-                    .valid('Buy', 'Sell')
-                    .required(),
+                partner_prospect_id: Joi.when('partener_order_id', {
+                    is: Joi.exist(),
+                    then: Joi.optional(),
+                    otherwise: Joi.required()
+                }),
 
-                quantity: Joi.number().required(),
-                price: Joi.number().required(),
-                broker_price: Joi.number().required(),
+                stock_details_id: Joi.when('partener_order_id', {
+                    is: Joi.exist(),
+                    then: Joi.optional(),
+                    otherwise: Joi.required()
+                }),
+
+                order_id: Joi.when('partener_order_id', {
+                    is: Joi.exist(),
+                    then: Joi.optional(),
+                    otherwise: Joi.required()
+                }),
+
+                order_type: Joi.when('partener_order_id', {
+                    is: Joi.exist(),
+                    then: Joi.string().valid('Buy', 'Sell').optional(),
+                    otherwise: Joi.string().valid('Buy', 'Sell').required()
+                }),
+
+                quantity: Joi.when('partener_order_id', {
+                    is: Joi.exist(),
+                    then: Joi.number().optional(),
+                    otherwise: Joi.number().required()
+                }),
+
+                price: Joi.when('partener_order_id', {
+                    is: Joi.exist(),
+                    then: Joi.number().optional(),
+                    otherwise: Joi.number().required()
+                }),
+
+                broker_price: Joi.when('partener_order_id', {
+                    is: Joi.exist(),
+                    then: Joi.number().optional(),
+                    otherwise: Joi.number().required()
+                }),
+
+                status: Joi.string()
+                    .valid('Pending', 'Approved', 'Rejected', 'Completed')
+                    .optional()
             });
 
             const dataObj = { ...req.body };
@@ -1059,14 +1103,18 @@ const partnerController = {
             if (error) {
                 return next(error);
             }
-
-            dataObj.created_at = new Date();
-
-            const result = await insertData(
-                `INSERT INTO partner_stock_orders SET ?`,
-                dataObj,
-                next
-            );
+            let query = "";
+            if (dataObj.partener_order_id) {
+                query = `UPDATE partner_stock_orders SET ? WHERE partener_order_id = ${dataObj.partener_order_id}`;
+                dataObj.updated_at = new Date();
+            } else {
+                query = `INSERT INTO partner_stock_orders SET ?`;
+                dataObj.created_at = new Date();
+            }
+            const result = await insertData(query, dataObj, next);
+            if (result.insertId) {
+                dataObj.partener_order_id = result.insertId;
+            }
 
             return res.json({
                 success: true,
@@ -1086,7 +1134,13 @@ const partnerController = {
                 partener_order_id: Joi.number().integer().optional(),
                 user_id: Joi.number().integer().optional(),
                 partner_prospect_id: Joi.number().integer().optional(),
+                rm_id: Joi.number().integer().optional(),
                 stock_details_id: Joi.number().integer().optional(),
+                status: Joi.string()
+                    .valid('Pending', 'Approved', 'Rejected', 'Completed')
+                    .optional(),
+                client_name: Joi.string().optional(),
+                partner_name: Joi.string().optional(),
                 order_type: Joi.string().valid('Buy', 'Sell').optional(),
                 pagination: Joi.boolean().optional(),
                 current_page: Joi.number().integer().optional(),
@@ -1108,7 +1162,26 @@ const partnerController = {
                 pp.client_firm_name,
                 pp.phone,
                 pp.email,
-                sd.company_name
+                sd.company_name,
+
+                CONCAT(
+                    COALESCE(u.first_name, ''),
+                    CASE 
+                        WHEN u.middle_name IS NOT NULL AND u.middle_name != '' 
+                        THEN CONCAT(' ', u.middle_name) 
+                        ELSE '' 
+                    END,
+                    CASE 
+                        WHEN u.last_name IS NOT NULL AND u.last_name != '' 
+                        THEN CONCAT(' ', u.last_name) 
+                        ELSE '' 
+                    END
+                ) AS partnerName,
+            cu.user_id AS client_userID,
+            cu.first_name AS client_first_name,
+            cu.middle_name AS client_middle_name,
+            cu.last_name AS client_last_name
+
 
             FROM partner_stock_orders pso
 
@@ -1117,6 +1190,13 @@ const partnerController = {
 
             LEFT JOIN stock_details sd
                 ON sd.stock_details_id = pso.stock_details_id
+            
+            LEFT JOIN users u
+                ON u.user_id = pso.user_id
+            
+            LEFT JOIN users cu
+                ON cu.phone_number = pp.phone
+                AND cu.user_type = 'user'
 
             WHERE 1 = 1
         `;
@@ -1131,6 +1211,38 @@ const partnerController = {
                 AND pso.partener_order_id =
                 ${req.query.partener_order_id}
             `;
+            }
+
+            if (req.query.status) {
+                cond += `
+                    AND pso.status = '${req.query.status}'
+                `;
+            }
+
+            if (req.query.client_name) {
+                cond += `
+                    AND pp.client_firm_name LIKE '%${req.query.client_name}%'
+                `;
+            }
+
+            if (req.query.partner_name) {
+                cond += `
+                    AND CONCAT(
+                        COALESCE(u.first_name, ''),
+                        CASE
+                            WHEN u.middle_name IS NOT NULL
+                            AND u.middle_name != ''
+                            THEN CONCAT(' ', u.middle_name)
+                            ELSE ''
+                        END,
+                        CASE
+                            WHEN u.last_name IS NOT NULL
+                            AND u.last_name != ''
+                            THEN CONCAT(' ', u.last_name)
+                            ELSE ''
+                        END
+                    ) LIKE '%${req.query.partner_name}%'
+                `;
             }
 
             if (req.query.user_id) {
@@ -1161,6 +1273,12 @@ const partnerController = {
             `;
             }
 
+            if (req.query.rm_id) {
+                cond += `
+                    AND u.assign_to = ${req.query.rm_id}
+                `;
+            }
+
             /* ------------------ Pagination ------------------ */
 
             if (req.query.pagination) {
@@ -1171,14 +1289,13 @@ const partnerController = {
                     req.query.current_page,
                     req.query.per_page_records
                 );
-
             }
 
             query += `
-            ${cond}
-            ORDER BY pso.partener_order_id DESC
-            ${page.pageQuery}
-        `;
+                ${cond}
+                ORDER BY pso.updated_at DESC
+                ${page.pageQuery}
+            `;
 
             /* ------------------ Get Orders ------------------ */
 

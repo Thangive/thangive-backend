@@ -1888,6 +1888,50 @@ const PriceController = {
         } catch (err) {
             next(err);
         }
-    }
+    },
+
+    async getStockLatestPrice(req, res, next) {
+        try {
+            const { stock_details_id } = req.query;
+
+            /* ---------- VALIDATION ---------- */
+            if (!stock_details_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "stock_details_id is required"
+                });
+            }
+
+            /* ---------- FETCH PRICE DATA ---------- */
+            const data = await getData(
+                `SELECT 
+                    DATE(present_date) AS stock_date,
+                    today_prices,
+                    partner_price
+                FROM stock_price
+                WHERE stock_details_id = '${stock_details_id}'
+                ORDER BY stock_price_id DESC
+                LIMIT 1;`,
+                next
+            );
+
+            /* ---------- NO DATA ---------- */
+            if (!data || data.length === 0) {
+                return res.json({
+                    success: true,
+                    data: {}
+                });
+            }
+
+            /* ---------- RESPONSE ---------- */
+            return res.json({
+                success: true,
+                data:data[0]
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
 }
 export default PriceController

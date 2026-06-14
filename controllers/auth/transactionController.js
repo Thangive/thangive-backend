@@ -17,6 +17,7 @@ const transactionController = {
                 quantity: Joi.number().positive().required(),
                 current_share_price: Joi.number().required(),
                 addedUserId: Joi.number().integer().optional(),
+                addedPartnerID: Joi.number().integer().optional(),
                 order_type: Joi.string()
                     .valid('MARKET', 'LIMIT')
                     .required(),
@@ -98,7 +99,8 @@ const transactionController = {
                     st_status: 'COMPLETED',
                     position_group: buyGroup,
                     created_at: new Date(),
-                    addedUserId: dataObj.addedUserId || null
+                    addedUserId: dataObj.addedUserId || null,
+                    addedPartnerID: dataObj.addedPartnerID || null
                 };
 
                 await insertData(`INSERT INTO order_transactions SET ?`, buyBeforeSellObj, next);
@@ -354,7 +356,7 @@ const transactionController = {
                 current_page: Joi.number().integer().min(1).default(1),
                 per_page_records: Joi.number().integer().min(1).default(10),
             });
-            
+
             const { error, value } = holdingSchema.validate(req.query);
             if (error) return next(error);
 
@@ -527,6 +529,13 @@ const transactionController = {
                     ot.user_id,
                     ot.transaction_type,
                     CONCAT(users.first_name, ' ', users.middle_name,' ', users.last_name) AS client_name,
+                    CONCAT(
+                        partner_user.first_name,
+                        ' ',
+                        partner_user.middle_name,
+                        ' ',
+                        partner_user.last_name
+                    ) AS partner_name,
                     ad.advisor_name,
                     bro.broker_name,
                     st.company_name,
@@ -563,6 +572,8 @@ const transactionController = {
                     GROUP BY stock_details_id
                 ) latest
                     ON latest.latest_id = sp.stock_price_id
+                LEFT JOIN users partner_user
+                    ON partner_user.user_id = ot.addedPartnerID
                 WHERE 1
             `;
 
@@ -607,6 +618,7 @@ const transactionController = {
                 order_id: Joi.string().optional(),
                 sort_field: Joi.string().optional(),
                 sort_order: Joi.string().optional(),
+                order: Joi.string().valid('Partner').optional(),
             });
 
             const { error, value } = holdingSchema.validate(req.query ?? {});
@@ -628,6 +640,10 @@ const transactionController = {
 
             if (value.employee_id && value.employee_type == "RM") {
                 cond += ` AND users.assign_to = ${value.employee_id}`;
+            }
+
+            if (value.order === "Partner") {
+                cond += ` AND ot.addedPartnerID IS NOT NULL`;
             }
 
             // ---- ALL PENDING (Only RM PENDING) ----
