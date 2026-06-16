@@ -46,6 +46,8 @@ const storage = multer.diskStorage({
         if (file.fieldname === "scanned_aadharcard_copy") prefix = "scanned_aadharcard_copy";
         if (file.fieldname === "cancel_cheque_copy") prefix = "cancel_cheque_copy";
         if (file.fieldname === "fund_transfer_document") prefix = "fund_transfer_document";
+        if (file.fieldname === "payment_doc") prefix = "payment_doc";
+
 
         cb(null, `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}${ext}`);
     }
@@ -98,6 +100,7 @@ const imageUpload = multer({
     { name: 'scanned_aadharcard_copy', maxCount: 1 },
     { name: 'cancel_cheque_copy', maxCount: 1 },
     { name: 'fund_transfer_document', maxCount: 1 },
+    { name: 'payment_doc', maxCount: 1 },
 ]);
 
 export default imageUpload;

@@ -1061,11 +1061,8 @@ const partnerController = {
                     otherwise: Joi.required()
                 }),
 
-                order_id: Joi.when('partener_order_id', {
-                    is: Joi.exist(),
-                    then: Joi.optional(),
-                    otherwise: Joi.required()
-                }),
+                order_id: Joi.number().integer().optional(),
+                addedUserId: Joi.number().integer().optional(),
 
                 order_type: Joi.when('partener_order_id', {
                     is: Joi.exist(),
@@ -1316,7 +1313,74 @@ const partnerController = {
         } catch (err) {
             next(err);
         }
-    }
+    },
+    async addPartnerCommission(req, res, next) {
+        try {
+
+            const commissionSchema = Joi.object({
+                order_id: Joi.number().integer().required(),
+                tds: Joi.number().required(),
+                gst: Joi.number().required(),
+                payment_id: Joi.string().required(),
+                payment_doc: Joi.string().allow('').optional(),
+                inv_number: Joi.string().optional(),
+            });
+
+            let dataObj = { ...req.body };
+
+            /* ------------------ FILE ------------------ */
+            if (req.files?.payment_doc?.length > 0) {
+                dataObj.payment_doc =
+                    req.files.payment_doc[0].path;
+            }
+
+            /* ------------------ VALIDATE ------------------ */
+            const { error } = commissionSchema.validate(dataObj);
+
+            if (error) {
+                return next(error);
+            }
+
+            /* ------------------ INSERT COMMISSION ------------------ */
+            const commissionData = {
+                order_id: dataObj.order_id,
+                tds: dataObj.tds,
+                gst: dataObj.gst,
+                payment_id: dataObj.payment_id,
+                payment_doc: dataObj.payment_doc || "",
+                inv_number: dataObj.inv_number,
+            };
+
+            const insertQuery = `
+            INSERT INTO partner_commission SET ?
+        `;
+
+            const result = await insertData(
+                insertQuery,
+                commissionData,
+                next
+            );
+
+            /* ------------------ UPDATE VERIFY STATUS ------------------ */
+            const updateQuery = `
+            UPDATE order_transactions
+            SET verify = 2
+            WHERE order_id = ${dataObj.order_id}
+        `;
+
+            await getData(updateQuery, next);
+
+            /* ------------------ RESPONSE ------------------ */
+            return res.json({
+                success: true,
+                message: "Commission added successfully",
+                commission_id: result.insertId,
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
 }
 
 export default partnerController;

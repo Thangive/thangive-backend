@@ -44,7 +44,8 @@ const transactionController = {
                         otherwise: Joi.optional()
                     }),
 
-                added_qty: Joi.number().optional()
+                added_qty: Joi.number().optional(),
+                partner_price: Joi.number().optional()
             });
 
             const dataObj = { ...req.body };
@@ -100,7 +101,8 @@ const transactionController = {
                     position_group: buyGroup,
                     created_at: new Date(),
                     addedUserId: dataObj.addedUserId || null,
-                    addedPartnerID: dataObj.addedPartnerID || null
+                    addedPartnerID: dataObj.addedPartnerID || null,
+                    partner_price: dataObj.partner_price || null
                 };
 
                 await insertData(`INSERT INTO order_transactions SET ?`, buyBeforeSellObj, next);
@@ -343,6 +345,68 @@ const transactionController = {
         }
     },
 
+    async verifyOrder(req, res, next) {
+        try {
+            /* ------------------ Validation Schema ------------------ */
+            const verifySchema = Joi.object({
+                order_id: Joi.number().integer().required(),
+                verify: Joi.number().valid(0, 1).required()
+            });
+
+            const { error, value } = verifySchema.validate(req.body);
+
+            if (error) {
+                return next(error);
+            }
+
+            /* ------------------ Check Order Exists ------------------ */
+            const checkQuery = `
+            SELECT order_id, verify
+            FROM order_transactions
+            WHERE order_id = ${value.order_id}
+            LIMIT 1
+        `;
+
+            const orderData = await getData(checkQuery, next);
+
+            if (!orderData || orderData.length === 0) {
+                return next(
+                    CustomErrorHandler.notFound("Order not found")
+                );
+            }
+
+            /* ------------------ Update Verify Status ------------------ */
+            const updateQuery = `
+            UPDATE order_transactions
+            SET ?
+            WHERE order_id = ${value.order_id}
+        `;
+
+            await insertData(
+                updateQuery,
+                {
+                    verify: value.verify
+                },
+                next
+            );
+
+            return res.json({
+                success: true,
+                message:
+                    value.verify === 1
+                        ? "Order verified successfully"
+                        : "Order verification removed successfully",
+                data: {
+                    order_id: value.order_id,
+                    verify: value.verify
+                }
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+
     async getUserHoldings(req, res, next) {
         try {
             /* ------------------ Validation Schema ------------------ */
@@ -529,6 +593,7 @@ const transactionController = {
                     ot.user_id,
                     ot.transaction_type,
                     CONCAT(users.first_name, ' ', users.middle_name,' ', users.last_name) AS client_name,
+                    users.phone_number AS client_phone,
                     CONCAT(
                         partner_user.first_name,
                         ' ',
@@ -536,6 +601,7 @@ const transactionController = {
                         ' ',
                         partner_user.last_name
                     ) AS partner_name,
+                    partner_user.phone_number AS partner_phone,
                     ad.advisor_name,
                     bro.broker_name,
                     st.company_name,
@@ -554,7 +620,10 @@ const transactionController = {
                     ot.am_status,
                     ot.st_status,
                     ot.payments_count,
-                    ot.created_at
+                    ot.created_at,
+                    ot.partner_price AS partner_price,
+                    ot.verify,
+                    ot.share_Debit_Invoice
                 FROM order_transactions ot
                 JOIN stock_details st
                     ON ot.stock_details_id = st.stock_details_id
@@ -587,11 +656,11 @@ const transactionController = {
                 broker_id: Joi.number().integer(),
                 advisor_id: Joi.number().integer(),
                 employee_type: Joi.string()
-                    .valid('RM', 'AM', 'ST')
+                    .valid('RM', 'AM', 'ST', 'PARTNER')
                     .optional(),
 
                 employee_id: Joi.when('employee_type', {
-                    is: 'RM',
+                    is: Joi.valid('RM', 'PARTNER'),
                     then: Joi.number().integer().required(),
                     otherwise: Joi.number().integer().optional()
                 }),
@@ -619,6 +688,7 @@ const transactionController = {
                 sort_field: Joi.string().optional(),
                 sort_order: Joi.string().optional(),
                 order: Joi.string().valid('Partner').optional(),
+                verify: Joi.string().valid('verify', 'notverify').optional(),
             });
 
             const { error, value } = holdingSchema.validate(req.query ?? {});
@@ -642,8 +712,20 @@ const transactionController = {
                 cond += ` AND users.assign_to = ${value.employee_id}`;
             }
 
+            if (value.employee_id && value.employee_type == "PARTNER") {
+                cond += ` AND ot.addedPartnerID = ${value.employee_id}`;
+            }
+
             if (value.order === "Partner") {
                 cond += ` AND ot.addedPartnerID IS NOT NULL`;
+            }
+
+            if (value.verify === "verify") {
+                cond += ` AND ot.verify = 2 `;
+            }
+
+            if (value.verify === "notverify") {
+                cond += ` AND ot.verify != 2 `;
             }
 
             // ---- ALL PENDING (Only RM PENDING) ----
@@ -673,7 +755,7 @@ const transactionController = {
 
             if (
                 value.status === "COMPLETED" &&
-                (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")
+                (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST" || value.employee_type === "PARTNER")
             ) {
                 cond += ` 
                     AND ot.rm_status = 'COMPLETED' 
@@ -835,6 +917,7 @@ const transactionController = {
                 ot.price_per_share AS buy_price,
                 ot.current_share_price AS current_share_price,
                 ot.user_share_price AS user_share_price,
+                ot.partner_price AS partner_price,
                 ot.quantity,
                 ot.bank_id,
                 ot.user_quantity,
