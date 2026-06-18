@@ -1040,9 +1040,6 @@ const partnerController = {
 
             const orderSchema = Joi.object({
                 partener_order_id: Joi.number().integer().optional(),
-                // user_id: Joi.number().integer().required(),
-                // partner_prospect_id: Joi.number().integer().required(),
-                // stock_details_id: Joi.number().integer().required(),
                 user_id: Joi.when('partener_order_id', {
                     is: Joi.exist(),
                     then: Joi.optional(),
@@ -1107,16 +1104,21 @@ const partnerController = {
             } else {
                 query = `INSERT INTO partner_stock_orders SET ?`;
                 dataObj.created_at = new Date();
+                dataObj.partnerQty = dataObj.quantity,
+                    dataObj.partnerPrice = dataObj.price,
+                    dataObj.partnerBrokerPrice = dataObj.broker_price
             }
             const result = await insertData(query, dataObj, next);
             if (result.insertId) {
                 dataObj.partener_order_id = result.insertId;
             }
-
+            
             return res.json({
                 success: true,
-                message: "Order created successfully",
-                order_id: result.insertId,
+                message: dataObj.partener_order_id
+                    ? "Order updated successfully"
+                    : "Order created successfully",
+                order_id: dataObj.partener_order_id || result.insertId,
             });
 
         } catch (error) {
@@ -1381,6 +1383,115 @@ const partnerController = {
             next(error);
         }
     },
+    async getOrderCommissionPartner(req, res, next) {
+        try {
+
+            /* ------------------ Validation ------------------ */
+            const schema = Joi.object({
+                order_id: Joi.number().integer().required(),
+                user_id: Joi.number().integer().required(),
+            });
+
+            const { error } = schema.validate(req.query);
+
+            if (error) {
+                return next(error);
+            }
+
+            /* ------------------ Query ------------------ */
+            const query = `
+            SELECT
+                pc.*,
+
+                pfd.business_name,
+                pfd.pan_number,
+                pfd.address_line_1,
+                pfd.address_line_2,
+                pfd.city,
+                pfd.state,
+                pfd.country,
+                pfd.postcode,
+
+                pbi.bank_account_name,
+                pbi.bank_account_number,
+                pbi.account_type,
+                pbi.bank_name,
+                pbi.neft_code,
+                pbi.swift_code,
+                pbi.micr_code,
+                pbi.bank_branch_address
+
+            FROM partner_commission pc
+
+            LEFT JOIN partner_financial_details pfd
+                ON pfd.user_id = ${req.query.user_id}
+                AND pfd.is_deleted = 0
+
+            LEFT JOIN partner_bank_information pbi
+                ON pbi.user_id = ${req.query.user_id}
+
+            WHERE pc.order_id = ${req.query.order_id}
+            LIMIT 1
+        `;
+
+            const data = await getData(query, next);
+
+            if (!data.length) {
+                return res.json({
+                    success: false,
+                    message: "Commission not found",
+                    data: {}
+                });
+            }
+
+            const item = data[0];
+            const response = {
+                commission: {
+                    commission_id: item.commission_id || "",
+                    order_id: item.order_id || "",
+                    tds: item.tds || "",
+                    gst: item.gst || "",
+                    payment_id: item.payment_id || "",
+                    payment_doc: item.payment_doc || "",
+                    inv_number: item.inv_number || "",
+                    created_at: item.created_at || "",
+                    updated_at: item.updated_at || ""
+                },
+
+                bankinfo: {
+                    bank_account_name: item.bank_account_name || "",
+                    bank_account_number: item.bank_account_number || "",
+                    account_type: item.account_type || "",
+                    bank_name: item.bank_name || "",
+                    neft_code: item.neft_code || "",
+                    swift_code: item.swift_code || "",
+                    micr_code: item.micr_code || "",
+                    bank_branch_address: item.bank_branch_address || ""
+                },
+
+                addressinfo: {
+                    business_name: item.business_name || "",
+                    pan_number: item.pan_number || "",
+                    address_line_1: item.address_line_1 || "",
+                    address_line_2: item.address_line_2 || "",
+                    city: item.city || "",
+                    state: item.state || "",
+                    country: item.country || "",
+                    postcode: item.postcode || ""
+                }
+            };
+
+            return res.json({
+                success: true,
+                message: "Commission details fetched successfully",
+                data: response
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+
 }
 
 export default partnerController;

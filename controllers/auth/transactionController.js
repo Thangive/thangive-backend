@@ -602,6 +602,7 @@ const transactionController = {
                         partner_user.last_name
                     ) AS partner_name,
                     partner_user.phone_number AS partner_phone,
+                    partner_user.user_id AS partner_id,
                     ad.advisor_name,
                     bro.broker_name,
                     st.company_name,
@@ -660,7 +661,7 @@ const transactionController = {
                     .optional(),
 
                 employee_id: Joi.when('employee_type', {
-                    is: Joi.valid('RM', 'PARTNER'),
+                    is: Joi.string().valid('RM', 'PARTNER').required(),
                     then: Joi.number().integer().required(),
                     otherwise: Joi.number().integer().optional()
                 }),
