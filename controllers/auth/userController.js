@@ -705,6 +705,7 @@ const userController = {
             const userSchema = Joi.object({
                 user_id: Joi.number().integer(),
                 assign_to: Joi.number().integer(),
+                assign_partner:Joi.number().integer(),
                 username: Joi.string(),
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
@@ -736,6 +737,10 @@ const userController = {
 
             if (req.query.assign_to) {
                 cond += ` AND assign_to LIKE '%${req.query.assign_to}%'`;
+            }
+
+            if (req.query.assign_partner) {
+                cond += ` AND assign_partner LIKE '%${req.query.assign_partner}%'`;
             }
 
             if (req.query.search) {

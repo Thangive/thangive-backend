@@ -275,7 +275,6 @@ const transactionController = {
                         )
                     );
                 }
-
             }
 
             /* ------------------ UPDATE ORDER ------------------ */
@@ -333,6 +332,25 @@ const transactionController = {
             `;
 
             await insertData(query, updatedObject, next);
+
+            // Get latest order status
+            const order = await getData(
+                `SELECT rm_status, am_status, st_status, addedPartnerID, user_id
+                    FROM order_transactions
+                    WHERE order_id = ${dataObj.order_id}
+                    LIMIT 1`,
+                    next
+                );
+
+            if (
+                order.length &&
+                order[0].rm_status === "COMPLETED" &&
+                order[0].am_status === "COMPLETED" &&
+                order[0].st_status === "COMPLETED" &&
+                order[0].addedPartnerID != null
+            ) {
+                await insertData(`UPDATE users SET assign_partner = ? WHERE user_id = ?`,[order[0].addedPartnerID, order[0].user_id],next);
+            }
 
             return res.json({
                 success: true,
@@ -1838,7 +1856,10 @@ const transactionController = {
                     ot.st_datetime,
                     ot.price_per_share AS share_price,
                     (ot.price_per_share * ot.quantity) AS total,
-                    DATE_FORMAT(ot.created_at, '%d %b %Y, %H:%i') AS date
+                    DATE_FORMAT(
+                        CONVERT_TZ(ot.created_at, '+00:00', '+05:30'),
+                        '%d-%m-%Y %h:%i %p'
+                    ) AS date
                 FROM order_transactions ot
                 JOIN stock_details st 
                     ON ot.stock_details_id = st.stock_details_id

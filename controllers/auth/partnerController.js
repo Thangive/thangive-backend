@@ -660,7 +660,7 @@ const partnerController = {
                 user_id: Joi.number().integer().required(),
                 client_type: Joi.string()
                     .valid('individual', 'firm')
-                    .required(),
+                    .optional(),
                 client_firm_name: Joi.string().allow('').optional(),
                 gst_number: Joi.string().allow('').optional(),
                 email: Joi.string().allow('').optional(),
@@ -678,7 +678,11 @@ const partnerController = {
                 scanned_aadharcard_copy: Joi.string().allow('').optional(),
                 cancel_cheque_copy: Joi.string().allow('').optional(),
                 fund_transfer_document: Joi.string().allow('').optional(),
-                stocks: Joi.any().optional()
+                stocks: Joi.any().optional(),
+                lead_status: Joi.string()
+                    .valid('Prospects', 'Deal Closed','Not Interested','In discussion')
+                    .allow('')
+                    .optional(),
             });
             /* ------------------ PREPARE DATA ------------------ */
             let dataObj = { ...req.body };
@@ -825,6 +829,7 @@ const partnerController = {
                 pagination: Joi.boolean().optional(),
                 current_page: Joi.number().integer().optional(),
                 per_page_records: Joi.number().integer().optional(),
+                lead_status: Joi.string().optional(),
             });
             const { error } = prospectSchema.validate(req.query);
             if (error) {
@@ -885,10 +890,11 @@ const partnerController = {
             `;
             }
             if (req.query.lead_type) {
-                cond += `
-                AND lead_type =
-                '${req.query.lead_type}'
-            `;
+                cond += `AND lead_type ='${req.query.lead_type}'`;
+            }
+            if (req.query.lead_status) 
+            {
+                cond += `AND lead_status ='${req.query.lead_status}'`;
             }
             /* ---------------- PAGINATION ---------------- */
             if (req.query.pagination) {
