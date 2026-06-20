@@ -670,7 +670,7 @@ const partnerController = {
                 lead_creation_date: Joi.string().allow('').optional(),
                 followup_date: Joi.string().allow('').optional(),
                 lead_type: Joi.string()
-                    .valid('Prospects', 'Converted')
+                    .valid('Prospects', 'Converted','New Lead')
                     .allow('')
                     .optional(),
                 scanned_cmr_copy: Joi.string().allow('').optional(),
@@ -801,7 +801,7 @@ const partnerController = {
             return res.json({
 
                 success: true,
-
+                partner_prospect_id: dataObj.partner_prospect_id,
                 message: exists.length > 0
                     ? 'Prospect updated successfully'
                     : 'Prospect added successfully',
