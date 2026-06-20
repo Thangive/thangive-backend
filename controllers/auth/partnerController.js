@@ -1427,28 +1427,29 @@ const partnerController = {
                 pbi.micr_code,
                 pbi.bank_branch_address
 
-            FROM partner_commission pc
-
-            LEFT JOIN partner_financial_details pfd
-                ON pfd.user_id = ${req.query.user_id}
-                AND pfd.is_deleted = 0
+            FROM partner_financial_details pfd
 
             LEFT JOIN partner_bank_information pbi
-                ON pbi.user_id = ${req.query.user_id}
+                ON pbi.user_id = pfd.user_id
 
-            WHERE pc.order_id = ${req.query.order_id}
-            LIMIT 1
+            LEFT JOIN partner_commission pc
+                ON pc.order_id = ${req.query.order_id}
+
+            WHERE pfd.user_id = ${req.query.user_id}
+            AND pfd.is_deleted = 0
+
+            LIMIT 1;
         `;
 
             const data = await getData(query, next);
 
-            if (!data.length) {
-                return res.json({
-                    success: false,
-                    message: "Commission not found",
-                    data: {}
-                });
-            }
+            // if (!data.length) {
+            //     return res.json({
+            //         success: false,
+            //         message: "Commission not found",
+            //         data: {}
+            //     });
+            // }
 
             const item = data[0];
             const response = {
