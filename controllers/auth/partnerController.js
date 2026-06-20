@@ -812,7 +812,6 @@ const partnerController = {
             next(error);
         }
     },
-
     async getPartnerProspects(req, res, next) {
         try {
             /* ---------------- VALIDATION ---------------- */
@@ -937,7 +936,6 @@ const partnerController = {
             next(error);
         }
     },
-
     async getPartnerProspectsIndividual(req, res, next) {
         try {
             /* ------------------ Validation ------------------ */
@@ -1049,7 +1047,6 @@ const partnerController = {
             next(err);
         }
     },
-
     async createPartnerOrder(req, res, next) {
         try {
 
@@ -1140,7 +1137,6 @@ const partnerController = {
             next(error);
         }
     },
-
     async getPartnerOrders(req, res, next) {
         try {
             /* ------------------ Validation ------------------ */
