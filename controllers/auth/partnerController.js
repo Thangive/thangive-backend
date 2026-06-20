@@ -820,6 +820,7 @@ const partnerController = {
                 partner_prospect_id: Joi.number().integer().optional(),
                 user_id: Joi.number().integer().optional(),
                 client_type: Joi.string().optional(),
+                search:Joi.string().optional(),
                 client_firm_name: Joi.string().optional(),
                 gst_number: Joi.string().optional(),
                 email: Joi.string().optional(),
@@ -865,6 +866,12 @@ const partnerController = {
                 '%${req.query.client_firm_name}%'
             `;
             }
+             if (req.query.search) {
+                cond += `
+                AND client_firm_name LIKE
+                '%${req.query.search}%'
+            `;
+            }
             if (req.query.gst_number) {
                 cond += `
                 AND gst_number LIKE
@@ -896,6 +903,8 @@ const partnerController = {
             {
                 cond += `AND lead_status ='${req.query.lead_status}'`;
             }
+
+            cond += `ORDER BY created_at DESC`;
             /* ---------------- PAGINATION ---------------- */
             if (req.query.pagination) {
                 page = await paginationQuery(
