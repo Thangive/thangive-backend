@@ -670,7 +670,7 @@ const partnerController = {
                 lead_creation_date: Joi.string().allow('').optional(),
                 followup_date: Joi.string().allow('').optional(),
                 lead_type: Joi.string()
-                    .valid('Prospects', 'Converted','New Lead')
+                    .valid('Prospects', 'Converted', 'New Lead')
                     .allow('')
                     .optional(),
                 scanned_cmr_copy: Joi.string().allow('').optional(),
@@ -680,7 +680,7 @@ const partnerController = {
                 fund_transfer_document: Joi.string().allow('').optional(),
                 stocks: Joi.any().optional(),
                 lead_status: Joi.string()
-                    .valid('Prospects', 'Deal Closed','Not Interested','In discussion')
+                    .valid('Prospects', 'Deal Closed', 'Not Interested', 'In discussion')
                     .allow('')
                     .optional(),
             });
@@ -819,7 +819,7 @@ const partnerController = {
                 partner_prospect_id: Joi.number().integer().optional(),
                 user_id: Joi.number().integer().optional(),
                 client_type: Joi.string().optional(),
-                search:Joi.string().optional(),
+                search: Joi.string().optional(),
                 client_firm_name: Joi.string().optional(),
                 gst_number: Joi.string().optional(),
                 email: Joi.string().optional(),
@@ -865,7 +865,7 @@ const partnerController = {
                 '%${req.query.client_firm_name}%'
             `;
             }
-             if (req.query.search) {
+            if (req.query.search) {
                 cond += `
                 AND client_firm_name LIKE
                 '%${req.query.search}%'
@@ -898,8 +898,7 @@ const partnerController = {
             if (req.query.lead_type) {
                 cond += `AND lead_type ='${req.query.lead_type}'`;
             }
-            if (req.query.lead_status) 
-            {
+            if (req.query.lead_status) {
                 cond += `AND lead_status ='${req.query.lead_status}'`;
             }
 
@@ -1124,7 +1123,7 @@ const partnerController = {
             if (result.insertId) {
                 dataObj.partener_order_id = result.insertId;
             }
-            
+
             return res.json({
                 success: true,
                 message: dataObj.partener_order_id
@@ -1168,7 +1167,10 @@ const partnerController = {
             let query = `
             SELECT
                 pso.*,
-
+                DATE_FORMAT(
+                        CONVERT_TZ(pso.created_at, '+00:00', '+05:30'),
+                        '%d-%m-%Y %h:%i %p'
+                    ) AS date,
                 pp.client_firm_name,
                 pp.phone,
                 pp.email,
