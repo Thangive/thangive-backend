@@ -168,6 +168,7 @@ router.post('/createPartnerOrder', auth, forms, partnerController.createPartnerO
 router.get('/getPartnerOrders', auth, partnerController.getPartnerOrders);
 router.post('/OrderCommissionAdd', auth, imageUpload, partnerController.addPartnerCommission);
 router.get('/getOrderCommissionPartner', auth, partnerController.getOrderCommissionPartner);
+router.get('/CountPartnerLeadAndProspects', auth, partnerController.CountPartnerLeadAndProspects);
 
 export default router;
 

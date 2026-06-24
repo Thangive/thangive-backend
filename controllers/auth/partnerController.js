@@ -1505,7 +1505,59 @@ const partnerController = {
             next(error);
         }
     },
+    async CountPartnerLeadAndProspects(req, res, next) {
+        console.log(req.query)
+        try {
 
+            const schema = Joi.object({
+                user_id: Joi.number().required()
+            });
+
+            const { error } = schema.validate(req.query);
+
+            if (error) {
+                return next(error);
+            }
+
+            const { user_id } = req.query;
+
+            // Total Prospects
+            const prospectsQuery = `
+            SELECT COUNT(*) AS totalProspects
+            FROM partner_prospects
+            WHERE user_id = ${user_id}
+            AND lead_type = 'Prospects'
+            AND is_deleted = 0
+        `;
+
+            // Converted Leads
+            const convertedLeadsQuery = `
+            SELECT COUNT(*) AS convertedLeads
+            FROM order_transactions
+            WHERE addedPartnerID = ${user_id}
+            AND rm_status = 'COMPLETED'
+            AND am_status = 'COMPLETED'
+            AND st_status = 'COMPLETED'
+        `;
+
+            const prospectsResult = await getData(prospectsQuery, next);
+            const convertedResult = await getData(convertedLeadsQuery, next);
+
+            return res.json({
+                message: "success",
+                data: {
+                    totalProspects:
+                        Number(prospectsResult?.[0]?.totalProspects || 0),
+
+                    convertedLeads:
+                        Number(convertedResult?.[0]?.convertedLeads || 0)
+                }
+            });
+
+        } catch (err) {
+            next(err);
+        }
+    }
 }
 
 export default partnerController;
