@@ -159,8 +159,10 @@ const userController = {
             }
             // ------------------ Insert / Update ------------------
             let query = "";
-            if (dataObj.user_id || (exists[0]?.user_id && exists[0]?.is_deleted != '0')) {
+            if (dataObj.user_id) {
                 query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
+            } else if (exists[0]?.user_id && exists[0]?.is_deleted != '0') {
+                query = `UPDATE users SET ? WHERE user_id='${exists[0].user_id}'`;
             } else {
                 query = `INSERT INTO users SET ?`;
             }
