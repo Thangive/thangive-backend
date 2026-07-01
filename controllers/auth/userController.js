@@ -119,7 +119,9 @@ const userController = {
                 // const phone = String(dataObj?.phone_number || "").trim();
                 // dataObj.password = md5(phone);
                 dataObj.password = md5(dataObj.password);
-                const checkQuery = `
+            }
+
+            const checkQuery = `
                 SELECT user_id, is_deleted
                 FROM users 
                 WHERE (email='${dataObj.email}' 
@@ -127,14 +129,13 @@ const userController = {
                 ${condition}
             `;
 
-                const exists = await getData(checkQuery, next);
-                if ((exists.length > 0) && exists[0].is_deleted == '0') {
-                    return next(
-                        CustomErrorHandler.alreadyExist(
-                            "Email or phone number already exists"
-                        )
-                    );
-                }
+            const existsDuplicate = await getData(checkQuery, next);
+            if ((existsDuplicate.length > 0) && existsDuplicate[0].is_deleted == '0') {
+                return next(
+                    CustomErrorHandler.alreadyExist(
+                        "Email or phone number already exists"
+                    )
+                );
             }
 
             const exists = await getData(`SELECT user_id, is_deleted
@@ -158,6 +159,12 @@ const userController = {
                 dataObj["is_deleted"] = 0;
             }
             // ------------------ Insert / Update ------------------
+            // let query = "";
+            // if (dataObj.user_id || (exists[0]?.user_id && exists[0]?.is_deleted != '0')) {
+            //     query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
+            // } else {
+            //     query = `INSERT INTO users SET ?`;
+            // }
             let query = "";
             if (dataObj.user_id) {
                 query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
