@@ -171,4 +171,3 @@ router.get('/getOrderCommissionPartner', auth, partnerController.getOrderCommiss
 router.get('/CountPartnerLeadAndProspects', auth, partnerController.CountPartnerLeadAndProspects);
 
 export default router;
-

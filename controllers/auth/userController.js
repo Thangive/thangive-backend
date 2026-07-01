@@ -44,6 +44,7 @@ const userController = {
                                 username: Joi.string().required(),
                                 email: Joi.string().email().required(),
                                 phone_number: Joi.string().required(),
+                                password: Joi.string().required(),
                                 user_type: Joi.string().required(),
                                 residency_status: Joi.string().required(),
                             }),
@@ -66,6 +67,7 @@ const userController = {
                                 username: Joi.string().required(),
                                 email: Joi.string().email().required(),
                                 phone_number: Joi.string().required(),
+                                password: Joi.string().required(),
                                 user_type: Joi.string().required(),
                             }),
                         }),
@@ -114,8 +116,9 @@ const userController = {
                 }
                 condition = ` AND user_id != '${dataObj.user_id}'`;
             } else {
-                const phone = String(dataObj?.phone_number || "").trim();
-                dataObj.password = md5(phone);
+                // const phone = String(dataObj?.phone_number || "").trim();
+                // dataObj.password = md5(phone);
+                dataObj.password = md5(dataObj.password);
                 const checkQuery = `
                 SELECT user_id, is_deleted
                 FROM users 
@@ -705,11 +708,12 @@ const userController = {
             const userSchema = Joi.object({
                 user_id: Joi.number().integer(),
                 assign_to: Joi.number().integer(),
-                assign_partner:Joi.number().integer(),
+                assign_partner: Joi.number().integer(),
                 username: Joi.string(),
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
                 search: Joi.string(),
+                searchUsernamePhone_numberEmail: Joi.string(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),
@@ -756,6 +760,17 @@ const userController = {
                     ) LIKE '%${search}%'
                 )`;
             }
+
+            if (req.query.searchUsernamePhone_numberEmail) {
+                const search = req.query.searchUsernamePhone_numberEmail;
+
+                cond += ` AND (
+                    username LIKE '%${search}%'
+                    OR phone_number LIKE '%${search}%'
+                    OR email LIKE '%${search}%'
+                )`;
+            }
+
             cond += `ORDER BY user_id DESC`;
             /* ------------------ Pagination ------------------ */
             if (req.query.pagination) {
@@ -1021,7 +1036,6 @@ const userController = {
             return next(err);
         }
     },
-
     async addContact(req, res, next) {
         try {
             const contactSchema = Joi.object({
@@ -1030,33 +1044,15 @@ const userController = {
                 email: Joi.string().email().required(),
                 phone: Joi.string().pattern(/^[0-9]{10}$/).required(),
                 message: Joi.string().required(),
-                // is_deleted: Joi.number().integer().optional(),
             });
+
             let dataObj = { ...req.body };
+
             const { error } = contactSchema.validate(dataObj);
             if (error) return next(error);
-            let condition = "";
-            if (dataObj.contact_id) {
-                condition = `AND contact_id != ${dataObj.contact_id}`;
-            }
-            const checkQuery = `
-                SELECT contact_id 
-                FROM contact
-                WHERE (
-                    email = '${dataObj.email}'
-                    OR phone = '${dataObj.phone}'
-                )
-                ${condition}
-            `;
-            const exists = await getData(checkQuery, next);
-            if (exists.length > 0) {
-                return next(
-                    CustomErrorHandler.alreadyExist(
-                        "Same contact already exists"
-                    )
-                );
-            }
+
             let query = "";
+
             if (dataObj.contact_id) {
                 query = `UPDATE contact SET ? WHERE contact_id = ${dataObj.contact_id}`;
                 dataObj.updated_at = new Date();
@@ -1064,21 +1060,83 @@ const userController = {
                 query = `INSERT INTO contact SET ?`;
                 dataObj.created_at = new Date();
             }
+
             const result = await insertData(query, dataObj, next);
+
             if (result.insertId) {
                 dataObj.contact_id = result.insertId;
             }
+
             return res.json({
                 success: true,
                 message: dataObj.contact_id
-                    ? "Contact updated successfully"
-                    : "Contact saved successfully",
-                data: dataObj
+                    ? "Contact Query saved successfully"
+                    : "Contact Query saved successfully",
+                data: dataObj,
             });
         } catch (error) {
             next(error);
         }
     }
+
+    // async addContact(req, res, next) 
+    // {
+    //     try {
+    //         const contactSchema = Joi.object({
+    //             contact_id: Joi.number().integer().optional(),
+    //             name: Joi.string().required(),
+    //             email: Joi.string().email().required(),
+    //             phone: Joi.string().pattern(/^[0-9]{10}$/).required(),
+    //             message: Joi.string().required(),
+    //             // is_deleted: Joi.number().integer().optional(),
+    //         });
+    //         let dataObj = { ...req.body };
+    //         const { error } = contactSchema.validate(dataObj);
+    //         if (error) return next(error);
+    //         let condition = "";
+    //         if (dataObj.contact_id) {
+    //             condition = `AND contact_id != ${dataObj.contact_id}`;
+    //         }
+    //         const checkQuery = `
+    //             SELECT contact_id 
+    //             FROM contact
+    //             WHERE (
+    //                 email = '${dataObj.email}'
+    //                 OR phone = '${dataObj.phone}'
+    //             )
+    //             ${condition}
+    //         `;
+    //         const exists = await getData(checkQuery, next);
+    //         if (exists.length > 0) {
+    //             return next(
+    //                 CustomErrorHandler.alreadyExist(
+    //                     "Same contact already exists"
+    //                 )
+    //             );
+    //         }
+    //         let query = "";
+    //         if (dataObj.contact_id) {
+    //             query = `UPDATE contact SET ? WHERE contact_id = ${dataObj.contact_id}`;
+    //             dataObj.updated_at = new Date();
+    //         } else {
+    //             query = `INSERT INTO contact SET ?`;
+    //             dataObj.created_at = new Date();
+    //         }
+    //         const result = await insertData(query, dataObj, next);
+    //         if (result.insertId) {
+    //             dataObj.contact_id = result.insertId;
+    //         }
+    //         return res.json({
+    //             success: true,
+    //             message: dataObj.contact_id
+    //                 ? "Contact updated successfully"
+    //                 : "Contact saved successfully",
+    //             data: dataObj
+    //         });
+    //     } catch (error) {
+    //         next(error);
+    //     }
+    // }
 }
 export default userController;
 
