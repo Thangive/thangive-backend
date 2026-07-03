@@ -22,7 +22,7 @@ const serviceController = {
 
             const isOtpLogin = !!value.phone_number && !!value.otp;
             if (isOtpLogin) {
-                const userQuery = `SELECT user_id, username, email, phone_number, user_type as Role,password FROM users WHERE is_deleted = 0 AND phone_number = '${value.phone_number}'`;
+                const userQuery = `SELECT user_id, username, email, phone_number, user_type as Role,password,CONCAT_WS(' ', first_name, middle_name, last_name) AS full_name FROM users WHERE is_deleted = 0 AND phone_number = '${value.phone_number}'`;
                 const users = await getData(userQuery, next);
                 if (!users || users.length === 0) {
                     return next(CustomErrorHandler.doesNotExist("Mobile number not registered"));
@@ -63,18 +63,31 @@ const serviceController = {
             }
 
             // ---------- Get user ----------
-            const query = `SELECT user_id,username,email,phone_number,user_type as Role,password FROM users WHERE is_deleted=0 AND username='${value.username}'`;
+            // const query = `SELECT user_id,username,email,phone_number,user_type as Role,password,first_name,middle_name,last_name as a full_name FROM users WHERE is_deleted=0 AND username='${value.username}'`;
+            const query = `
+                SELECT
+                    user_id,
+                    username,
+                    email,
+                    phone_number,
+                    user_type AS Role,
+                    password,
+                    CONCAT_WS(' ', first_name, middle_name, last_name) AS full_name
+                FROM users
+                WHERE is_deleted = 0
+                AND username = '${value.username}'
+            `;
             const users = await getData(query, next);
 
             if (!users || users.length === 0) {
-                return next(CustomErrorHandler.wrongCredentials());
+                return next(CustomErrorHandler.wrongCredentials("User Does Not Exists"));
             }
 
             const user = users[0];
 
             // ---------- Verify password ----------
             const match = md5(req.body.password) === user.password ? true : false;
-            if (!match) return next(CustomErrorHandler.wrongCredentials());
+            if (!match) return next(CustomErrorHandler.wrongCredentials("User Does Not Exists"));
 
             delete user.password; // remove password from response
 
@@ -124,7 +137,7 @@ const serviceController = {
                 cond = (value.user_type == 'user') ? `AND user_type = 'user'` : `AND user_type != 'user'`;
             }
             else {
-               cond = (value.user_type == 'PARTNER') ? `AND user_type = 'PARTNER'` : `AND user_type != 'PARTNER'`;
+                cond = (value.user_type == 'PARTNER') ? `AND user_type = 'PARTNER'` : `AND user_type != 'PARTNER'`;
             }
             const userQuery = `SELECT user_id, phone_number FROM users WHERE  is_deleted = 0 ${cond} AND  username = '${value.username}' OR phone_number = '${value.phone_number}'`;
 

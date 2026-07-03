@@ -15,7 +15,11 @@ class CustomErrorHandler extends Error {
         return new CustomErrorHandler(400, message);
     }
 
-    static wrongCredentials(message = "Wrong Credential") {
+    // static wrongCredentials(message = "Wrong Credential") {
+    //     return new CustomErrorHandler(401, message);
+    // }
+
+    static wrongCredentials(message = "User Does Not Exists") {
         return new CustomErrorHandler(401, message);
     }
 

@@ -121,22 +121,62 @@ const userController = {
                 dataObj.password = md5(dataObj.password);
             }
 
-            const checkQuery = `
-                SELECT user_id, is_deleted
-                FROM users 
-                WHERE (email='${dataObj.email}' 
-                    OR phone_number='${dataObj.phone_number}') AND user_type = '${dataObj.user_type}'
+            const duplicateQuery = `
+                SELECT email, phone_number, is_deleted
+                FROM users
+                WHERE user_type='${dataObj.user_type}'
                 ${condition}
+                AND (
+                    email='${dataObj.email}'
+                    OR phone_number='${dataObj.phone_number}'
+                )
             `;
 
-            const existsDuplicate = await getData(checkQuery, next);
-            if ((existsDuplicate.length > 0) && existsDuplicate[0].is_deleted == '0') {
-                return next(
-                    CustomErrorHandler.alreadyExist(
-                        "Email or phone number already exists"
-                    )
-                );
+            const duplicateData = await getData(duplicateQuery, next);
+            if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') {
+                const emailExists = duplicateData[0].email == dataObj.email;
+                const phoneExists = duplicateData[0].phone_number == dataObj.phone_number;
+                if (emailExists && phoneExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Email and phone number already exist"
+                        )
+                    );
+                }
+
+                if (emailExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Email already exists"
+                        )
+                    );
+                }
+
+                if (phoneExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Phone number already exists"
+                        )
+                    );
+                }
             }
+
+            // const checkQuery = `
+            //     SELECT user_id, is_deleted
+            //     FROM users 
+            //     WHERE (email='${dataObj.email}' 
+            //         OR phone_number='${dataObj.phone_number}') AND user_type = '${dataObj.user_type}'
+            //     ${condition}
+            // `;
+
+            // const existsDuplicate = await getData(checkQuery, next);
+            // if ((existsDuplicate.length > 0) && existsDuplicate[0].is_deleted == '0') {
+            //     return next(
+            //         CustomErrorHandler.alreadyExist(
+            //             "Email or phone number already exists"
+            //         )
+            //     );
+            // }
 
             const exists = await getData(`SELECT user_id, is_deleted
                 FROM users 
@@ -174,6 +214,7 @@ const userController = {
                 query = `INSERT INTO users SET ?`;
             }
 
+            const isUpdate = !!dataObj.user_id;
             const result = await insertData(query, dataObj, next);
 
             if (result.insertId) {
@@ -182,9 +223,9 @@ const userController = {
             delete dataObj.password;
             return res.json({
                 success: true,
-                message: dataObj.user_id
-                    ? `${dataObj.user_type} registered successfully`
-                    : `${dataObj.user_type} updated successfully`,
+                message: isUpdate
+                    ? `${dataObj.user_type} Information updated successfully`
+                    : `${dataObj.user_type} registered successfully`,
                 data: dataObj
             });
 
@@ -1049,6 +1090,7 @@ const userController = {
         try {
             const contactSchema = Joi.object({
                 contact_id: Joi.number().integer().optional(),
+                user_id: Joi.number().integer().optional(),
                 name: Joi.string().required(),
                 email: Joi.string().email().required(),
                 phone: Joi.string().pattern(/^[0-9]{10}$/).required(),
@@ -1079,12 +1121,107 @@ const userController = {
             return res.json({
                 success: true,
                 message: dataObj.contact_id
-                    ? "Contact Query saved successfully"
-                    : "Contact Query saved successfully",
+                    ? "Query submitted successfully"
+                    : "Query submitted successfully",
                 data: dataObj,
             });
         } catch (error) {
             next(error);
+        }
+    },
+    async fetchContactedQuery(req, res, next) {
+        try {
+            /* ------------------ Base Query ------------------ */
+            let query = `SELECT * FROM contact WHERE 1 = 1`;
+            let cond = "";
+            let page = { pageQuery: "" };
+
+            /* ------------------ Validation ------------------ */
+            const contactSchema = Joi.object({
+                contact_id: Joi.number().integer(),
+                user_id: Joi.number().integer(),
+                name: Joi.string(),
+                email: Joi.string().email(),
+                phone: Joi.string(),
+                search: Joi.string(),
+                Exists: Joi.string().valid("existing", "new").optional(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer(),
+            });
+
+            const { error } = contactSchema.validate(req.query);
+            if (error) return next(error);
+
+            /* ------------------ Filters ------------------ */
+            if (req.query.contact_id) {
+                cond += ` AND contact_id = ${req.query.contact_id}`;
+            }
+
+            if (req.query.user_id) {
+                cond += ` AND user_id = ${req.query.user_id}`;
+            }
+
+            if (req.query.name) {
+                cond += ` AND name LIKE '%${req.query.name}%'`;
+            }
+
+            if (req.query.email) {
+                cond += ` AND email LIKE '%${req.query.email}%'`;
+            }
+
+            if (req.query.phone) {
+                cond += ` AND phone LIKE '%${req.query.phone}%'`;
+            }
+
+            if (req.query.search) {
+                cond += `
+                    AND (
+                        name LIKE '%${req.query.search}%'
+                        OR email LIKE '%${req.query.search}%'
+                        OR phone LIKE '%${req.query.search}%'
+                    )
+                `;
+            }
+
+            if (req.query.Exists === "existing") {
+                cond += `
+                    AND user_id IS NOT NULL
+                `;
+            }
+
+            if (req.query.Exists === "new") {
+                cond += `
+                    AND (user_id IS NULL OR user_id = '')
+                `;
+            }
+
+            /* ------------------ Pagination ------------------ */
+            if (req.query.pagination) {
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+            }
+
+            query += cond + ` ORDER BY contact_id DESC ` + page.pageQuery;
+
+            const data = await getData(query, next);
+
+            return res.json({
+                success: true,
+                message: "success",
+                total_records: page.total_rec ?? data.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: data.length,
+                data,
+            });
+
+        } catch (err) {
+            next(err);
         }
     }
 

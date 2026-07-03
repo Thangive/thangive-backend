@@ -24,6 +24,7 @@ router.post('/userCMRDetails', auth, imageUpload, userController.addUpdateUserCM
 router.get('/RMList', auth, userController.getRMList);
 router.post('/assignToRM', auth, forms, userController.assignToRM);
 router.post('/contact',forms, userController.addContact);
+router.get('/fetchContactedQuery',auth, userController.fetchContactedQuery);
 
 
 router.post('/login', forms, serviceController.login);

@@ -344,7 +344,8 @@ const BlogController = {
                 AND LOWER(b.keyword) LIKE '%"${keyword}"%'
             `;
             }
-
+            cond=` ORDER BY b.created_at DESC`;
+            
             /* ------------------ Pagination ------------------ */
             if (req.query.pagination) {
                 page = await paginationQuery(
