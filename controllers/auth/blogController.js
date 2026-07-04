@@ -284,6 +284,7 @@ const BlogController = {
         `;
 
             let cond = '';
+            let orderBy = ` ORDER BY b.created_at DESC`;
             let page = { pageQuery: '' };
 
             /* ------------------ Validation ------------------ */
@@ -344,7 +345,7 @@ const BlogController = {
                 AND LOWER(b.keyword) LIKE '%"${keyword}"%'
             `;
             }
-            cond=` ORDER BY b.created_at DESC`;
+            // cond=` ORDER BY b.created_at DESC`;
             
             /* ------------------ Pagination ------------------ */
             if (req.query.pagination) {
@@ -356,7 +357,8 @@ const BlogController = {
                 );
             }
 
-            query += cond + page.pageQuery;
+            // query += cond + page.pageQuery;
+            query += cond + orderBy + page.pageQuery;
 
             const data = await getData(query, next);
 
