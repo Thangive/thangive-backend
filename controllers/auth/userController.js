@@ -122,20 +122,44 @@ const userController = {
             }
 
             const duplicateQuery = `
-                SELECT email, phone_number, is_deleted
+                SELECT email, phone_number, whatsapp_number, is_deleted
                 FROM users
                 WHERE user_type='${dataObj.user_type}'
                 ${condition}
                 AND (
                     email='${dataObj.email}'
                     OR phone_number='${dataObj.phone_number}'
+                    OR whatsapp_number='${dataObj.phone_number}'
+                    ${dataObj.whatsapp_number?.trim()
+                    ? `
+                                OR phone_number='${dataObj.whatsapp_number}'
+                                OR whatsapp_number='${dataObj.whatsapp_number}'
+                            `
+                    : ""
+                }
                 )
             `;
 
             const duplicateData = await getData(duplicateQuery, next);
             if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') {
                 const emailExists = duplicateData[0].email == dataObj.email;
-                const phoneExists = duplicateData[0].phone_number == dataObj.phone_number;
+                const phoneExists =
+                    duplicateData[0].phone_number == dataObj.phone_number ||
+                    duplicateData[0].whatsapp_number == dataObj.phone_number;
+
+                const whatsappExists = dataObj.whatsapp_number?.trim()
+                    ? (
+                        duplicateData[0].phone_number == dataObj.whatsapp_number ||
+                        duplicateData[0].whatsapp_number == dataObj.whatsapp_number
+                    )
+                    : false;
+                if (emailExists && phoneExists && whatsappExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Email, phone number and WhatsApp number already exist"
+                        )
+                    );
+                }
                 if (emailExists && phoneExists) {
                     return next(
                         CustomErrorHandler.alreadyExist(
@@ -143,7 +167,20 @@ const userController = {
                         )
                     );
                 }
-
+                if (emailExists && whatsappExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Email and WhatsApp number already exist"
+                        )
+                    );
+                }
+                if (phoneExists && whatsappExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Phone number and WhatsApp number already exist"
+                        )
+                    );
+                }
                 if (emailExists) {
                     return next(
                         CustomErrorHandler.alreadyExist(
@@ -151,7 +188,6 @@ const userController = {
                         )
                     );
                 }
-
                 if (phoneExists) {
                     return next(
                         CustomErrorHandler.alreadyExist(
@@ -159,6 +195,14 @@ const userController = {
                         )
                     );
                 }
+                if (whatsappExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "WhatsApp number already exists"
+                        )
+                    );
+                }
+
             }
 
             // const checkQuery = `
@@ -224,8 +268,8 @@ const userController = {
             return res.json({
                 success: true,
                 message: isUpdate
-                    ? `${dataObj.user_type} Information updated successfully`
-                    : `${dataObj.user_type} registered successfully`,
+                    ? `${dataObj.user_type === "user" ? "User" : dataObj.user_type} Information updated successfully`
+                    : `${dataObj.user_type === "user" ? "User" : dataObj.user_type} registered successfully`,
                 data: dataObj
             });
 
@@ -536,6 +580,7 @@ const userController = {
                 broker_id: Joi.string().required(),
                 client_id: Joi.string().required(),
                 broker_custom_id: Joi.string().required(),
+                crm_status: Joi.string().valid("Active", "Inactive").required(),
                 cmr_document: Joi.string()
                     .allow('')
                     .optional()
@@ -617,12 +662,12 @@ const userController = {
             `;
 
             const latestData = await getData(getQuery, next);
-
+            const isUpdate = !!req.body.cmr_id;
             return res.json({
                 success: true,
-                message: dataObj.cmr_id
-                    ? 'User CMR details saved successfully'
-                    : 'User CMR details updated successfully',
+                message: isUpdate
+                    ? "User CMR details updated successfully"
+                    : "User CMR details added successfully",
                 data: latestData[0],
             });
 
