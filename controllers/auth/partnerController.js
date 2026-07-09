@@ -26,6 +26,7 @@ const partnerController = {
                 assign_to: Joi.number().integer(),
                 username: Joi.string(),
                 search: Joi.string(),
+                searchUsernamePhone_numberEmail: Joi.string(),
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
                 pagination: Joi.boolean(),
@@ -72,6 +73,16 @@ const partnerController = {
                         COALESCE(middle_name, ''), ' ',
                         COALESCE(last_name, '')
                     ) LIKE '%${search}%'
+                )`;
+            }
+
+            if (req.query.searchUsernamePhone_numberEmail) {
+                const search = req.query.searchUsernamePhone_numberEmail;
+
+                cond += ` AND (
+                    username LIKE '%${search}%'
+                    OR phone_number LIKE '%${search}%'
+                    OR email LIKE '%${search}%'
                 )`;
             }
 

@@ -393,13 +393,19 @@ const sectorController = {
             LEFT JOIN stock_description sd
                 ON sd.stock_details_id = s.stock_details_id
             LEFT JOIN stock_price sp
-                ON sp.stock_details_id = s.stock_details_id
-               AND sp.present_date = (
-                    SELECT MAX(p2.present_date)
-                    FROM stock_price p2
-                    WHERE p2.stock_details_id = s.stock_details_id
-                      AND p2.present_date <= CURDATE()
-               )
+                ON sp.stock_price_id = (
+                    SELECT p1.stock_price_id
+                    FROM stock_price p1
+                    WHERE p1.stock_details_id = s.stock_details_id
+                    AND p1.present_date = (
+                        SELECT MAX(p2.present_date)
+                        FROM stock_price p2
+                        WHERE p2.stock_details_id = s.stock_details_id
+                            AND p2.present_date <= CURDATE()
+                    )
+                    ORDER BY p1.time DESC
+                    LIMIT 1
+                )
             WHERE s.stock_details_id = ${id}
             LIMIT 1
         `;

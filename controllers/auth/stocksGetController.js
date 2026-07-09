@@ -172,17 +172,9 @@ const stocksGetController = {
 
             LEFT JOIN stock_price sp
                 ON sp.stock_price_id = (
-                    SELECT p1.stock_price_id
-                    FROM stock_price p1
-                    WHERE p1.stock_details_id = s.stock_details_id
-                    AND p1.present_date = (
-                        SELECT MAX(p2.present_date)
-                        FROM stock_price p2
-                        WHERE p2.stock_details_id = s.stock_details_id
-                            AND p2.present_date <= CURDATE()
-                    )
-                    ORDER BY p1.time DESC
-                    LIMIT 1
+                    SELECT MAX(sp2.stock_price_id)
+                    FROM stock_price sp2
+                    WHERE sp2.stock_details_id = s.stock_details_id
                 )
 
             WHERE s.stock_type != 'LISTED'
@@ -347,6 +339,15 @@ const stocksGetController = {
                 isin_no: Joi.string(),
                 search: Joi.string().allow(''),
                 stock_type: Joi.valid('UNLISTED', 'PRE IPO', 'DELISTED', 'ANGEL INVESTING', 'THANGIV'),
+                availability: Joi.string().valid(
+                    'AVAILABLE',
+                    'OUT OF STOCK',
+                    'NOT AVAILABLE',
+                    'ON DEMAND',
+                    'LIMITED',
+                    'COMING SOON',
+                    'SOLD OUT'
+                ).optional(),
                 // wishlist_id: Joi.string().optional(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
@@ -377,6 +378,9 @@ const stocksGetController = {
 
             if (req.query.stock_type)
                 cond += ` AND s.stock_type = '${req.query.stock_type}'`;
+
+            if (req.query.availability)
+                cond += ` AND sp.availability = '${req.query.availability}'`;
 
             if (req.query.search) {
                 cond += `
