@@ -64,9 +64,11 @@ const faqController = {
 
             return res.json({
                 success: true,
-                message: dataObj.faq_id
-                    ? 'FAQ updated successfully'
-                    : 'FAQ created successfully',
+                message: dataObj.is_deleted == 1
+                    ? 'FAQ deleted successfully'
+                    : dataObj.faq_id
+                        ? 'FAQ updated successfully'
+                        : 'FAQ created successfully',
                 data: dataObj
             });
 
