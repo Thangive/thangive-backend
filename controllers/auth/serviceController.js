@@ -22,7 +22,7 @@ const serviceController = {
 
             const isOtpLogin = !!value.phone_number && !!value.otp;
             if (isOtpLogin) {
-                const userQuery = `SELECT user_id,user_custum_id, username, email, phone_number, user_type as Role,password,CONCAT_WS(' ', first_name, middle_name, last_name) AS full_name FROM users WHERE is_deleted = 0 AND phone_number = '${value.phone_number}'`;
+                let userQuery = `SELECT user_id,user_custum_id, username, email, phone_number, user_type as Role,password,CONCAT_WS(' ', first_name, middle_name, last_name) AS full_name FROM users WHERE is_deleted = 0 AND phone_number = '${value.phone_number}'`;
                 if (value.user_type) {
                     userQuery += ` AND user_type = '${value.user_type}'`;
                 }
