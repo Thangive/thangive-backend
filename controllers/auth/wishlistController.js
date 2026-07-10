@@ -166,11 +166,16 @@ const wishlistController = {
 
             /* ------------------ Check Exists ------------------ */
             const checkQuery = `
-            SELECT wishlist_stock_id
-            FROM wishlist_stock
-            WHERE user_id = ${dataObj.user_id}
-            AND stock_details_id = ${dataObj.stock_details_id}
-        `;
+                SELECT 
+                    ws.wishlist_stock_id,
+                    ws.wishlist_id,
+                    w.wishlist_name
+                FROM wishlist_stock ws
+                LEFT JOIN wishlist w
+                    ON ws.wishlist_id = w.wishlist_id
+                WHERE ws.user_id = ${dataObj.user_id}
+                AND ws.stock_details_id = ${dataObj.stock_details_id}
+            `;
 
             const exists = await getData(checkQuery, next);
 
@@ -193,7 +198,7 @@ const wishlistController = {
 
             return res.json({
                 success: true,
-                message: 'Stock removed from wishlist successfully',
+                message: `Stock removed from wishlist ${exists[0].wishlist_name}`,
                 data: dataObj
             });
 
