@@ -9,7 +9,7 @@ const faqController = {
             /* ------------------ Validation Schema ------------------ */
             const faqSchema = Joi.object({
                 faq_id: Joi.number().integer().optional(),
-                quation: Joi.string().required(),
+                quation: Joi.string().required().label("Question"),
                 description: Joi.string().optional(),
                 url: Joi.string()
                     .uri({ scheme: ['http', 'https'] })
@@ -35,7 +35,7 @@ const faqController = {
                 SELECT faq_id
                 FROM faq
                 WHERE quation = '${dataObj.quation}'
-                AND role_id = ${dataObj.role_id}
+                AND is_deleted = 0
                 ${condition}
             `;
 
@@ -55,18 +55,19 @@ const faqController = {
                 query = `INSERT INTO faq SET ?`;
                 dataObj.created_at = new Date();
             }
-
+            const isUpdate = !!dataObj.faq_id;
             const result = await insertData(query, dataObj, next);
 
-            if (result.insertId) {
+            if (!isUpdate && result.insertId) {
                 dataObj.faq_id = result.insertId;
             }
+
 
             return res.json({
                 success: true,
                 message: dataObj.is_deleted == 1
                     ? 'FAQ deleted successfully'
-                    : dataObj.faq_id
+                    : isUpdate
                         ? 'FAQ updated successfully'
                         : 'FAQ created successfully',
                 data: dataObj
