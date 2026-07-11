@@ -27,7 +27,7 @@ const stocksControllers = {
                 drhp_filed: Joi.boolean().required(),
                 available_on: Joi.string().required(),
 
-                face_value: Joi.number().required(),
+                face_value: Joi.number().optional(),
                 registration_date: Joi.string().required(),
 
                 cmp_logo: Joi.string().allow("").optional(),
