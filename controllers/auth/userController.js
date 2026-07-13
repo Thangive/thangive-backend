@@ -949,7 +949,7 @@ const userController = {
                 )`;
             }
 
-            cond += `ORDER BY user_id DESC`;
+            cond += ` ORDER BY user_id DESC`;
 
             /* ------------------ Pagination ------------------ */
             if (req.query.pagination) {
