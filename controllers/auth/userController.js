@@ -310,16 +310,99 @@ const userController = {
             const condition = isUpdate ? ` AND user_id != '${dataObj.user_id}'` : "";
 
             // ------------------ Duplicate Email / Phone Check ------------------
-            const checkQuery = `
-                SELECT user_id, is_deleted
-                FROM users 
-                WHERE (email='${dataObj.email}' OR phone_number='${dataObj.phone_number}')
-                AND user_type = 'user'
+            // const checkQuery = `
+            //     SELECT user_id, is_deleted
+            //     FROM users 
+            //     WHERE (email='${dataObj.email}' OR phone_number='${dataObj.phone_number}')
+            //     AND user_type = 'user'
+            //     ${condition}
+            // `;
+            // ------------------ Duplicate Email / Phone / WhatsApp Check ------------------
+            const duplicateQuery = `
+                SELECT user_id, email, phone_number, whatsapp_number, is_deleted
+                FROM users
+                WHERE user_type='user'
                 ${condition}
+                AND (
+                    email='${dataObj.email}'
+                    OR phone_number='${dataObj.phone_number}'
+                    OR whatsapp_number='${dataObj.phone_number}'
+                    ${dataObj.whatsapp_number?.trim()
+                    ? `
+                                OR phone_number='${dataObj.whatsapp_number}'
+                                OR whatsapp_number='${dataObj.whatsapp_number}'
+                            `
+                    : ""
+                }
+                )
             `;
-            const exists = await getData(checkQuery, next);
-            if (exists.length > 0 && exists[0].is_deleted == '0') {
-                return next(CustomErrorHandler.alreadyExist("Email or phone number already exists"));
+            const duplicateData = await getData(duplicateQuery, next);
+            // const exists = await getData(checkQuery, next);
+            if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') {
+
+                const emailExists =
+                    duplicateData[0].email === dataObj.email;
+
+                const phoneExists =
+                    duplicateData[0].phone_number === dataObj.phone_number ||
+                    duplicateData[0].whatsapp_number === dataObj.phone_number;
+
+                const whatsappExists = dataObj.whatsapp_number?.trim()
+                    ? (
+                        duplicateData[0].phone_number === dataObj.whatsapp_number ||
+                        duplicateData[0].whatsapp_number === dataObj.whatsapp_number
+                    )
+                    : false;
+
+                if (emailExists && phoneExists && whatsappExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Email, phone number and WhatsApp number already exist"
+                        )
+                    );
+                }
+
+                if (emailExists && phoneExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Email and phone number already exist"
+                        )
+                    );
+                }
+
+                if (emailExists && whatsappExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Email and WhatsApp number already exist"
+                        )
+                    );
+                }
+
+                if (phoneExists && whatsappExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Phone number and WhatsApp number already exist"
+                        )
+                    );
+                }
+
+                if (emailExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist("Email already exists")
+                    );
+                }
+
+                if (phoneExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist("Phone number already exists")
+                    );
+                }
+
+                if (whatsappExists) {
+                    return next(
+                        CustomErrorHandler.alreadyExist("WhatsApp number already exists")
+                    );
+                }
             }
 
             // ------------------ Duplicate Username Check ------------------
@@ -349,10 +432,10 @@ const userController = {
                 // 👉 RM updating existing user
                 query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
                 delete dataObj.user_id; // remove from SET clause
-            } else if (exists.length > 0 && exists[0].is_deleted != '0') {
+            } else if (duplicateData.length > 0 && duplicateData[0].is_deleted != '0') {
                 // 👉 Soft-deleted user → reactivate
-                query = `UPDATE users SET ? WHERE user_id='${exists[0].user_id}'`;
-                dataObj.user_id = exists[0].user_id;
+                query = `UPDATE users SET ? WHERE user_id='${duplicateData[0].user_id}'`;
+                dataObj.user_id = duplicateData[0].user_id;
             } else {
                 // 👉 Fresh insert
                 query = `INSERT INTO users SET ?`;
@@ -460,8 +543,8 @@ const userController = {
             return res.json({
                 success: true,
                 message: isUpdate
-                    ? "User document updated successfully"
-                    : "User document saved successfully",
+                    ? "Document updated successfully"
+                    : "Document saved successfully",
                 data: dataObj,
             });
 
@@ -560,8 +643,8 @@ const userController = {
             return res.json({
                 success: true,
                 message: dataObj.bank_id
-                    ? 'User bank details saved successfully'
-                    : 'User bank details updated successfully',
+                    ? 'Bank details saved successfully'
+                    : 'Bank details updated successfully',
                 data: dataObj,
             });
 
