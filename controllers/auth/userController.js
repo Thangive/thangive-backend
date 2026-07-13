@@ -450,7 +450,7 @@ const userController = {
                 query = `INSERT INTO user_documents SET ?`;
                 dataObj.created_at = new Date();
             }
-
+            const isUpdate = !!dataObj.doc_id;
             const result = await insertData(query, dataObj, next);
 
             if (result.insertId) {
@@ -459,9 +459,9 @@ const userController = {
 
             return res.json({
                 success: true,
-                message: dataObj.doc_id
-                    ? "User document saved successfully"
-                    : "User document updated successfully",
+                message: isUpdate
+                    ? "User document updated successfully"
+                    : "User document saved successfully",
                 data: dataObj,
             });
 
@@ -898,7 +898,7 @@ const userController = {
     async getEmplyees(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = "SELECT * FROM users WHERE 1 AND user_type!='user' AND user_type!='admin' AND is_deleted = 0 AND user_type != 'ADMIN'";
+            let query = "SELECT * FROM users WHERE 1 AND user_type!='user' AND user_type!='admin' AND user_type!='PARTNER' AND is_deleted = 0 AND user_type != 'ADMIN'";
             let cond = '';
             let page = { pageQuery: '' };
 
@@ -909,6 +909,7 @@ const userController = {
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
                 user_type: Joi.valid('RM', 'AM', 'SM', 'ST').optional(),
+                searchUsernamePhone_numberEmail: Joi.string(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),
@@ -938,6 +939,18 @@ const userController = {
                 cond += ` AND phone_number LIKE '%${req.query.phone_number}%'`;
             }
 
+            if (req.query.searchUsernamePhone_numberEmail) {
+                const search = req.query.searchUsernamePhone_numberEmail;
+
+                cond += ` AND (
+                    username LIKE '%${search}%'
+                    OR phone_number LIKE '%${search}%'
+                    OR email LIKE '%${search}%'
+                )`;
+            }
+
+            cond += `ORDER BY user_id DESC`;
+
             /* ------------------ Pagination ------------------ */
             if (req.query.pagination) {
                 page = await paginationQuery(
@@ -966,36 +979,36 @@ const userController = {
             }
 
             /* ------------------ Bank  Details ------------------ */
-            if (users.length) {
-                for (const user of users) {
-                    const docQuery = `
-                        SELECT * FROM user_bank_details
-                        WHERE is_deleted = 0 AND user_id = ${user.user_id}
-                    `;
-                    const bankDetails = await getData(docQuery, next);
-                    user.bankDetails = bankDetails ?? [];
-                }
-            }
+            // if (users.length) {
+            //     for (const user of users) {
+            //         const docQuery = `
+            //             SELECT * FROM user_bank_details
+            //             WHERE is_deleted = 0 AND user_id = ${user.user_id}
+            //         `;
+            //         const bankDetails = await getData(docQuery, next);
+            //         user.bankDetails = bankDetails ?? [];
+            //     }
+            // }
 
             /* ------------------ Bank  Details ------------------ */
-            if (users.length) {
-                for (const user of users) {
-                    const docQuery = `
-                    SELECT 
-                        cmr.*,
-                        broker.broker_name,
-                        broker.broker_email,
-                        broker.broker_contact
-                    FROM user_cmr_details AS cmr
-                    INNER JOIN broker 
-                        ON broker.broker_id = cmr.broker_id
-                    WHERE cmr.is_deleted = 0
-                      AND cmr.user_id = "${user.user_id}"
-                `;
-                    const cmrDetails = await getData(docQuery, next);
-                    user.cmrDetails = cmrDetails ?? [];
-                }
-            }
+            // if (users.length) {
+            //     for (const user of users) {
+            //         const docQuery = `
+            //         SELECT 
+            //             cmr.*,
+            //             broker.broker_name,
+            //             broker.broker_email,
+            //             broker.broker_contact
+            //         FROM user_cmr_details AS cmr
+            //         INNER JOIN broker 
+            //             ON broker.broker_id = cmr.broker_id
+            //         WHERE cmr.is_deleted = 0
+            //           AND cmr.user_id = "${user.user_id}"
+            //     `;
+            //         const cmrDetails = await getData(docQuery, next);
+            //         user.cmrDetails = cmrDetails ?? [];
+            //     }
+            // }
 
             return res.json({
                 message: 'success',
