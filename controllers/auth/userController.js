@@ -69,6 +69,7 @@ const userController = {
                                 phone_number: Joi.string().required(),
                                 password: Joi.string().required(),
                                 user_type: Joi.string().required(),
+                                residency_status: Joi.string().required(),
                             }),
                         }),
                 })
@@ -1062,16 +1063,16 @@ const userController = {
             }
 
             /* ------------------ Bank  Details ------------------ */
-            // if (users.length) {
-            //     for (const user of users) {
-            //         const docQuery = `
-            //             SELECT * FROM user_bank_details
-            //             WHERE is_deleted = 0 AND user_id = ${user.user_id}
-            //         `;
-            //         const bankDetails = await getData(docQuery, next);
-            //         user.bankDetails = bankDetails ?? [];
-            //     }
-            // }
+            if (users.length) {
+                for (const user of users) {
+                    const docQuery = `
+                        SELECT * FROM user_bank_details
+                        WHERE is_deleted = 0 AND user_id = ${user.user_id}
+                    `;
+                    const bankDetails = await getData(docQuery, next);
+                    user.bankDetails = bankDetails ?? [];
+                }
+            }
 
             /* ------------------ Bank  Details ------------------ */
             // if (users.length) {
