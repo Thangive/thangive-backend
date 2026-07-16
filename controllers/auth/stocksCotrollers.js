@@ -907,7 +907,7 @@ const stocksControllers = {
                 pre_ipo: Joi.number().required(),
                 stock_return: Joi.number().required(),
                 stock_status: Joi.string().valid('UNLISTED', 'LISTED').required(),
-                ps_logo: Joi.string().required(),
+                ps_logo: Joi.string().optional(),
             });
 
             // ------------------ Prepare Data ------------------
