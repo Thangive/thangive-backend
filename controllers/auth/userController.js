@@ -86,7 +86,7 @@ const userController = {
                         user_type: Joi.string().required(),
                         username: Joi.string().required(),
                         password: Joi.string().optional(),
-                        employee_id: Joi.string().required(),
+                        employee_id: Joi.string().optional(),
                     })
                 });
 
@@ -104,10 +104,10 @@ const userController = {
                 return next(error);
             }
 
-            if (!['user', 'PARTNER'].includes(dataObj.user_type)) {
-                dataObj.user_custum_id = dataObj.employee_id;
-                delete dataObj.employee_id;
-            }
+            // if (!['user', 'PARTNER'].includes(dataObj.user_type)) {
+            //     dataObj.user_custum_id = dataObj.employee_id;
+            //     delete dataObj.employee_id;
+            // }
 
             // ------------------ Duplicate Email / Phone Check ------------------
             let condition = "";
