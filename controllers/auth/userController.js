@@ -21,6 +21,7 @@ const userController = {
                 email: Joi.string().email(),
                 phone_number: Joi.string(),
                 whatsapp_number: Joi.string().allow(""),
+                company_number: Joi.string().allow(""),
                 password: Joi.string().allow(""),
                 residency_status: Joi.string().allow("")
             };
@@ -82,6 +83,7 @@ const userController = {
                         email: Joi.string().email().required(),
                         whatsapp_number: Joi.string().optional(),
                         phone_number: Joi.string().required(),
+                        company_number: Joi.string().optional(),
                         profile: Joi.string().optional(),
                         user_type: Joi.string().required(),
                         username: Joi.string().required(),
@@ -635,17 +637,18 @@ const userController = {
                 dataObj.created_at = new Date();
             }
 
+            const isUpdate = !!dataObj.bank_id;
             const result = await insertData(query, dataObj, next);
 
-            if (result.insertId) {
+            if (!isUpdate && result.insertId) {
                 dataObj.bank_id = result.insertId;
             }
 
             return res.json({
                 success: true,
-                message: dataObj.bank_id
-                    ? 'Bank details saved successfully'
-                    : 'Bank details updated successfully',
+                message: isUpdate
+                    ? "Bank details updated successfully"
+                    : "Bank details saved successfully",
                 data: dataObj,
             });
 
