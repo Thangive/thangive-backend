@@ -275,7 +275,25 @@ const BlogController = {
                 b.role_id,
                 b.created_at,
                 b.updated_at,
-                s.company_name
+                s.company_name,
+                (
+                    SELECT COUNT(*)
+                    FROM blog_views bv
+                    WHERE bv.blog_id = b.blog_id
+                ) AS totalViews,
+
+                (
+                    SELECT COUNT(
+                        DISTINCT
+                        CASE
+                            WHEN bv.user_id IS NOT NULL
+                                THEN CONCAT('U_', bv.user_id)
+                            ELSE CONCAT('G_', bv.ip_address, '_', bv.user_agent)
+                        END
+                    )
+                    FROM blog_views bv
+                    WHERE bv.blog_id = b.blog_id
+                ) AS uniqueViews
             FROM blogArticle b
             LEFT JOIN stock_details s 
                 ON b.stockID = s.stock_details_id
@@ -552,7 +570,7 @@ const BlogController = {
             const ip_address =
                 req.headers["x-forwarded-for"]?.split(",")[0] ||
                 req.socket.remoteAddress;
-            console.log(ip_address);
+            // console.log(ip_address);
 
             const user_agent = req.headers["user-agent"] || "";
 
