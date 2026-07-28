@@ -254,8 +254,7 @@ const BlogController = {
         }
     },
 
-    async getBlog(req, res, next) 
-    {
+    async getBlog(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
             let query = `
@@ -308,8 +307,7 @@ const BlogController = {
                 cond += ` AND b.blog_id = ${req.query.blog_id}`;
             }
 
-            if (req.query.draft) 
-            {
+            if (req.query.draft) {
                 cond += ` AND b.draft = ${req.query.draft}`;
             }
 
@@ -346,7 +344,7 @@ const BlogController = {
             `;
             }
             // cond=` ORDER BY b.created_at DESC`;
-            
+
             /* ------------------ Pagination ------------------ */
             if (req.query.pagination) {
                 page = await paginationQuery(
@@ -533,6 +531,47 @@ const BlogController = {
                 success: true,
                 message: "Banner fetched successfully",
                 data: data[0]
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
+    async addBlogView(req, res, next) {
+        try {
+            /* ---------------- VALIDATION ---------------- */
+            const schema = Joi.object({
+                blog_id: Joi.number().integer().required(),
+                user_id: Joi.number().allow(null).optional(),
+            });
+
+            const { error } = schema.validate(req.body);
+            if (error) return next(error);
+
+            /* ---------------- DATA ---------------- */
+            const ip_address =
+                req.headers["x-forwarded-for"]?.split(",")[0] ||
+                req.socket.remoteAddress;
+            console.log(ip_address);
+
+            const user_agent = req.headers["user-agent"] || "";
+
+            const dataObj = {
+                blog_id: req.body.blog_id,
+                user_id: req.body.user_id || null,
+                ip_address,
+                user_agent,
+                viewed_at: new Date(),
+            };
+
+            /* ---------------- INSERT ---------------- */
+            const query = `INSERT INTO blog_views SET ?`;
+
+            await insertData(query, dataObj, next);
+
+            return res.json({
+                success: true,
+                message: "Blog view added successfully"
             });
 
         } catch (error) {

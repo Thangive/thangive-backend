@@ -155,6 +155,7 @@ router.get('/Keyword', blogController.getKeywords);
 router.get('/relatedBloags', blogController.RelatedBlog);
 router.post('/blogBanner', auth, imageUpload, blogController.addBlogBanner);
 router.get('/blogBanner', blogController.getLatestBlogBanner);
+router.post("/addBlogView", blogController.addBlogView);
 
 //Partner APIS
 router.get('/Partners', auth, partnerController.getPartners);
