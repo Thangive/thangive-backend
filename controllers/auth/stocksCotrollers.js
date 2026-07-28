@@ -1005,7 +1005,7 @@ const stocksControllers = {
             if (req.query.stock_status) {
                 cond += ` AND stock_status = '${req.query.stock_status}'`;
             }
-
+            const orderBy = ` ORDER BY ps_id DESC`;
             /* ------------------ Pagination ------------------ */
             if (req.query.pagination) {
                 page = await paginationQuery(
@@ -1015,8 +1015,7 @@ const stocksControllers = {
                     req.query.per_page_records
                 );
             }
-
-            query += cond + page.pageQuery;
+            query += cond + orderBy + page.pageQuery;
 
             const data = await getData(query, next);
 

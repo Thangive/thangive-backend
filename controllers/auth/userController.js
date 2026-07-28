@@ -1277,7 +1277,15 @@ const userController = {
     async fetchContactedQuery(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = `SELECT * FROM contact WHERE 1 = 1`;
+            let query = `
+                SELECT
+                    contact.*,
+                    users.user_custum_id
+                FROM contact
+                LEFT JOIN users
+                    ON contact.user_id = users.user_id
+                WHERE 1 = 1
+            `;
             let cond = "";
             let page = { pageQuery: "" };
 
@@ -1300,44 +1308,44 @@ const userController = {
 
             /* ------------------ Filters ------------------ */
             if (req.query.contact_id) {
-                cond += ` AND contact_id = ${req.query.contact_id}`;
+                cond += ` AND contact.contact_id = ${req.query.contact_id}`;
             }
 
             if (req.query.user_id) {
-                cond += ` AND user_id = ${req.query.user_id}`;
+                cond += ` AND contact.user_id = ${req.query.user_id}`;
             }
 
             if (req.query.name) {
-                cond += ` AND name LIKE '%${req.query.name}%'`;
+                cond += ` AND contact.name LIKE '%${req.query.name}%'`;
             }
 
             if (req.query.email) {
-                cond += ` AND email LIKE '%${req.query.email}%'`;
+                cond += ` AND contact.email LIKE '%${req.query.email}%'`;
             }
 
             if (req.query.phone) {
-                cond += ` AND phone LIKE '%${req.query.phone}%'`;
+                cond += ` AND contact.phone LIKE '%${req.query.phone}%'`;
             }
 
             if (req.query.search) {
                 cond += `
                     AND (
-                        name LIKE '%${req.query.search}%'
-                        OR email LIKE '%${req.query.search}%'
-                        OR phone LIKE '%${req.query.search}%'
+                        contact.name LIKE '%${req.query.search}%'
+                        OR contact.email LIKE '%${req.query.search}%'
+                        OR contact.phone LIKE '%${req.query.search}%'
                     )
                 `;
             }
 
             if (req.query.Exists === "existing") {
                 cond += `
-                    AND user_id IS NOT NULL
+                    AND contact.user_id IS NOT NULL
                 `;
             }
 
             if (req.query.Exists === "new") {
                 cond += `
-                    AND (user_id IS NULL OR user_id = '')
+                    AND (contact.user_id IS NULL OR contact.user_id = '')
                 `;
             }
 
@@ -1351,7 +1359,7 @@ const userController = {
                 );
             }
 
-            query += cond + ` ORDER BY contact_id DESC ` + page.pageQuery;
+            query += cond + ` ORDER BY contact.contact_id DESC ` + page.pageQuery;
 
             const data = await getData(query, next);
 
