@@ -301,7 +301,7 @@ const BlogController = {
         `;
 
             let cond = '';
-            let orderBy = ` ORDER BY b.created_at DESC`;
+            let orderBy = ` ORDER BY b.publishdate DESC`;
             let page = { pageQuery: '' };
 
             /* ------------------ Validation ------------------ */
@@ -461,7 +461,7 @@ const BlogController = {
                 b.is_deleted = 0
                 AND b.blog_id != ${blog_id}
                 AND (${keywordCond})
-            ORDER BY b.blog_id DESC
+            ORDER BY b.publishdate DESC
             LIMIT 10
         `;
 

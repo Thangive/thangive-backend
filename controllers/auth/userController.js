@@ -546,8 +546,8 @@ const userController = {
             return res.json({
                 success: true,
                 message: isUpdate
-                    ? "Document updated successfully"
-                    : "Document saved successfully",
+                    ? `${dataObj.document_name} updated successfully`
+                    : `${dataObj.document_name} saved successfully`,
                 data: dataObj,
             });
 
@@ -568,7 +568,7 @@ const userController = {
                 account_no: Joi.string().required(),
                 ifsc_code: Joi.string().required(),
                 account_status: Joi.string().required(),
-                phone_number: Joi.string().required(),
+                phone_number: Joi.string().optional(),
                 branch: Joi.string().required(),
 
                 statement: Joi.string()
@@ -613,8 +613,7 @@ const userController = {
             const checkQuery = `
                 SELECT bank_id
                 FROM user_bank_details
-                WHERE user_id = ${dataObj.user_id}
-                AND account_no = '${dataObj.account_no}'
+                WHERE account_no = '${dataObj.account_no}'
                 ${condition}
             `;
 
@@ -622,7 +621,7 @@ const userController = {
             if (exists.length > 0) {
                 return next(
                     CustomErrorHandler.alreadyExist(
-                        'Bank account already exists for this user'
+                        'This bank account number is already registered.'
                     )
                 );
             }
