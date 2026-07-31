@@ -312,14 +312,6 @@ const userController = {
             const isUpdate = !!dataObj.user_id;  // 👈 true if user_id present
             const condition = isUpdate ? ` AND user_id != '${dataObj.user_id}'` : "";
 
-            // ------------------ Duplicate Email / Phone Check ------------------
-            // const checkQuery = `
-            //     SELECT user_id, is_deleted
-            //     FROM users 
-            //     WHERE (email='${dataObj.email}' OR phone_number='${dataObj.phone_number}')
-            //     AND user_type = 'user'
-            //     ${condition}
-            // `;
             // ------------------ Duplicate Email / Phone / WhatsApp Check ------------------
             const duplicateQuery = `
                 SELECT user_id, email, phone_number, whatsapp_number, is_deleted
@@ -341,19 +333,19 @@ const userController = {
             `;
             const duplicateData = await getData(duplicateQuery, next);
             // const exists = await getData(checkQuery, next);
-            if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') {
-
+            if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') 
+            {
                 const emailExists =
-                    duplicateData[0].email === dataObj.email;
-
+                    duplicateData[0].email == dataObj.email;
+                console.log(emailExists);
                 const phoneExists =
-                    duplicateData[0].phone_number === dataObj.phone_number ||
-                    duplicateData[0].whatsapp_number === dataObj.phone_number;
-
+                    duplicateData[0].phone_number == dataObj.phone_number ||
+                    duplicateData[0].whatsapp_number == dataObj.phone_number;
+                console.log(phoneExists)
                 const whatsappExists = dataObj.whatsapp_number?.trim()
                     ? (
-                        duplicateData[0].phone_number === dataObj.whatsapp_number ||
-                        duplicateData[0].whatsapp_number === dataObj.whatsapp_number
+                        duplicateData[0].phone_number == dataObj.whatsapp_number ||
+                        duplicateData[0].whatsapp_number == dataObj.whatsapp_number
                     )
                     : false;
 
@@ -407,7 +399,6 @@ const userController = {
                     );
                 }
             }
-
             // ------------------ Duplicate Username Check ------------------
             const usernameCheck = await getData(
                 `SELECT user_id, is_deleted FROM users WHERE username = '${dataObj.username}' ${condition}`,
@@ -472,6 +463,7 @@ const userController = {
                 user_id: Joi.number().integer().required(),
                 document_name: Joi.string().required(),
                 document_number: Joi.string().required(),
+                user_type: Joi.valid('user', 'PARTNER', 'RM', 'ADMIN', 'AM', 'SM', 'ST').required(),
                 document_path: Joi.string()
                     .allow('')
                     .required()
@@ -515,12 +507,13 @@ const userController = {
             const checkQuery = `
                 SELECT doc_id
                 FROM user_documents
-                WHERE user_id = ${dataObj.user_id}
-                AND document_name = '${dataObj.document_name}'
+                WHERE user_type = '${dataObj.user_type}'
+                AND document_number = '${dataObj.document_number}'
                 ${condition}
             `;
 
             const exists = await getData(checkQuery, next);
+            console.log(exists);
             if (exists.length > 0) {
                 return next(
                     CustomErrorHandler.alreadyExist("Document already exists for this user")
@@ -570,7 +563,7 @@ const userController = {
                 account_status: Joi.string().required(),
                 phone_number: Joi.string().optional(),
                 branch: Joi.string().required(),
-
+                user_type: Joi.valid('user', 'PARTNER', 'RM', 'ADMIN', 'AM', 'SM', 'ST').required(),
                 statement: Joi.string()
                     .allow('')
                     .required()
@@ -614,6 +607,10 @@ const userController = {
                 SELECT bank_id
                 FROM user_bank_details
                 WHERE account_no = '${dataObj.account_no}'
+                AND (
+                    bank_name = '${dataObj.bank_name}'
+                    OR account_no = '${dataObj.account_no}'
+                )
                 ${condition}
             `;
 
@@ -621,7 +618,7 @@ const userController = {
             if (exists.length > 0) {
                 return next(
                     CustomErrorHandler.alreadyExist(
-                        'This bank account number is already registered.'
+                        'Bank name or account number already exists for this user type.'
                     )
                 );
             }
@@ -665,6 +662,7 @@ const userController = {
                 user_id: Joi.number().integer().required(),
                 broker_id: Joi.string().required(),
                 client_id: Joi.string().required(),
+                client_name:Joi.string().required(),
                 broker_custom_id: Joi.string().required(),
                 crm_status: Joi.string().valid("Active", "Inactive").required(),
                 cmr_document: Joi.string()
@@ -707,8 +705,7 @@ const userController = {
             const checkQuery = `
                 SELECT cmr_id
                 FROM user_cmr_details
-                WHERE user_id = ${dataObj.user_id}
-                AND broker_id = '${dataObj.broker_id}'
+                WHERE broker_id = '${dataObj.broker_id}'
                 AND client_id = '${dataObj.client_id}'
                 ${condition}
             `;

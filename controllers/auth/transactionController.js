@@ -612,6 +612,7 @@ const transactionController = {
                     ot.transaction_type,
                     CONCAT(users.first_name, ' ', users.middle_name,' ', users.last_name) AS client_name,
                     users.phone_number AS client_phone,
+                    users.user_custum_id,
                     CONCAT(
                         partner_user.first_name,
                         ' ',
