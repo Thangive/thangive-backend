@@ -1985,6 +1985,7 @@ const transactionController = {
 
                 /* User Info */
                 u.user_custum_id,
+                u.phone_number AS client_phone,
                 CONCAT(
                     u.first_name, ' ',
                     IFNULL(u.middle_name, ''),
