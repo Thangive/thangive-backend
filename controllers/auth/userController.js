@@ -582,7 +582,6 @@ const userController = {
 
             /* ------------------ Prepare Data ------------------ */
             let dataObj = { ...req.body };
-
             /* ------------------ Handle File Upload ------------------ */
             if (req.files?.bank_document?.length > 0) {
                 const file = req.files.bank_document[0];

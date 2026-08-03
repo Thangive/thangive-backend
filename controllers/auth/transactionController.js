@@ -1029,6 +1029,7 @@ const transactionController = {
             const brokerQuery = `
                 SELECT 
                     cmr.broker_custom_id,
+                    cmr.client_name,
                     br.broker_name,
                     br.broker_id,
                     cmr.client_id,
