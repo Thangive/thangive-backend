@@ -1860,10 +1860,12 @@ const transactionController = {
                     ot.st_datetime,
                     ot.price_per_share AS share_price,
                     (ot.price_per_share * ot.quantity) AS total,
+                    ot.created_at,
                     DATE_FORMAT(
                         CONVERT_TZ(ot.created_at, '+00:00', '+05:30'),
                         '%d-%m-%Y %h:%i %p'
-                    ) AS date
+                    ) AS date,
+                    ot.st_datetime
                 FROM order_transactions ot
                 JOIN stock_details st 
                     ON ot.stock_details_id = st.stock_details_id
