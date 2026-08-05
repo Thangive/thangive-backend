@@ -943,6 +943,11 @@ const stocksControllers = {
                 }
             }
 
+            if (dataObj.stock_details_id && dataObj.stock_status !== "LISTED")
+            {
+                dataObj.is_deleted = 1;
+            }
+
             // ------------------ Insert / Update ------------------
             let query = "";
 
