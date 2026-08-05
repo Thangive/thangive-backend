@@ -339,8 +339,8 @@ const transactionController = {
                     FROM order_transactions
                     WHERE order_id = ${dataObj.order_id}
                     LIMIT 1`,
-                    next
-                );
+                next
+            );
 
             if (
                 order.length &&
@@ -349,7 +349,7 @@ const transactionController = {
                 order[0].st_status === "COMPLETED" &&
                 order[0].addedPartnerID != null
             ) {
-                await insertData(`UPDATE users SET assign_partner = ? WHERE user_id = ?`,[order[0].addedPartnerID, order[0].user_id],next);
+                await insertData(`UPDATE users SET assign_partner = ? WHERE user_id = ?`, [order[0].addedPartnerID, order[0].user_id], next);
             }
 
             return res.json({
@@ -641,6 +641,7 @@ const transactionController = {
                     ot.st_status,
                     ot.payments_count,
                     ot.created_at,
+                    ot.rm_datetime,
                     ot.partner_price AS partner_price,
                     ot.verify,
                     ot.share_Debit_Invoice
@@ -956,6 +957,7 @@ const transactionController = {
                 ) AS order_time,
                 ot.st_datetime,
                 ot.rm_datetime,
+                ot.created_at,
                 ot.remark,
                 ot.share_Debit_Invoice,
                 ot.share_Debit_Path,
@@ -1956,6 +1958,16 @@ const transactionController = {
                 from_date: Joi.string().optional(),
                 to_date: Joi.string().optional(),
 
+                employee_type: Joi.string()
+                    .valid("RM", "AM", "ST", "PARTNER")
+                    .optional(),
+
+                employee_id: Joi.when("employee_type", {
+                    is: Joi.string().valid("RM", "PARTNER").required(),
+                    then: Joi.number().integer().required(),
+                    otherwise: Joi.number().integer().optional()
+                }),
+
                 pagination: Joi.boolean().optional(),
                 current_page: Joi.number().integer().optional(),
                 per_page_records: Joi.number().integer().optional(),
@@ -1994,9 +2006,16 @@ const transactionController = {
                     u.last_name
                 ) AS client_name,
 
+                CONCAT(
+                    rm_user.first_name, ' ',
+                    IFNULL(rm_user.middle_name, ''),
+                    IF(rm_user.middle_name IS NOT NULL AND rm_user.middle_name != '', ' ', ''),
+                    rm_user.last_name
+                ) AS rm_name,
+
                 /* Payment Info */
-                DATE_FORMAT(pt.rm_Datetime, '%d-%m-%Y %H:%i:%s') AS payment_date,
-                DATE_FORMAT(pt.am_Datetime, '%d-%m-%Y %H:%i:%s') AS am_date,
+                pt.rm_Datetime AS payment_date,
+                pt.am_Datetime AS am_date,
                 b.bank_id,
                 b.bank_name,
                 pt.amount,
@@ -2016,6 +2035,8 @@ const transactionController = {
                 ON ot.order_id = pt.order_id
             LEFT JOIN users u
                 ON u.user_id = ot.user_id
+            LEFT JOIN users rm_user
+                ON rm_user.user_id = u.assign_to
             LEFT JOIN user_bank_details b
                 ON b.bank_id = pt.bank_id
             LEFT JOIN stock_details st
@@ -2044,6 +2065,10 @@ const transactionController = {
 
             if (value.company_name) {
                 cond += ` AND st.company_name LIKE '%${value.company_name}%'`;
+            }
+
+            if (value.employee_id && value.employee_type === "RM") {
+                cond += ` AND u.assign_to = ${value.employee_id}`;
             }
 
             if (value.am_status) {

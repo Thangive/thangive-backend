@@ -32,7 +32,7 @@ let con;
 function handleDisconnect() {
     con = mysql.createConnection({
         ...credentil,
-        timezone: "+05:30"
+        dateStrings: true
     });
 
     con.connect((err) => {
@@ -40,13 +40,6 @@ function handleDisconnect() {
             console.error('❌ DB connect error:', err.message);
             setTimeout(handleDisconnect, 3000); // retry
         } else {
-            con.query("SET time_zone = '+05:30'", (err) => {
-                if (err) {
-                    console.error(err);
-                } else {
-                    console.log("✅ MySQL Session Timezone = IST");
-                }
-            });
             console.log('✅ Database Connected successfully!');
         }
     });
