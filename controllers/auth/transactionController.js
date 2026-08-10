@@ -13,6 +13,7 @@ const transactionController = {
                 user_id: Joi.number().integer().required(),
                 advisor_id: Joi.number().integer().required(),
                 broker_id: Joi.number().integer().required(),
+                user_broker_id: Joi.number().integer().required(),
                 stock_details_id: Joi.number().integer().required(),
                 quantity: Joi.number().positive().required(),
                 current_share_price: Joi.number().required(),
@@ -192,6 +193,12 @@ const transactionController = {
                     otherwise: Joi.forbidden()
                 }),
 
+                broker_id: Joi.when('employee_type', {
+                    is: 'RM',
+                    then: Joi.number().optional(),
+                    otherwise: Joi.forbidden()
+                }),
+
                 rm_qty: Joi.when('employee_type', {
                     is: 'RM',
                     then: Joi.number().optional(),
@@ -284,6 +291,10 @@ const transactionController = {
 
                 if (dataObj.bank_id != null) {
                     updatedObject.bank_id = dataObj.bank_id;
+                }
+
+                if (dataObj.broker_id != null) {
+                    updatedObject.broker_id = dataObj.broker_id;
                 }
 
                 if (dataObj.rm_qty != null) {
@@ -926,6 +937,7 @@ const transactionController = {
             SELECT 
                 ot.order_id,
                 ot.user_id,
+                ot.broker_id,
                 ot.order_custom_id,
                 ot.order_type,
                 ot.stock_details_id,
