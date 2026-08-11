@@ -622,6 +622,12 @@ const transactionController = {
                     ot.user_id,
                     ot.transaction_type,
                     CONCAT(users.first_name, ' ', users.middle_name,' ', users.last_name) AS client_name,
+                    CONCAT(
+                        rm.first_name, ' ',
+                        IFNULL(rm.middle_name, ''), 
+                        IF(rm.middle_name IS NOT NULL AND rm.middle_name != '', ' ', ''),
+                        rm.last_name
+                    ) AS rmName,
                     users.phone_number AS client_phone,
                     users.user_custum_id,
                     CONCAT(
@@ -646,6 +652,10 @@ const transactionController = {
                     (sp.today_prices * ot.quantity) AS market_value,
                     (sp.today_prices * ot.quantity) - (ot.price_per_share * ot.quantity) AS overall_PL,
                     ((sp.today_prices - sp.prev_price) * ot.quantity) AS daily_PL,
+                    CASE
+                        WHEN ot.addedUserId IS NULL THEN 'User'
+                        ELSE 'RM'
+                    END AS added_by,
                     ot.order_type,
                     ot.rm_status,
                     ot.am_status,
@@ -675,6 +685,8 @@ const transactionController = {
                     ON latest.latest_id = sp.stock_price_id
                 LEFT JOIN users partner_user
                     ON partner_user.user_id = ot.addedPartnerID
+                LEFT JOIN users rm                
+                    ON rm.user_id = users.assign_to
                 WHERE 1
             `;
 
