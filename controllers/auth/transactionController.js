@@ -630,6 +630,10 @@ const transactionController = {
                     ) AS rmName,
                     users.phone_number AS client_phone,
                     users.user_custum_id,
+                    CASE
+                        WHEN users.residency_status = 1 THEN 'Resident'
+                        ELSE 'Non Resident'
+                    END AS residency_status,
                     CONCAT(
                         partner_user.first_name,
                         ' ',
@@ -665,7 +669,8 @@ const transactionController = {
                     ot.rm_datetime,
                     ot.partner_price AS partner_price,
                     ot.verify,
-                    ot.share_Debit_Invoice
+                    ot.share_Debit_Invoice,
+                    latest_payment.payment_type AS payment_type
                 FROM order_transactions ot
                 JOIN stock_details st
                     ON ot.stock_details_id = st.stock_details_id
@@ -687,6 +692,18 @@ const transactionController = {
                     ON partner_user.user_id = ot.addedPartnerID
                 LEFT JOIN users rm                
                     ON rm.user_id = users.assign_to
+                LEFT JOIN (
+                    SELECT pt1.order_id, pt1.payment_type
+                    FROM payment_transactions pt1
+                    INNER JOIN (
+                        SELECT order_id, MAX(payment_id) AS latest_payment_id
+                        FROM payment_transactions
+                        GROUP BY order_id
+                    ) pt2
+                        ON pt2.order_id = pt1.order_id
+                        AND pt2.latest_payment_id = pt1.payment_id
+                ) latest_payment
+                    ON latest_payment.order_id = ot.order_id
                 WHERE 1
             `;
 
@@ -789,7 +806,7 @@ const transactionController = {
 
             // ---- ONLY BUY RM AND AM COMPLETED () ----
             if (value.status === "AM_COMPLETED" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
-                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'PENDING'`;
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND (ot.st_status = 'PENDING' OR ot.st_status = 'HOLD')`;
             }
 
             // ---- ONLY SELL RM AND ST COMPLETED () ----
@@ -1975,9 +1992,10 @@ const transactionController = {
             /* ------------------ Validation Schema ------------------ */
             const paymentSchema = Joi.object({
                 user_id: Joi.number().integer().optional(),
-                order_id: Joi.number().integer().optional(),
+                order_id: Joi.string().optional(),
                 transaction_type: Joi.string().valid("BUY", "SELL").optional(),
                 order_type: Joi.string().optional(),
+                searchUser: Joi.string().optional(),
 
                 company_name: Joi.string().optional(),
                 am_status: Joi.string().valid("PENDING", "RECEVIED").optional(),
@@ -2078,7 +2096,7 @@ const transactionController = {
             }
 
             if (value.order_id) {
-                cond += ` AND pt.order_id = ${value.order_id}`;
+                cond += ` AND ot.order_custom_id LIKE '%${value.order_id}%'`;
             }
 
             if (value.transaction_type) {
@@ -2091,6 +2109,18 @@ const transactionController = {
 
             if (value.company_name) {
                 cond += ` AND st.company_name LIKE '%${value.company_name}%'`;
+            }
+
+            if (value.searchUser) {
+                cond += `
+                    AND CONCAT(
+                        IFNULL(u.first_name, ''),
+                        ' ',
+                        IFNULL(u.middle_name, ''),
+                        ' ',
+                        IFNULL(u.last_name, '')
+                    ) LIKE '%${value.searchUser}%'
+                `;
             }
 
             if (value.employee_id && value.employee_type === "RM") {

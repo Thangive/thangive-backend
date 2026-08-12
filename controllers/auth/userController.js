@@ -333,8 +333,7 @@ const userController = {
             `;
             const duplicateData = await getData(duplicateQuery, next);
             // const exists = await getData(checkQuery, next);
-            if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') 
-            {
+            if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') {
                 const emailExists =
                     duplicateData[0].email == dataObj.email;
                 console.log(emailExists);
@@ -661,7 +660,7 @@ const userController = {
                 user_id: Joi.number().integer().required(),
                 broker_id: Joi.string().required(),
                 client_id: Joi.string().required(),
-                client_name:Joi.string().required(),
+                client_name: Joi.string().required(),
                 broker_custom_id: Joi.string().required(),
                 crm_status: Joi.string().valid("Active", "Inactive").required(),
                 cmr_document: Joi.string()
@@ -1231,10 +1230,43 @@ const userController = {
             const contactSchema = Joi.object({
                 contact_id: Joi.number().integer().optional(),
                 user_id: Joi.number().integer().optional(),
-                name: Joi.string().required(),
-                email: Joi.string().email().required(),
-                phone: Joi.string().pattern(/^[0-9]{10}$/).required(),
-                message: Joi.string().required(),
+
+                name: Joi.string().when("status", {
+                    is: Joi.exist(),
+                    then: Joi.optional(),
+                    otherwise: Joi.required(),
+                }),
+
+                email: Joi.string().email().when("status", {
+                    is: Joi.exist(),
+                    then: Joi.optional(),
+                    otherwise: Joi.required(),
+                }),
+
+                phone: Joi.string().pattern(/^[0-9]{10}$/).when("status", {
+                    is: Joi.exist(),
+                    then: Joi.optional(),
+                    otherwise: Joi.required(),
+                }),
+
+                message: Joi.string().when("status", {
+                    is: Joi.exist(),
+                    then: Joi.optional(),
+                    otherwise: Joi.required(),
+                }),
+
+                status: Joi.string()
+                    .valid(
+                        "Resolved",
+                        "Pending",
+                        "Allocated to RM",
+                        "In Discussion",
+                        "Allocated to Management",
+                        "Not Relatable",
+                        "Cancel",
+                        "Closed"
+                    )
+                    .optional(),
             });
 
             let dataObj = { ...req.body };
@@ -1261,7 +1293,7 @@ const userController = {
             return res.json({
                 success: true,
                 message: dataObj.contact_id
-                    ? "Query submitted successfully"
+                    ? "Query updated successfully"
                     : "Query submitted successfully",
                 data: dataObj,
             });
@@ -1293,6 +1325,7 @@ const userController = {
                 phone: Joi.string(),
                 search: Joi.string(),
                 Exists: Joi.string().valid("existing", "new").optional(),
+                status: Joi.string(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),
@@ -1320,6 +1353,10 @@ const userController = {
 
             if (req.query.phone) {
                 cond += ` AND contact.phone LIKE '%${req.query.phone}%'`;
+            }
+
+            if (req.query.status) {
+                cond += ` AND contact.status = '${req.query.status}'`;
             }
 
             if (req.query.search) {
