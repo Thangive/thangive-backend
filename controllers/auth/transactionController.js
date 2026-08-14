@@ -670,7 +670,11 @@ const transactionController = {
                     ot.partner_price AS partner_price,
                     ot.verify,
                     ot.share_Debit_Invoice,
-                    latest_payment.payment_type AS payment_type
+                    CASE
+                        WHEN latest_payment.payment_type = 'FULL' THEN 'FULL PAYMENT'
+                        WHEN latest_payment.payment_type = 'PARTIAL' THEN 'PARTIAL PAYMENT'
+                        ELSE latest_payment.payment_type
+                    END AS payment_type
                 FROM order_transactions ot
                 JOIN stock_details st
                     ON ot.stock_details_id = st.stock_details_id

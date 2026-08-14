@@ -6,6 +6,288 @@ import paginationQuery from '../../helper/paginationQuery.js';
 import commonFunction from '../../helper/commonFunction.js';
 
 const userController = {
+    // async addUpdateUserProfile(req, res, next) {
+    //     try {
+    //         // ------------------ Validation Schema ------------------
+    //         const baseSchema = {
+    //             user_type: Joi.valid('user', 'PARTNER', 'RM', 'ADMIN', 'AM', 'SM', 'ST').required(),
+    //             user_id: Joi.number().integer().optional(),
+    //             employee_id: Joi.string().allow(""),
+    //             profile: Joi.string().allow(""),
+    //             username: Joi.string(),
+    //             first_name: Joi.string(),
+    //             middle_name: Joi.string().allow(""),
+    //             last_name: Joi.string(),
+    //             email: Joi.string().email(),
+    //             phone_number: Joi.string(),
+    //             whatsapp_number: Joi.string().allow(""),
+    //             company_number: Joi.string().allow(""),
+    //             password: Joi.string().allow(""),
+    //             residency_status: Joi.string().allow("")
+    //         };
+
+    //         const userSchema = Joi.object(baseSchema)
+    //             .when(Joi.object({ user_type: Joi.valid('user') }).unknown(), {
+    //                 // 👉 USER TYPE = user (your existing logic)
+    //                 then: Joi.object()
+    //                     .when(Joi.object({ user_id: Joi.exist() }).unknown(), {
+    //                         then: Joi.object({
+    //                             first_name: Joi.string().required(),
+    //                             middle_name: Joi.string().optional(),
+    //                             last_name: Joi.string().required(),
+    //                             email: Joi.string().email().optional(),
+    //                             phone_number: Joi.string().optional(),
+    //                             whatsapp_number: Joi.string().optional(),
+    //                             profile: Joi.string().optional(),
+    //                             password: Joi.string().optional(),
+    //                         }),
+    //                         otherwise: Joi.object({
+    //                             username: Joi.string().required(),
+    //                             email: Joi.string().email().required(),
+    //                             phone_number: Joi.string().required(),
+    //                             password: Joi.string().required(),
+    //                             user_type: Joi.string().required(),
+    //                             residency_status: Joi.string().required(),
+    //                         }),
+    //                     }),
+    //             })
+    //             .when(Joi.object({ user_type: Joi.valid('PARTNER') }).unknown(), {
+    //                 then: Joi.object()
+    //                     .when(Joi.object({ user_id: Joi.exist() }).unknown(), {
+    //                         then: Joi.object({
+    //                             first_name: Joi.string().required(),
+    //                             middle_name: Joi.string().optional(),
+    //                             last_name: Joi.string().required(),
+    //                             email: Joi.string().email().optional(),
+    //                             phone_number: Joi.string().optional(),
+    //                             whatsapp_number: Joi.string().optional(),
+    //                             profile: Joi.string().optional(),
+    //                             password: Joi.string().optional(),
+    //                         }),
+    //                         otherwise: Joi.object({
+    //                             username: Joi.string().required(),
+    //                             email: Joi.string().email().required(),
+    //                             phone_number: Joi.string().required(),
+    //                             password: Joi.string().required(),
+    //                             user_type: Joi.string().required(),
+    //                             residency_status: Joi.string().required(),
+    //                         }),
+    //                     }),
+    //             })
+    //             .when(Joi.object({ user_type: Joi.invalid('user', 'PARTNER') }).unknown(), {
+    //                 // 👉 USER TYPE ≠ user (Admin / Staff / Employee etc.)
+    //                 then: Joi.object({
+    //                     first_name: Joi.string().required(),
+    //                     middle_name: Joi.string().optional(),
+    //                     last_name: Joi.string().required(),
+    //                     email: Joi.string().email().required(),
+    //                     whatsapp_number: Joi.string().optional(),
+    //                     phone_number: Joi.string().required(),
+    //                     company_number: Joi.string().optional(),
+    //                     profile: Joi.string().optional(),
+    //                     user_type: Joi.string().required(),
+    //                     username: Joi.string().required(),
+    //                     password: Joi.string().optional(),
+    //                     employee_id: Joi.string().optional(),
+    //                 })
+    //             });
+
+
+
+    //         var dataObj = { ...req.body };
+
+    //         if (req.files?.profile?.length > 0) {
+    //             const file = req.files.profile[0];
+    //             dataObj.profile = `uploads/upload/${file.filename}`;
+    //         }
+    //         // ------------------ Validate ------------------
+    //         const { error } = userSchema.validate(dataObj ?? {});
+    //         if (error) {
+    //             return next(error);
+    //         }
+
+    //         // if (!['user', 'PARTNER'].includes(dataObj.user_type)) {
+    //         //     dataObj.user_custum_id = dataObj.employee_id;
+    //         //     delete dataObj.employee_id;
+    //         // }
+
+    //         // ------------------ Duplicate Email / Phone Check ------------------
+    //         let condition = "";
+    //         if ((dataObj.user_id && ['user', 'PARTNER'].includes(dataObj.user_type)) || !['user', 'PARTNER'].includes(dataObj.user_type)) {
+    //             if (dataObj?.password) {
+    //                 dataObj.password = md5(dataObj?.password);
+    //             }
+    //             condition = ` AND user_id != '${dataObj.user_id}'`;
+    //         } else {
+    //             // const phone = String(dataObj?.phone_number || "").trim();
+    //             // dataObj.password = md5(phone);
+    //             dataObj.password = md5(dataObj.password);
+    //         }
+
+    //         const duplicateQuery = `
+    //             SELECT email, phone_number, whatsapp_number, is_deleted
+    //             FROM users
+    //             WHERE user_type='${dataObj.user_type}'
+    //             ${condition}
+    //             AND (
+    //                 email='${dataObj.email}'
+    //                 OR phone_number='${dataObj.phone_number}'
+    //                 OR whatsapp_number='${dataObj.phone_number}'
+    //                 ${dataObj.whatsapp_number?.trim()
+    //                 ? `
+    //                             OR phone_number='${dataObj.whatsapp_number}'
+    //                             OR whatsapp_number='${dataObj.whatsapp_number}'
+    //                         `
+    //                 : ""
+    //             }
+    //             )
+    //         `;
+
+    //         const duplicateData = await getData(duplicateQuery, next);
+    //         if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') {
+    //             const emailExists = duplicateData[0].email == dataObj.email;
+    //             const phoneExists =
+    //                 duplicateData[0].phone_number == dataObj.phone_number ||
+    //                 duplicateData[0].whatsapp_number == dataObj.phone_number;
+
+    //             const whatsappExists = dataObj.whatsapp_number?.trim()
+    //                 ? (
+    //                     duplicateData[0].phone_number == dataObj.whatsapp_number ||
+    //                     duplicateData[0].whatsapp_number == dataObj.whatsapp_number
+    //                 )
+    //                 : false;
+    //             if (emailExists && phoneExists && whatsappExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Email, phone number and WhatsApp number already exist"
+    //                     )
+    //                 );
+    //             }
+    //             if (emailExists && phoneExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Email and phone number already exist"
+    //                     )
+    //                 );
+    //             }
+    //             if (emailExists && whatsappExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Email and WhatsApp number already exist"
+    //                     )
+    //                 );
+    //             }
+    //             if (phoneExists && whatsappExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Phone number and WhatsApp number already exist"
+    //                     )
+    //                 );
+    //             }
+    //             if (emailExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Email already exists"
+    //                     )
+    //                 );
+    //             }
+    //             if (phoneExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Phone number already exists"
+    //                     )
+    //                 );
+    //             }
+    //             if (whatsappExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "WhatsApp number already exists"
+    //                     )
+    //                 );
+    //             }
+
+    //         }
+
+    //         // const checkQuery = `
+    //         //     SELECT user_id, is_deleted
+    //         //     FROM users 
+    //         //     WHERE (email='${dataObj.email}' 
+    //         //         OR phone_number='${dataObj.phone_number}') AND user_type = '${dataObj.user_type}'
+    //         //     ${condition}
+    //         // `;
+
+    //         // const existsDuplicate = await getData(checkQuery, next);
+    //         // if ((existsDuplicate.length > 0) && existsDuplicate[0].is_deleted == '0') {
+    //         //     return next(
+    //         //         CustomErrorHandler.alreadyExist(
+    //         //             "Email or phone number already exists"
+    //         //         )
+    //         //     );
+    //         // }
+
+    //         const exists = await getData(`SELECT user_id, is_deleted
+    //             FROM users 
+    //             WHERE username = '${dataObj.username}'${condition}`, next);
+    //         if ((exists.length > 0) && exists[0].is_deleted == '0') {
+    //             return next(
+    //                 CustomErrorHandler.alreadyExist(
+    //                     `${dataObj.username} Username already exists`
+    //                 )
+    //             );
+    //         }
+    //         // Send OTP only when creating new USER (no user_id)
+    //         if (['user', 'PARTNER'].includes(dataObj.user_type) && !dataObj.user_id) {
+    //             const otp = await commonFunction.setOtp({ phoneNumber: dataObj.phone_number }, next);
+    //             const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`;
+    //             await commonFunction.sendSMS(dataObj.phone_number, message);
+    //         }
+
+    //         // if (!['user', 'PARTNER'].includes(dataObj.user_type)) {
+    //         //     dataObj["is_deleted"] = 0;
+    //         // }
+    //         if (['user', 'PARTNER'].includes(dataObj.user_type) && !dataObj.user_id) {
+    //             dataObj.is_verified = 0;
+    //         }
+    //         if (!['user', 'PARTNER'].includes(dataObj.user_type)) {
+    //             dataObj["is_deleted"] = 0;
+    //             dataObj["is_verified"] = 1; // admin-created accounts don't need OTP
+    //         }
+    //         // ------------------ Insert / Update ------------------
+    //         // let query = "";
+    //         // if (dataObj.user_id || (exists[0]?.user_id && exists[0]?.is_deleted != '0')) {
+    //         //     query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
+    //         // } else {
+    //         //     query = `INSERT INTO users SET ?`;
+    //         // }
+    //         let query = "";
+    //         if (dataObj.user_id) {
+    //             query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
+    //         } else if (exists[0]?.user_id && exists[0]?.is_deleted != '0') {
+    //             query = `UPDATE users SET ? WHERE user_id='${exists[0].user_id}'`;
+    //         } else {
+    //             query = `INSERT INTO users SET ?`;
+    //         }
+
+    //         const isUpdate = !!dataObj.user_id;
+    //         const result = await insertData(query, dataObj, next);
+
+    //         if (result.insertId) {
+    //             dataObj.user_id = result.insertId;
+    //         }
+    //         delete dataObj.password;
+    //         return res.json({
+    //             success: true,
+    //             message: isUpdate
+    //                 ? `${dataObj.user_type === "user" ? "User" : dataObj.user_type} Information updated successfully`
+    //                 : `${dataObj.user_type === "user" ? "User" : dataObj.user_type} registered successfully`,
+    //             data: dataObj
+    //         });
+
+    //     } catch (error) {
+    //         next(error);
+    //     }
+    // },
+
     async addUpdateUserProfile(req, res, next) {
         try {
             // ------------------ Validation Schema ------------------
@@ -92,26 +374,20 @@ const userController = {
                     })
                 });
 
-
-
             var dataObj = { ...req.body };
 
             if (req.files?.profile?.length > 0) {
                 const file = req.files.profile[0];
                 dataObj.profile = `uploads/upload/${file.filename}`;
             }
+
             // ------------------ Validate ------------------
             const { error } = userSchema.validate(dataObj ?? {});
             if (error) {
                 return next(error);
             }
 
-            // if (!['user', 'PARTNER'].includes(dataObj.user_type)) {
-            //     dataObj.user_custum_id = dataObj.employee_id;
-            //     delete dataObj.employee_id;
-            // }
-
-            // ------------------ Duplicate Email / Phone Check ------------------
+            // ------------------ Password hashing / condition setup ------------------
             let condition = "";
             if ((dataObj.user_id && ['user', 'PARTNER'].includes(dataObj.user_type)) || !['user', 'PARTNER'].includes(dataObj.user_type)) {
                 if (dataObj?.password) {
@@ -119,43 +395,51 @@ const userController = {
                 }
                 condition = ` AND user_id != '${dataObj.user_id}'`;
             } else {
-                // const phone = String(dataObj?.phone_number || "").trim();
-                // dataObj.password = md5(phone);
                 dataObj.password = md5(dataObj.password);
             }
 
+            // ------------------ Duplicate Email / Phone Check ------------------
+            // NOTE: only block if a VERIFIED (is_verified=1) and NOT-deleted row already exists.
+            // Unverified rows (is_verified=0) are considered "pending" and are handled separately below.
             const duplicateQuery = `
-                SELECT email, phone_number, whatsapp_number, is_deleted
-                FROM users
-                WHERE user_type='${dataObj.user_type}'
-                ${condition}
-                AND (
-                    email='${dataObj.email}'
-                    OR phone_number='${dataObj.phone_number}'
-                    OR whatsapp_number='${dataObj.phone_number}'
-                    ${dataObj.whatsapp_number?.trim()
+            SELECT user_id, email, phone_number, whatsapp_number, is_deleted, is_verified
+            FROM users
+            WHERE user_type='${dataObj.user_type}'
+            ${condition}
+            AND (
+                email='${dataObj.email}'
+                OR phone_number='${dataObj.phone_number}'
+                OR whatsapp_number='${dataObj.phone_number}'
+                ${dataObj.whatsapp_number?.trim()
                     ? `
-                                OR phone_number='${dataObj.whatsapp_number}'
-                                OR whatsapp_number='${dataObj.whatsapp_number}'
-                            `
+                            OR phone_number='${dataObj.whatsapp_number}'
+                            OR whatsapp_number='${dataObj.whatsapp_number}'
+                        `
                     : ""
                 }
-                )
-            `;
+            )
+        `;
 
             const duplicateData = await getData(duplicateQuery, next);
-            if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') {
-                const emailExists = duplicateData[0].email == dataObj.email;
+
+            // Only rows that are NOT deleted AND ARE verified count as a real duplicate block.
+            const verifiedDuplicate = duplicateData.find(
+                (row) => row.is_deleted == '0' && row.is_verified == 1
+            );
+
+            if (verifiedDuplicate) {
+                const emailExists = verifiedDuplicate.email == dataObj.email;
                 const phoneExists =
-                    duplicateData[0].phone_number == dataObj.phone_number ||
-                    duplicateData[0].whatsapp_number == dataObj.phone_number;
+                    verifiedDuplicate.phone_number == dataObj.phone_number ||
+                    verifiedDuplicate.whatsapp_number == dataObj.phone_number;
 
                 const whatsappExists = dataObj.whatsapp_number?.trim()
                     ? (
-                        duplicateData[0].phone_number == dataObj.whatsapp_number ||
-                        duplicateData[0].whatsapp_number == dataObj.whatsapp_number
+                        verifiedDuplicate.phone_number == dataObj.whatsapp_number ||
+                        verifiedDuplicate.whatsapp_number == dataObj.whatsapp_number
                     )
                     : false;
+
                 if (emailExists && phoneExists && whatsappExists) {
                     return next(
                         CustomErrorHandler.alreadyExist(
@@ -205,68 +489,88 @@ const userController = {
                         )
                     );
                 }
-
             }
 
-            // const checkQuery = `
-            //     SELECT user_id, is_deleted
-            //     FROM users 
-            //     WHERE (email='${dataObj.email}' 
-            //         OR phone_number='${dataObj.phone_number}') AND user_type = '${dataObj.user_type}'
-            //     ${condition}
-            // `;
+            // ------------------ Username Duplicate Check ------------------
+            const exists = await getData(`SELECT user_id, is_deleted, is_verified
+            FROM users 
+            WHERE username = '${dataObj.username}'${condition}`, next);
 
-            // const existsDuplicate = await getData(checkQuery, next);
-            // if ((existsDuplicate.length > 0) && existsDuplicate[0].is_deleted == '0') {
-            //     return next(
-            //         CustomErrorHandler.alreadyExist(
-            //             "Email or phone number already exists"
-            //         )
-            //     );
-            // }
-
-            const exists = await getData(`SELECT user_id, is_deleted
-                FROM users 
-                WHERE username = '${dataObj.username}'${condition}`, next);
-            if ((exists.length > 0) && exists[0].is_deleted == '0') {
+            const verifiedUsernameDuplicate = exists.find(
+                (row) => row.is_deleted == '0' && row.is_verified == 1
+            );
+            if (verifiedUsernameDuplicate) {
                 return next(
                     CustomErrorHandler.alreadyExist(
                         `${dataObj.username} Username already exists`
                     )
                 );
             }
-            // Send OTP only when creating new USER (no user_id)
+
+            // ------------------ Find pending (unverified) row for this user/partner ------------------
+            // If the same person tried to sign up before but never verified OTP,
+            // we reuse that row instead of creating a brand-new duplicate row.
+            let pendingUser = null;
+            if (['user', 'PARTNER'].includes(dataObj.user_type) && !dataObj.user_id) {
+                const pendingQuery = `
+                SELECT user_id
+                FROM users
+                WHERE user_type='${dataObj.user_type}'
+                AND is_verified = 0
+                AND (
+                    phone_number='${dataObj.phone_number}'
+                    OR email='${dataObj.email}'
+                    ${dataObj.username ? `OR username='${dataObj.username}'` : ""}
+                )
+                ORDER BY user_id DESC
+                LIMIT 1
+            `;
+                const pendingRows = await getData(pendingQuery, next);
+                pendingUser = pendingRows[0] || null;
+            }
+
+            // ------------------ Set verification / deletion flags ------------------
+            if (['user', 'PARTNER'].includes(dataObj.user_type) && !dataObj.user_id) {
+                // New signup (or re-signup attempt) -> always pending until OTP verified
+                dataObj.is_verified = 0;
+                dataObj.is_deleted = 0;
+            }
+            if (!['user', 'PARTNER'].includes(dataObj.user_type)) {
+                // Admin-created accounts (RM/ADMIN/AM/SM/ST) skip OTP flow entirely
+                dataObj.is_deleted = 0;
+                dataObj.is_verified = 1;
+            }
+
+            // Send OTP only when creating new USER/PARTNER (no user_id)
             if (['user', 'PARTNER'].includes(dataObj.user_type) && !dataObj.user_id) {
                 const otp = await commonFunction.setOtp({ phoneNumber: dataObj.phone_number }, next);
                 const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`;
                 await commonFunction.sendSMS(dataObj.phone_number, message);
             }
 
-            if (!['user', 'PARTNER'].includes(dataObj.user_type)) {
-                dataObj["is_deleted"] = 0;
-            }
             // ------------------ Insert / Update ------------------
-            // let query = "";
-            // if (dataObj.user_id || (exists[0]?.user_id && exists[0]?.is_deleted != '0')) {
-            //     query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
-            // } else {
-            //     query = `INSERT INTO users SET ?`;
-            // }
             let query = "";
             if (dataObj.user_id) {
+                // Explicit update via user_id
                 query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
+            } else if (pendingUser?.user_id) {
+                // Re-signup before verifying OTP -> update same pending row, don't duplicate
+                query = `UPDATE users SET ? WHERE user_id='${pendingUser.user_id}'`;
             } else if (exists[0]?.user_id && exists[0]?.is_deleted != '0') {
                 query = `UPDATE users SET ? WHERE user_id='${exists[0].user_id}'`;
             } else {
                 query = `INSERT INTO users SET ?`;
             }
 
-            const isUpdate = !!dataObj.user_id;
+            const isUpdate = !!dataObj.user_id || !!pendingUser?.user_id || (exists[0]?.user_id && exists[0]?.is_deleted != '0');
             const result = await insertData(query, dataObj, next);
 
             if (result.insertId) {
                 dataObj.user_id = result.insertId;
+            } else if (pendingUser?.user_id) {
+                dataObj.user_id = pendingUser.user_id;
             }
+
             delete dataObj.password;
             return res.json({
                 success: true,
@@ -313,38 +617,45 @@ const userController = {
             const condition = isUpdate ? ` AND user_id != '${dataObj.user_id}'` : "";
 
             // ------------------ Duplicate Email / Phone / WhatsApp Check ------------------
+            // Only a VERIFIED, non-deleted row counts as a real duplicate block —
+            // consistent with addUpdateUserProfile. This also means an RM can
+            // reactivate/take over a soft-deleted row, but not one that's still
+            // sitting in someone else's unverified self-signup limbo... though
+            // since RM-created users are verified instantly, that edge case is
+            // narrow. See note below the code.
             const duplicateQuery = `
-                SELECT user_id, email, phone_number, whatsapp_number, is_deleted
-                FROM users
-                WHERE user_type='user'
-                ${condition}
-                AND (
-                    email='${dataObj.email}'
-                    OR phone_number='${dataObj.phone_number}'
-                    OR whatsapp_number='${dataObj.phone_number}'
-                    ${dataObj.whatsapp_number?.trim()
+            SELECT user_id, email, phone_number, whatsapp_number, is_deleted, is_verified
+            FROM users
+            WHERE user_type='user'
+            ${condition}
+            AND (
+                email='${dataObj.email}'
+                OR phone_number='${dataObj.phone_number}'
+                OR whatsapp_number='${dataObj.phone_number}'
+                ${dataObj.whatsapp_number?.trim()
                     ? `
-                                OR phone_number='${dataObj.whatsapp_number}'
-                                OR whatsapp_number='${dataObj.whatsapp_number}'
-                            `
+                            OR phone_number='${dataObj.whatsapp_number}'
+                            OR whatsapp_number='${dataObj.whatsapp_number}'
+                        `
                     : ""
                 }
-                )
-            `;
+            )
+        `;
             const duplicateData = await getData(duplicateQuery, next);
-            // const exists = await getData(checkQuery, next);
-            if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') {
-                const emailExists =
-                    duplicateData[0].email == dataObj.email;
-                console.log(emailExists);
+
+            const verifiedDuplicate = duplicateData.find(
+                (row) => row.is_deleted == '0' && row.is_verified == 1
+            );
+
+            if (verifiedDuplicate) {
+                const emailExists = verifiedDuplicate.email == dataObj.email;
                 const phoneExists =
-                    duplicateData[0].phone_number == dataObj.phone_number ||
-                    duplicateData[0].whatsapp_number == dataObj.phone_number;
-                console.log(phoneExists)
+                    verifiedDuplicate.phone_number == dataObj.phone_number ||
+                    verifiedDuplicate.whatsapp_number == dataObj.phone_number;
                 const whatsappExists = dataObj.whatsapp_number?.trim()
                     ? (
-                        duplicateData[0].phone_number == dataObj.whatsapp_number ||
-                        duplicateData[0].whatsapp_number == dataObj.whatsapp_number
+                        verifiedDuplicate.phone_number == dataObj.whatsapp_number ||
+                        verifiedDuplicate.whatsapp_number == dataObj.whatsapp_number
                     )
                     : false;
 
@@ -355,7 +666,6 @@ const userController = {
                         )
                     );
                 }
-
                 if (emailExists && phoneExists) {
                     return next(
                         CustomErrorHandler.alreadyExist(
@@ -363,7 +673,6 @@ const userController = {
                         )
                     );
                 }
-
                 if (emailExists && whatsappExists) {
                     return next(
                         CustomErrorHandler.alreadyExist(
@@ -371,7 +680,6 @@ const userController = {
                         )
                     );
                 }
-
                 if (phoneExists && whatsappExists) {
                     return next(
                         CustomErrorHandler.alreadyExist(
@@ -379,44 +687,43 @@ const userController = {
                         )
                     );
                 }
-
                 if (emailExists) {
                     return next(
                         CustomErrorHandler.alreadyExist("Email already exists")
                     );
                 }
-
                 if (phoneExists) {
                     return next(
                         CustomErrorHandler.alreadyExist("Phone number already exists")
                     );
                 }
-
                 if (whatsappExists) {
                     return next(
                         CustomErrorHandler.alreadyExist("WhatsApp number already exists")
                     );
                 }
             }
+
             // ------------------ Duplicate Username Check ------------------
             const usernameCheck = await getData(
-                `SELECT user_id, is_deleted FROM users WHERE username = '${dataObj.username}' ${condition}`,
+                `SELECT user_id, is_deleted, is_verified FROM users WHERE username = '${dataObj.username}' ${condition}`,
                 next
             );
-            if (usernameCheck.length > 0 && usernameCheck[0].is_deleted == '0') {
+            const verifiedUsernameDuplicate = usernameCheck.find(
+                (row) => row.is_deleted == '0' && row.is_verified == 1
+            );
+            if (verifiedUsernameDuplicate) {
                 return next(CustomErrorHandler.alreadyExist(`${dataObj.username} Username already exists`));
             }
 
-            // ------------------ Password & OTP (only on CREATE) ------------------
+            // ------------------ Password (only on CREATE, no OTP needed) ------------------
             if (!isUpdate) {
                 const phone = String(dataObj.phone_number).trim();
                 dataObj.password = md5(phone);
 
-                // const otp = await commonFunction.setOtp({ phoneNumber: dataObj.phone_number }, next);
-                // const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`;
-                // await commonFunction.sendSMS(dataObj.phone_number, message);
-
                 dataObj.is_deleted = 0;
+                // RM-created users skip OTP entirely — verified immediately.
+                dataObj.is_verified = 1;
             }
 
             // ------------------ Insert / Update ------------------
@@ -426,7 +733,7 @@ const userController = {
                 query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
                 delete dataObj.user_id; // remove from SET clause
             } else if (duplicateData.length > 0 && duplicateData[0].is_deleted != '0') {
-                // 👉 Soft-deleted user → reactivate
+                // 👉 Soft-deleted user → reactivate, mark verified
                 query = `UPDATE users SET ? WHERE user_id='${duplicateData[0].user_id}'`;
                 dataObj.user_id = duplicateData[0].user_id;
             } else {
@@ -452,6 +759,178 @@ const userController = {
             next(error);
         }
     },
+    // async rmCreateUpdateUser(req, res, next) {
+    //     try {
+    //         // ------------------ Validation Schema ------------------
+    //         const schema = Joi.object({
+    //             user_id: Joi.number().integer().optional(),  // 👈 optional for update
+    //             username: Joi.string().required(),
+    //             user_type: Joi.valid('user').required(),
+    //             assign_to: Joi.number().integer().required(),
+    //             created_id: Joi.number().integer().required(),
+    //             residency_status: Joi.string().required(),
+    //             first_name: Joi.string().required(),
+    //             middle_name: Joi.string().allow("").optional(),
+    //             last_name: Joi.string().required(),
+    //             email: Joi.string().email().required(),
+    //             whatsapp_number: Joi.string().allow("").optional(),
+    //             phone_number: Joi.string().required(),
+    //             profile: Joi.string().optional(),
+    //         });
+
+    //         var dataObj = { ...req.body };
+    //         if (req.files?.profile?.length > 0) {
+    //             const file = req.files.profile[0];
+    //             dataObj.profile = `uploads/upload/${file.filename}`;
+    //         }
+
+    //         // ------------------ Validate ------------------
+    //         const { error } = schema.validate(dataObj ?? {});
+    //         if (error) return next(error);
+
+    //         const isUpdate = !!dataObj.user_id;  // 👈 true if user_id present
+    //         const condition = isUpdate ? ` AND user_id != '${dataObj.user_id}'` : "";
+
+    //         // ------------------ Duplicate Email / Phone / WhatsApp Check ------------------
+    //         const duplicateQuery = `
+    //             SELECT user_id, email, phone_number, whatsapp_number, is_deleted
+    //             FROM users
+    //             WHERE user_type='user'
+    //             ${condition}
+    //             AND (
+    //                 email='${dataObj.email}'
+    //                 OR phone_number='${dataObj.phone_number}'
+    //                 OR whatsapp_number='${dataObj.phone_number}'
+    //                 ${dataObj.whatsapp_number?.trim()
+    //                 ? `
+    //                             OR phone_number='${dataObj.whatsapp_number}'
+    //                             OR whatsapp_number='${dataObj.whatsapp_number}'
+    //                         `
+    //                 : ""
+    //             }
+    //             )
+    //         `;
+    //         const duplicateData = await getData(duplicateQuery, next);
+    //         // const exists = await getData(checkQuery, next);
+    //         if (duplicateData.length > 0 && duplicateData[0].is_deleted == '0') {
+    //             const emailExists =
+    //                 duplicateData[0].email == dataObj.email;
+    //             console.log(emailExists);
+    //             const phoneExists =
+    //                 duplicateData[0].phone_number == dataObj.phone_number ||
+    //                 duplicateData[0].whatsapp_number == dataObj.phone_number;
+    //             console.log(phoneExists)
+    //             const whatsappExists = dataObj.whatsapp_number?.trim()
+    //                 ? (
+    //                     duplicateData[0].phone_number == dataObj.whatsapp_number ||
+    //                     duplicateData[0].whatsapp_number == dataObj.whatsapp_number
+    //                 )
+    //                 : false;
+
+    //             if (emailExists && phoneExists && whatsappExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Email, phone number and WhatsApp number already exist"
+    //                     )
+    //                 );
+    //             }
+
+    //             if (emailExists && phoneExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Email and phone number already exist"
+    //                     )
+    //                 );
+    //             }
+
+    //             if (emailExists && whatsappExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Email and WhatsApp number already exist"
+    //                     )
+    //                 );
+    //             }
+
+    //             if (phoneExists && whatsappExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Phone number and WhatsApp number already exist"
+    //                     )
+    //                 );
+    //             }
+
+    //             if (emailExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist("Email already exists")
+    //                 );
+    //             }
+
+    //             if (phoneExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist("Phone number already exists")
+    //                 );
+    //             }
+
+    //             if (whatsappExists) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist("WhatsApp number already exists")
+    //                 );
+    //             }
+    //         }
+    //         // ------------------ Duplicate Username Check ------------------
+    //         const usernameCheck = await getData(
+    //             `SELECT user_id, is_deleted FROM users WHERE username = '${dataObj.username}' ${condition}`,
+    //             next
+    //         );
+    //         if (usernameCheck.length > 0 && usernameCheck[0].is_deleted == '0') {
+    //             return next(CustomErrorHandler.alreadyExist(`${dataObj.username} Username already exists`));
+    //         }
+
+    //         // ------------------ Password & OTP (only on CREATE) ------------------
+    //         if (!isUpdate) {
+    //             const phone = String(dataObj.phone_number).trim();
+    //             dataObj.password = md5(phone);
+
+    //             // const otp = await commonFunction.setOtp({ phoneNumber: dataObj.phone_number }, next);
+    //             // const message = `Dear User, ${otp} is your login OTP for account access. Do not share it with anyone. - THANGIV CONSULTANCY PRIVATE LIMITED`;
+    //             // await commonFunction.sendSMS(dataObj.phone_number, message);
+
+    //             dataObj.is_deleted = 0;
+    //         }
+
+    //         // ------------------ Insert / Update ------------------
+    //         let query;
+    //         if (isUpdate) {
+    //             // 👉 RM updating existing user
+    //             query = `UPDATE users SET ? WHERE user_id='${dataObj.user_id}'`;
+    //             delete dataObj.user_id; // remove from SET clause
+    //         } else if (duplicateData.length > 0 && duplicateData[0].is_deleted != '0') {
+    //             // 👉 Soft-deleted user → reactivate
+    //             query = `UPDATE users SET ? WHERE user_id='${duplicateData[0].user_id}'`;
+    //             dataObj.user_id = duplicateData[0].user_id;
+    //         } else {
+    //             // 👉 Fresh insert
+    //             query = `INSERT INTO users SET ?`;
+    //         }
+
+    //         const result = await insertData(query, dataObj, next);
+
+    //         if (result.insertId) {
+    //             dataObj.user_id = result.insertId;
+    //         }
+
+    //         delete dataObj.password;
+
+    //         return res.json({
+    //             success: true,
+    //             message: isUpdate ? "User updated successfully" : "User registered successfully",
+    //             data: dataObj
+    //         });
+
+    //     } catch (error) {
+    //         next(error);
+    //     }
+    // },
 
     async addUpdateUserDocument(req, res, next) {
         try {
@@ -760,7 +1239,7 @@ const userController = {
     async getUserList(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = "SELECT * FROM users WHERE 1 AND user_type='user' AND is_deleted = 0 AND user_type != 'ADMIN'";
+            let query = "SELECT * FROM users WHERE 1 AND user_type='user' AND is_deleted = 0 AND is_verified=1 AND user_type != 'ADMIN'";
             let cond = '';
             let page = { pageQuery: '' };
 
@@ -876,7 +1355,7 @@ const userController = {
     async RMuserList(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = "SELECT * FROM users WHERE 1 AND user_type='user' AND is_deleted = 0 AND user_type != 'ADMIN'";
+            let query = "SELECT * FROM users WHERE 1 AND user_type='user' AND is_deleted = 0 AND is_verified = 1 AND user_type != 'ADMIN'";
             let cond = '';
             let page = { pageQuery: '' };
 
@@ -979,7 +1458,7 @@ const userController = {
     async getEmplyees(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = "SELECT * FROM users WHERE 1 AND user_type!='user' AND user_type!='admin' AND user_type!='PARTNER' AND is_deleted = 0 AND user_type != 'ADMIN'";
+            let query = "SELECT * FROM users WHERE 1 AND user_type!='user' AND user_type!='admin' AND user_type!='PARTNER' AND is_deleted = 0 AND is_verified = 1 AND user_type != 'ADMIN'";
             let cond = '';
             let page = { pageQuery: '' };
 
@@ -1496,4 +1975,86 @@ export default userController;
 //         END IF;
 
 //     END IF;
+// END
+
+
+
+
+// BEGIN
+//     DECLARE next_id INT DEFAULT 1;
+//     DECLARE prefix VARCHAR(10);
+
+//     -- User Prefix (THNGVMMYY)
+//     SET prefix = CONCAT(
+//         'THNGV',
+//         DATE_FORMAT(CURDATE(), '%m'),
+//         DATE_FORMAT(CURDATE(), '%y')
+//     );
+
+//     /* ---------------- User ID ---------------- */
+//     IF NEW.user_type = 'user' THEN
+
+//         SELECT IFNULL(
+//             MAX(
+//                 CAST(
+//                     SUBSTRING_INDEX(user_custum_id, '_', -1) AS UNSIGNED
+//                 )
+//             ),
+//             0
+//         ) + 1
+//         INTO next_id
+//         FROM users
+//         WHERE user_type = 'user'
+//           AND user_custum_id LIKE 'THNGV%';
+
+//         SET NEW.user_custum_id = CONCAT(
+//             prefix,
+//             '_',
+//             LPAD(next_id, 2, '0')
+//         );
+
+//     /* ---------------- Partner ID ---------------- */
+//     ELSEIF NEW.user_type = 'Partner' THEN
+
+//         SELECT IFNULL(
+//             MAX(
+//                 CAST(
+//                     SUBSTRING_INDEX(user_custum_id, '_', -1) AS UNSIGNED
+//                 )
+//             ),
+//             0
+//         ) + 1
+//         INTO next_id
+//         FROM users
+//         WHERE user_type = 'Partner'
+//           AND user_custum_id LIKE 'PTR_%';
+
+//         SET NEW.user_custum_id = CONCAT(
+//             'PTR_',
+//             LPAD(next_id, 2, '0')
+//         );
+
+//     /* ---------------- Employee ID (RM, AM, ST) ---------------- */
+//     ELSEIF NEW.user_type IN ('RM', 'AM', 'ST') THEN
+
+//         SELECT IFNULL(
+//             MAX(
+//                 CAST(
+//                     SUBSTRING_INDEX(user_custum_id, '_', -1) AS UNSIGNED
+//                 )
+//             ),
+//             0
+//         ) + 1
+//         INTO next_id
+//         FROM users
+//         WHERE user_type IN ('RM', 'AM', 'ST')
+//           AND user_custum_id LIKE 'EMP_%';
+
+//         SET NEW.user_custum_id = CONCAT(
+//             'EMP_',
+//             LPAD(next_id, 2, '0')
+//         );
+
+//     END IF;
+
 // END

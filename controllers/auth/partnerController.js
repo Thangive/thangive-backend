@@ -13,7 +13,7 @@ const partnerController = {
             let query = `
                 SELECT * 
                 FROM users 
-                WHERE is_deleted = 0 
+                WHERE is_deleted = 0 AND is_verified = 1
                 AND user_type = 'PARTNER'
             `;
 
