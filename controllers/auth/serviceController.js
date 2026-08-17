@@ -16,7 +16,7 @@ const serviceController = {
                 otp: Joi.number().optional(),
                 user_type: Joi.valid('user', 'PARTNER').optional(),
             }).or('username', 'phone_number').messages({ 'object.missing': 'Either username or phone_number is required' });
-
+            console.log(req.body);
             const { error, value } = loginSchema.validate(req.body ?? {});
             if (error) return next(error);
 
@@ -30,6 +30,7 @@ const serviceController = {
                 if (value.user_type) {
                     userQuery += ` AND user_type = '${value.user_type}'`;
                 }
+                
                 const users = await getData(userQuery, next);
 
                 if (!users || users.length === 0) {
@@ -81,7 +82,7 @@ const serviceController = {
             }
 
             // ---------- Get user (username/password login) ----------
-            const query = `
+            let query = `
             SELECT
                 user_id,
                 username,
@@ -95,6 +96,9 @@ const serviceController = {
             WHERE is_deleted = 0
             AND username = '${value.username}'
         `;
+            if (value.user_type) {
+                query += ` AND user_type = '${value.user_type}'`;
+            }
             const users = await getData(query, next);
 
             if (!users || users.length === 0) {
