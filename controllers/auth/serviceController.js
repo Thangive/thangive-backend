@@ -27,10 +27,18 @@ const serviceController = {
                 // a user who signed up but never verified OTP at signup time
                 // cannot log in via OTP either, because is_verified is still 0.
                 let userQuery = `SELECT user_id, user_custum_id, username, email, phone_number, is_verified, user_type as Role, password, CONCAT_WS(' ', first_name, middle_name, last_name) AS full_name FROM users WHERE is_deleted = 0 AND phone_number = '${value.phone_number}'`;
+                // if (value.user_type) {
+                //     userQuery += ` AND user_type = '${value.user_type}'`;
+                // }
+
                 if (value.user_type) {
-                    userQuery += ` AND user_type = '${value.user_type}'`;
+                    if (value.user_type === 'user') {
+                        userQuery += ` AND user_type IN ('user', 'RM', 'ADMIN', 'AM', 'SM', 'ST')`;
+                    } else if (value.user_type === 'PARTNER') {
+                        userQuery += ` AND user_type = 'PARTNER'`;
+                    }
                 }
-                
+
                 const users = await getData(userQuery, next);
 
                 if (!users || users.length === 0) {
@@ -96,8 +104,15 @@ const serviceController = {
             WHERE is_deleted = 0
             AND username = '${value.username}'
         `;
+            // if (value.user_type) {
+            //     query += ` AND user_type = '${value.user_type}'`;
+            // }
             if (value.user_type) {
-                query += ` AND user_type = '${value.user_type}'`;
+                if (value.user_type === 'user') {
+                    query += ` AND user_type IN ('user', 'RM', 'ADMIN', 'AM', 'SM', 'ST')`;
+                } else if (value.user_type === 'PARTNER') {
+                    query += ` AND user_type = 'PARTNER'`;
+                }
             }
             const users = await getData(query, next);
 
