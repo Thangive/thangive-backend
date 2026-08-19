@@ -593,7 +593,12 @@ const userController = {
                 user_type: Joi.valid('user').required(),
                 assign_to: Joi.number().integer().required(),
                 created_id: Joi.number().integer().required(),
-                residency_status: Joi.string().required(),
+                // residency_status: Joi.string().required(),
+                residency_status: Joi.string().when('user_id', {
+                    is: Joi.exist(),
+                    then: Joi.optional(),
+                    otherwise: Joi.required()
+                }),
                 first_name: Joi.string().required(),
                 middle_name: Joi.string().allow("").optional(),
                 last_name: Joi.string().required(),

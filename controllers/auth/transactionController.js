@@ -248,6 +248,16 @@ const transactionController = {
                         .optional(),
                     otherwise: Joi.forbidden()
                 }),
+                user_Datetime: Joi.when('employee_type', {
+                    is: 'RM',
+                    then: Joi.string().optional(),
+                    otherwise: Joi.forbidden()
+                }),
+                am_datetime: Joi.when('employee_type', {
+                    is: 'AM',
+                    then: Joi.string().optional(),
+                    otherwise: Joi.forbidden()
+                }),
                 stock_details_id: Joi.number().integer().required(),
                 status: Joi.string()
                     .valid('COMPLETED', 'PROCCESSING', 'HOLD', 'REJECTED', 'CANCEL', 'PENDING')
@@ -318,9 +328,15 @@ const transactionController = {
                 if (dataObj.share_Debit_Datetime != null) {
                     updatedObject.share_Debit_Datetime = dataObj.share_Debit_Datetime;
                 }
+                if (dataObj.user_Datetime != null) {
+                    updatedObject.user_Datetime = dataObj.user_Datetime;
+                }
                 updatedObject.rm_status = dataObj.status;
             } else if (dataObj.employee_type === 'AM') {
                 updatedObject.am_status = dataObj.status;
+                if (dataObj.am_datetime != null) {
+                    updatedObject.am_datetime = dataObj.am_datetime;
+                }
             } else if (dataObj.employee_type === 'ST') {
                 if (req.files?.share_Debit?.length > 0) {
                     updatedObject.share_Debit_Path = dataObj.share_Debit_Path;
@@ -741,6 +757,7 @@ const transactionController = {
                     'RM_PROCCESSING',
                     'AM_COMPLETED',
                     'ST_PROCCESSING',
+                    'AM_PROCCESSING',
                     'REJECTED',
                     'CANCEL',
                     'COMPLETED'
@@ -813,9 +830,14 @@ const transactionController = {
                 cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND (ot.st_status = 'PENDING' OR ot.st_status = 'HOLD')`;
             }
 
-            // ---- ONLY SELL RM AND ST COMPLETED () ----
+            // ---- ONLY SELL RM AND ST PENDING () ----
             if (value.status === "ST_PROCCESSING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
-                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED'`;
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED' AND (ot.st_status = 'PENDING' OR ot.st_status = 'HOLD')`;
+            }
+
+            // ---- ONLY SELL RM AND ST COMPLETED () ----
+            if (value.status === "AM_PROCCESSING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.st_status = 'COMPLETED' AND ot.am_status != 'COMPLETED'`;
             }
 
             if (
@@ -1007,6 +1029,8 @@ const transactionController = {
                 ot.share_Debit_Invoice,
                 ot.share_Debit_Path,
                 ot.share_Debit_Datetime,
+                ot.user_Datetime,
+                ot.am_datetime,
                 CONCAT(
                     rm.first_name, ' ',
                     IFNULL(rm.middle_name, ''), 
@@ -1624,7 +1648,7 @@ const transactionController = {
 
             const { error, value } = holdingSchema.validate(req.query ?? {});
             if (error) return next(error);
-            
+
             const query = `
                 SELECT 
                     sub.advisor_name,
@@ -1755,7 +1779,8 @@ const transactionController = {
                         CONVERT_TZ(ot.created_at, '+00:00', '+05:30'),
                         '%d-%m-%Y %h:%i %p'
                     ) AS date,
-                    ot.st_datetime
+                    ot.st_datetime,
+                    ot.am_datetime
                 FROM order_transactions ot
                 JOIN stock_details st 
                     ON ot.stock_details_id = st.stock_details_id
