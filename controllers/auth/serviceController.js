@@ -393,7 +393,8 @@ const serviceController = {
                 username: Joi.string().optional(),
                 phone_number: Joi.number().optional(),
                 newPassword: Joi.string().required(),
-                confirmPassword: Joi.string().required()
+                confirmPassword: Joi.string().required(),
+                user_type: Joi.string().valid("user", "PARTNER").required(),
             }).or('username', 'phone_number')
                 .messages({
                     'object.missing': 'Either username or phone number is required'
@@ -422,6 +423,7 @@ const serviceController = {
                         password
                     FROM users
                     WHERE is_deleted = 0
+                    AND user_type = '${value.user_type}'
                     AND (username = '${value.username}' OR phone_number = '${value.phone_number}')`;
 
             const data = await getData(query, next);

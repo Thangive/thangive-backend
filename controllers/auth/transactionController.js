@@ -992,6 +992,7 @@ const transactionController = {
             SELECT 
                 ot.order_id,
                 ot.user_id,
+                ot.advisor_id,
                 ot.broker_id,
                 ot.order_custom_id,
                 ot.order_type,
