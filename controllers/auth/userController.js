@@ -1319,10 +1319,11 @@ const userController = {
                         WHERE is_deleted = 0 AND user_id = ${user.user_id}
                     `;
                     const bankDetails = await getData(docQuery, next);
+                    // console.log(bankDetails);
                     user.bankDetails = bankDetails ?? [];
                 }
             }
-
+            
             /* ------------------ Bank  Details ------------------ */
             if (users.length) {
                 for (const user of users) {

@@ -179,6 +179,8 @@ const transactionController = {
     async updateOrderStatus(req, res, next) {
         try {
             /* ------------------ Validation Schema ------------------ */
+
+            const optionalNumber = Joi.number().empty(['', 'null', null]).optional();
             const orderSchema = Joi.object({
                 order_id: Joi.number().integer().required(),
                 user_id: Joi.number().integer().required(),
@@ -189,25 +191,25 @@ const transactionController = {
 
                 bank_id: Joi.when('employee_type', {
                     is: 'RM',
-                    then: Joi.number().optional(),
+                    then: optionalNumber,
                     otherwise: Joi.forbidden()
                 }),
 
                 broker_id: Joi.when('employee_type', {
                     is: 'RM',
-                    then: Joi.number().optional(),
+                    then: optionalNumber,
                     otherwise: Joi.forbidden()
                 }),
 
                 rm_qty: Joi.when('employee_type', {
                     is: 'RM',
-                    then: Joi.number().optional(),
+                    then: optionalNumber,
                     otherwise: Joi.forbidden()
                 }),
 
                 rm_price: Joi.when('employee_type', {
                     is: 'RM',
-                    then: Joi.number().optional(),
+                    then: optionalNumber,
                     otherwise: Joi.forbidden()
                 }),
 
@@ -274,8 +276,9 @@ const transactionController = {
             }
 
             /* ------------------ Validate Request ------------------ */
-            const { error } = orderSchema.validate(dataObj ?? {});
+            const { error, value } = orderSchema.validate(dataObj ?? {});
             if (error) return next(error);
+            Object.assign(dataObj, value);
 
             /* ------------------ USER ↔ EMPLOYEE ASSIGNMENT CHECK ------------------ */
             const assignCheckQuery = ` SELECT user_id  FROM users WHERE user_id = '${dataObj.user_id}' AND assign_to = '${dataObj.employee_id}' AND is_deleted = 0 LIMIT 1 `;
@@ -299,20 +302,24 @@ const transactionController = {
             // store status against employee type
             if (dataObj.employee_type === 'RM') {
 
-                if (dataObj.bank_id != null) {
-                    updatedObject.bank_id = dataObj.bank_id;
-                }
+                const skipRequiredFields = ["REJECTED", "HOLD", "CANCEL"].includes(dataObj.status);
 
-                if (dataObj.broker_id != null) {
-                    updatedObject.broker_id = dataObj.broker_id;
-                }
+                if (!skipRequiredFields) {
+                    if (dataObj.bank_id != null) {
+                        updatedObject.bank_id = dataObj.bank_id;
+                    }
 
-                if (dataObj.rm_qty != null) {
-                    updatedObject.quantity = dataObj.rm_qty;
-                }
+                    if (dataObj.broker_id != null) {
+                        updatedObject.broker_id = dataObj.broker_id;
+                    }
 
-                if (dataObj.rm_price != null) {
-                    updatedObject.price_per_share = dataObj.rm_price;
+                    if (dataObj.rm_qty != null) {
+                        updatedObject.quantity = dataObj.rm_qty;
+                    }
+
+                    if (dataObj.rm_price != null) {
+                        updatedObject.price_per_share = dataObj.rm_price;
+                    }
                 }
 
                 if (dataObj.rm_Datetime != null) {
