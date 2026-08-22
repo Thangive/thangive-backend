@@ -690,6 +690,8 @@ const transactionController = {
                     ot.payments_count,
                     ot.created_at,
                     ot.rm_datetime,
+                    ot.st_datetime,
+                    ot.am_datetime,
                     ot.partner_price AS partner_price,
                     ot.verify,
                     ot.share_Debit_Invoice,
