@@ -302,7 +302,7 @@ const transactionController = {
             // store status against employee type
             if (dataObj.employee_type === 'RM') {
 
-                const skipRequiredFields = ["REJECTED", "HOLD", "CANCEL"].includes(dataObj.status);
+                const skipRequiredFields = ["REJECTED", "HOLD", "CANCEL", "PENDING"].includes(dataObj.status);
 
                 if (!skipRequiredFields) {
                     if (dataObj.bank_id != null) {
@@ -339,6 +339,10 @@ const transactionController = {
                     updatedObject.user_Datetime = dataObj.user_Datetime;
                 }
                 updatedObject.rm_status = dataObj.status;
+                if (["REJECTED", "CANCEL"].includes(dataObj.status)) {
+                    updatedObject.am_status = dataObj.status;
+                    updatedObject.st_status = dataObj.status;
+                }
             } else if (dataObj.employee_type === 'AM') {
                 updatedObject.am_status = dataObj.status;
                 if (dataObj.am_datetime != null) {
@@ -695,6 +699,7 @@ const transactionController = {
                     ot.partner_price AS partner_price,
                     ot.verify,
                     ot.share_Debit_Invoice,
+                    ot.share_Debit_Datetime,
                     CASE
                         WHEN latest_payment.payment_type = 'FULL' THEN 'FULL PAYMENT'
                         WHEN latest_payment.payment_type = 'PARTIAL' THEN 'PARTIAL PAYMENT'
