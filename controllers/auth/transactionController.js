@@ -751,7 +751,7 @@ const transactionController = {
                 broker_id: Joi.number().integer(),
                 advisor_id: Joi.number().integer(),
                 employee_type: Joi.string()
-                    .valid('RM', 'AM', 'ST', 'PARTNER')
+                    .valid('RM', 'AM', 'ST', 'PARTNER','ADMIN')
                     .optional(),
 
                 employee_id: Joi.when('employee_type', {
@@ -762,6 +762,7 @@ const transactionController = {
                 transaction_type: Joi.string()
                     .valid('BUY', 'SELL')
                     .optional(),
+                rm_id: Joi.number().integer().optional(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),
@@ -806,6 +807,10 @@ const transactionController = {
 
             if (value.employee_id && value.employee_type == "RM") {
                 cond += ` AND users.assign_to = ${value.employee_id}`;
+            }
+
+            if (value.rm_id) {
+                cond += ` AND users.assign_to = ${value.rm_id}`;
             }
 
             if (value.employee_id && value.employee_type == "PARTNER") {
