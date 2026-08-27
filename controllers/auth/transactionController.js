@@ -339,9 +339,16 @@ const transactionController = {
                     updatedObject.user_Datetime = dataObj.user_Datetime;
                 }
                 updatedObject.rm_status = dataObj.status;
+                // if (["REJECTED", "CANCEL"].includes(dataObj.status)) {
+                //     updatedObject.am_status = dataObj.status;
+                //     updatedObject.st_status = dataObj.status;
+                // }
                 if (["REJECTED", "CANCEL"].includes(dataObj.status)) {
                     updatedObject.am_status = dataObj.status;
                     updatedObject.st_status = dataObj.status;
+                } else if (["COMPLETED", "PROCCESSING", "HOLD", "PENDING"].includes(dataObj.status)) {
+                    updatedObject.am_status = "PENDING";
+                    updatedObject.st_status = "PENDING";
                 }
             } else if (dataObj.employee_type === 'AM') {
                 updatedObject.am_status = dataObj.status;
