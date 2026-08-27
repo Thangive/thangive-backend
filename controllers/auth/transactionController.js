@@ -837,8 +837,9 @@ const transactionController = {
             }
 
             // ---- ALL PENDING (Only RM PENDING) ----
-            if (value.status === "PENDING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
-                cond += ` AND ot.rm_status = 'PENDING' AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
+            if (value.status === "PENDING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) 
+            {
+                cond += `  AND (ot.rm_status = 'PENDING' OR ot.rm_status = 'HOLD') AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
             }
 
             // ---- SALE PROCCESSING (Only RM PROCCESSING) ----
