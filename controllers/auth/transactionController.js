@@ -708,6 +708,14 @@ const transactionController = {
                     ot.share_Debit_Invoice,
                     ot.share_Debit_Datetime,
                     CASE
+                        WHEN ot.transaction_type = 'SELL' THEN
+                            CASE
+                                WHEN ot.markAsSold = 1 THEN 'Mark As Sold'
+                                ELSE 'Thangiv'
+                            END
+                        ELSE NULL
+                    END AS selling_type,
+                    CASE
                         WHEN latest_payment.payment_type = 'FULL' THEN 'FULL PAYMENT'
                         WHEN latest_payment.payment_type = 'PARTIAL' THEN 'PARTIAL PAYMENT'
                         ELSE latest_payment.payment_type
@@ -758,7 +766,7 @@ const transactionController = {
                 broker_id: Joi.number().integer(),
                 advisor_id: Joi.number().integer(),
                 employee_type: Joi.string()
-                    .valid('RM', 'AM', 'ST', 'PARTNER','ADMIN')
+                    .valid('RM', 'AM', 'ST', 'PARTNER', 'ADMIN')
                     .optional(),
 
                 employee_id: Joi.when('employee_type', {
@@ -837,8 +845,7 @@ const transactionController = {
             }
 
             // ---- ALL PENDING (Only RM PENDING) ----
-            if (value.status === "PENDING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) 
-            {
+            if (value.status === "PENDING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
                 cond += `  AND (ot.rm_status = 'PENDING' OR ot.rm_status = 'HOLD') AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
             }
 
@@ -1801,6 +1808,14 @@ const transactionController = {
                     ot.broker_id,
                     ot.st_datetime,
                     ot.price_per_share AS share_price,
+                    CASE
+                        WHEN ot.transaction_type = 'SELL' THEN
+                            CASE
+                                WHEN ot.markAsSold = 1 THEN 'Mark As Sold'
+                                ELSE 'Thangiv'
+                            END
+                        ELSE NULL
+                    END AS selling_type,
                     (ot.price_per_share * ot.quantity) AS total,
                     ot.created_at,
                     DATE_FORMAT(
