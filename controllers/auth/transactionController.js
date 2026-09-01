@@ -122,8 +122,16 @@ const transactionController = {
             /* ------------------ SELL Validation ------------------ */
             if (dataObj.transaction_type === 'SELL') {
 
-                let check = dataObj.markAsSold ? true : dataObj.advisor_id != 2 ? true : false;
-                if ((remainingQty < dataObj.quantity) && check) {
+                // let check = dataObj.markAsSold ? true : dataObj.advisor_id != 2 ? true : false;
+                // if ((remainingQty < dataObj.quantity) && check) {
+                //     return next(
+                //         CustomErrorHandler.badRequest(
+                //             `Insufficient quantity. Available: ${remainingQty}`
+                //         )
+                //     );
+                // }
+
+                if (remainingQty < dataObj.quantity) {
                     return next(
                         CustomErrorHandler.badRequest(
                             `Insufficient quantity. Available: ${remainingQty}`
@@ -139,12 +147,39 @@ const transactionController = {
                 }
             }
 
-            if ((dataObj.transaction_type === 'BUY' && dataObj.advisor_id == 2) || (dataObj.transaction_type === 'SELL' && dataObj.markAsSold)) {
+            /* ------------------ Mark As Sold Handling ------------------ */
+
+            dataObj.markAsSold = dataObj.markAsSold ? 1 : 0;
+            if (dataObj.transaction_type === 'SELL' && dataObj.markAsSold === 1) {
+                if (Number(dataObj.advisor_id) === 2) {
+                    dataObj.markAsSoldStatus = 'APPROVED';
+                    dataObj.rm_status = 'COMPLETED';
+                    dataObj.am_status = 'COMPLETED';
+                    dataObj.st_status = 'COMPLETED';
+                } else {
+                    dataObj.markAsSoldStatus = 'PENDING';
+
+                    dataObj.rm_status = 'PENDING';
+                    dataObj.am_status = 'PENDING';
+                    dataObj.st_status = 'PENDING';
+                }
+            }
+
+            /* ------------------ Normal BUY Handling ------------------ */
+            if (dataObj.transaction_type === 'BUY' && dataObj.advisor_id == 2) {
                 dataObj.rm_status = 'COMPLETED';
                 dataObj.am_status = 'COMPLETED';
                 dataObj.st_status = 'COMPLETED';
             }
-            dataObj.markAsSold = dataObj.markAsSold ? 1 : 0;
+
+            // if ((dataObj.transaction_type === 'BUY' && dataObj.advisor_id == 2) || (dataObj.transaction_type === 'SELL' && dataObj.markAsSold)) {
+            //     dataObj.rm_status = 'COMPLETED';
+            //     dataObj.am_status = 'COMPLETED';
+            //     dataObj.st_status = 'COMPLETED';
+            // }
+
+            /* ------------------ Normal Order Defaults ------------------ */
+
             /* ------------------ Insert / Update ------------------ */
             let query = '';
             if (dataObj.order_id) {
@@ -264,6 +299,7 @@ const transactionController = {
                 status: Joi.string()
                     .valid('COMPLETED', 'PROCCESSING', 'HOLD', 'REJECTED', 'CANCEL', 'PENDING')
                     .required(),
+                markAsSold: Joi.string().valid('APPROVED', 'CANCELLED').optional(),
             });
 
             const dataObj = { ...req.body };
@@ -302,53 +338,76 @@ const transactionController = {
             // store status against employee type
             if (dataObj.employee_type === 'RM') {
 
-                const skipRequiredFields = ["REJECTED", "HOLD", "CANCEL", "PENDING"].includes(dataObj.status);
+                if (dataObj.markAsSold) {
 
-                if (!skipRequiredFields) {
-                    if (dataObj.bank_id != null) {
-                        updatedObject.bank_id = dataObj.bank_id;
+                    updatedObject.markAsSoldStatus = dataObj.markAsSold;
+                    if (dataObj.markAsSold === 'APPROVED') {
+                        updatedObject.markAsSold = 1;
+                        updatedObject.rm_status = 'COMPLETED';
+                        updatedObject.am_status = 'COMPLETED';
+                        updatedObject.st_status = 'COMPLETED';
+                    }
+                    else if (dataObj.markAsSold === 'CANCELLED') {
+                        updatedObject.markAsSold = 1;
+                        updatedObject.rm_status = 'CANCEL';
+                        updatedObject.am_status = 'CANCEL';
+                        updatedObject.st_status = 'CANCEL';
                     }
 
-                    if (dataObj.broker_id != null) {
-                        updatedObject.broker_id = dataObj.broker_id;
+                    if (dataObj.rm_Datetime != null) {
+                        updatedObject.rm_Datetime = dataObj.rm_Datetime;
+                    }
+                } else {
+
+
+                    const skipRequiredFields = ["REJECTED", "HOLD", "CANCEL", "PENDING"].includes(dataObj.status);
+
+                    if (!skipRequiredFields) {
+                        if (dataObj.bank_id != null) {
+                            updatedObject.bank_id = dataObj.bank_id;
+                        }
+
+                        if (dataObj.broker_id != null) {
+                            updatedObject.broker_id = dataObj.broker_id;
+                        }
+
+                        if (dataObj.rm_qty != null) {
+                            updatedObject.quantity = dataObj.rm_qty;
+                        }
+
+                        if (dataObj.rm_price != null) {
+                            updatedObject.price_per_share = dataObj.rm_price;
+                        }
                     }
 
-                    if (dataObj.rm_qty != null) {
-                        updatedObject.quantity = dataObj.rm_qty;
+                    if (dataObj.rm_Datetime != null) {
+                        updatedObject.rm_Datetime = dataObj.rm_Datetime;
                     }
 
-                    if (dataObj.rm_price != null) {
-                        updatedObject.price_per_share = dataObj.rm_price;
+                    if (dataObj.remark != null) {
+                        updatedObject.remark = dataObj.remark;
                     }
-                }
-
-                if (dataObj.rm_Datetime != null) {
-                    updatedObject.rm_Datetime = dataObj.rm_Datetime;
-                }
-
-                if (dataObj.remark != null) {
-                    updatedObject.remark = dataObj.remark;
-                }
-                if (req.files?.share_Debit?.length > 0) {
-                    updatedObject.share_Debit_Path = dataObj.share_Debit_Path;
-                }
-                if (dataObj.share_Debit_Datetime != null) {
-                    updatedObject.share_Debit_Datetime = dataObj.share_Debit_Datetime;
-                }
-                if (dataObj.user_Datetime != null) {
-                    updatedObject.user_Datetime = dataObj.user_Datetime;
-                }
-                updatedObject.rm_status = dataObj.status;
-                // if (["REJECTED", "CANCEL"].includes(dataObj.status)) {
-                //     updatedObject.am_status = dataObj.status;
-                //     updatedObject.st_status = dataObj.status;
-                // }
-                if (["REJECTED", "CANCEL"].includes(dataObj.status)) {
-                    updatedObject.am_status = dataObj.status;
-                    updatedObject.st_status = dataObj.status;
-                } else if (["COMPLETED", "PROCCESSING", "HOLD", "PENDING"].includes(dataObj.status)) {
-                    updatedObject.am_status = "PENDING";
-                    updatedObject.st_status = "PENDING";
+                    if (req.files?.share_Debit?.length > 0) {
+                        updatedObject.share_Debit_Path = dataObj.share_Debit_Path;
+                    }
+                    if (dataObj.share_Debit_Datetime != null) {
+                        updatedObject.share_Debit_Datetime = dataObj.share_Debit_Datetime;
+                    }
+                    if (dataObj.user_Datetime != null) {
+                        updatedObject.user_Datetime = dataObj.user_Datetime;
+                    }
+                    updatedObject.rm_status = dataObj.status;
+                    // if (["REJECTED", "CANCEL"].includes(dataObj.status)) {
+                    //     updatedObject.am_status = dataObj.status;
+                    //     updatedObject.st_status = dataObj.status;
+                    // }
+                    if (["REJECTED", "CANCEL"].includes(dataObj.status)) {
+                        updatedObject.am_status = dataObj.status;
+                        updatedObject.st_status = dataObj.status;
+                    } else if (["COMPLETED", "PROCCESSING", "HOLD", "PENDING"].includes(dataObj.status)) {
+                        updatedObject.am_status = "PENDING";
+                        updatedObject.st_status = "PENDING";
+                    }
                 }
             } else if (dataObj.employee_type === 'AM') {
                 updatedObject.am_status = dataObj.status;
@@ -651,6 +710,7 @@ const transactionController = {
             let query = `
                 SELECT
                     ot.order_id AS order_transaction_id,
+                    ot.order_id,
                     ot.order_custom_id AS order_custom_id,
                     ot.stock_details_id,
                     ot.user_id,
@@ -707,6 +767,7 @@ const transactionController = {
                     ot.verify,
                     ot.share_Debit_Invoice,
                     ot.share_Debit_Datetime,
+                    ot.markAsSoldStatus,
                     CASE
                         WHEN ot.transaction_type = 'SELL' THEN
                             CASE
@@ -790,8 +851,10 @@ const transactionController = {
                     'AM_PROCCESSING',
                     'REJECTED',
                     'CANCEL',
-                    'COMPLETED'
+                    'COMPLETED',
+                    'MarkAsSOLD'
                 ).optional(),
+                markAsSold: Joi.string().valid('PENDING', 'APPROVED', 'CANCELLED').optional(),
                 from_date: Joi.string().optional(),
                 to_date: Joi.string().optional(),
                 company_name: Joi.string().optional(),
@@ -844,34 +907,43 @@ const transactionController = {
                 cond += ` AND ot.verify != 2 `;
             }
 
+
+            if (value.status === "MarkAsSOLD" && (value.employee_type === "RM")) {
+                if (value.markAsSold) {
+                    cond += `  AND ot.markAsSold = 1 AND ot.markAsSoldStatus = '${value.markAsSold}'`;
+                } else {
+                    cond += `  AND ot.markAsSold = 1`;
+                }
+            }
+
             // ---- ALL PENDING (Only RM PENDING) ----
             if (value.status === "PENDING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
-                cond += `  AND (ot.rm_status = 'PENDING' OR ot.rm_status = 'HOLD') AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
+                cond += `  AND (ot.rm_status = 'PENDING' OR ot.rm_status = 'HOLD') AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING' AND ot.markAsSold <> 1`;
             }
 
             // ---- SALE PROCCESSING (Only RM PROCCESSING) ----
             if (value.status === "RM_PROCCESSING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
-                cond += ` AND ot.rm_status = 'PROCCESSING' AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
+                cond += ` AND ot.rm_status = 'PROCCESSING' AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING' AND ot.markAsSold <> 1`;
             }
 
             // ---- COMPLETED (Only RM completed) ----
             if (value.status === "RM_COMPLETED" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
-                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING'`;
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'PENDING' AND ot.st_status = 'PENDING' AND ot.markAsSold <> 1`;
             }
 
             // ---- ONLY BUY RM AND AM COMPLETED () ----
             if (value.status === "AM_COMPLETED" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
-                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND (ot.st_status = 'PENDING' OR ot.st_status = 'HOLD')`;
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND (ot.st_status = 'PENDING' OR ot.st_status = 'HOLD') AND ot.markAsSold <> 1`;
             }
 
             // ---- ONLY SELL RM AND ST PENDING () ----
             if (value.status === "ST_PROCCESSING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
-                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED' AND (ot.st_status = 'PENDING' OR ot.st_status = 'HOLD')`;
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.am_status != 'COMPLETED' AND (ot.st_status = 'PENDING' OR ot.st_status = 'HOLD') AND ot.markAsSold <> 1`;
             }
 
             // ---- ONLY SELL RM AND ST COMPLETED () ----
             if (value.status === "AM_PROCCESSING" && (value.employee_type === "RM" || value.employee_type === "AM" || value.employee_type === "ST")) {
-                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.st_status = 'COMPLETED' AND ot.am_status != 'COMPLETED'`;
+                cond += ` AND ot.rm_status = 'COMPLETED' AND ot.st_status = 'COMPLETED' AND ot.am_status != 'COMPLETED' AND ot.markAsSold <> 1`;
             }
 
             if (
