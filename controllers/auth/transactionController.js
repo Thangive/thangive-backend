@@ -768,6 +768,7 @@ const transactionController = {
                     ot.share_Debit_Invoice,
                     ot.share_Debit_Datetime,
                     ot.markAsSoldStatus,
+                    ot.share_Debit_Invoice,
                     CASE
                         WHEN ot.transaction_type = 'SELL' THEN
                             CASE
@@ -780,7 +781,9 @@ const transactionController = {
                         WHEN latest_payment.payment_type = 'FULL' THEN 'FULL PAYMENT'
                         WHEN latest_payment.payment_type = 'PARTIAL' THEN 'PARTIAL PAYMENT'
                         ELSE latest_payment.payment_type
-                    END AS payment_type
+                    END AS payment_type,
+                    latest_payment.remaining_amount AS Balance,
+                    latest_payment.payment_custom_id
                 FROM order_transactions ot
                 JOIN stock_details st
                     ON ot.stock_details_id = st.stock_details_id
@@ -803,7 +806,7 @@ const transactionController = {
                 LEFT JOIN users rm                
                     ON rm.user_id = users.assign_to
                 LEFT JOIN (
-                    SELECT pt1.order_id, pt1.payment_type
+                    SELECT pt1.order_id, pt1.payment_type,pt1.remaining_amount,pt1.payment_custom_id
                     FROM payment_transactions pt1
                     INNER JOIN (
                         SELECT order_id, MAX(payment_id) AS latest_payment_id
@@ -2025,6 +2028,10 @@ const transactionController = {
                 ot.bank_id,
                 ot.st_status,
                 ot.user_quantity,
+                ot.created_at,
+                ot.rm_datetime AS rm_datetimeOrder,
+                ot.st_datetime,
+                ot.share_Debit_Datetime,
                 (ot.price_per_share * ot.quantity) AS deal_value,
 
                 st.company_name,
