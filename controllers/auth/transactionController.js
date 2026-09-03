@@ -2033,7 +2033,8 @@ const transactionController = {
                 ot.st_datetime,
                 ot.share_Debit_Datetime,
                 (ot.price_per_share * ot.quantity) AS deal_value,
-
+                ot.price_per_share AS stock_price,
+                ot.quantity AS quantity,
                 st.company_name,
 
                 /* User Info */
