@@ -869,6 +869,9 @@ const transactionController = {
                 sort_order: Joi.string().optional(),
                 order: Joi.string().valid('Partner').optional(),
                 verify: Joi.string().valid('verify', 'notverify').optional(),
+                rm_status: Joi.string().optional(),
+                am_status: Joi.string().optional(),
+                st_status: Joi.string().optional(),
             });
 
             const { error, value } = holdingSchema.validate(req.query ?? {});
@@ -931,6 +934,18 @@ const transactionController = {
                 if (value.selling_type === "MARK_AS_SOLD") {
                     cond += ` AND ot.markAsSold = 1`;
                 }
+            }
+
+            if (value.rm_status) {
+                cond += ` AND ot.rm_status = '${value.rm_status}'`;
+            }
+
+            if (value.am_status) {
+                cond += ` AND ot.am_status = '${value.am_status}'`;
+            }
+
+            if (value.st_status) {
+                cond += ` AND ot.st_status = '${value.st_status}'`;
             }
 
             // ---- ALL PENDING (Only RM PENDING) ----
@@ -1944,6 +1959,7 @@ const transactionController = {
                 AND ot.rm_status = 'COMPLETED'
                 AND ot.am_status = 'COMPLETED'
                 AND ot.st_status = 'COMPLETED'
+                AND ot.share_Debit_Invoice IS NOT NULL
             `;
 
             if (value.transaction_type) {
