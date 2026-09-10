@@ -768,6 +768,7 @@ const transactionController = {
                     ot.share_Debit_Invoice,
                     ot.share_Debit_Datetime,
                     ot.markAsSoldStatus,
+                    ot.markAsSold,
                     ot.share_Debit_Invoice,
                     CASE
                         WHEN ot.transaction_type = 'SELL' THEN
@@ -858,6 +859,7 @@ const transactionController = {
                     'MarkAsSOLD'
                 ).optional(),
                 markAsSold: Joi.string().valid('PENDING', 'APPROVED', 'CANCELLED').optional(),
+                selling_type: Joi.string().valid('THANGIV', 'MARK_AS_SOLD').optional(),
                 from_date: Joi.string().optional(),
                 to_date: Joi.string().optional(),
                 company_name: Joi.string().optional(),
@@ -911,11 +913,23 @@ const transactionController = {
             }
 
 
-            if (value.status === "MarkAsSOLD" && (value.employee_type === "RM")) {
+            // if (value.status === "MarkAsSOLD" && (value.employee_type === "RM")) {
+            if (value.status === "MarkAsSOLD") {
                 if (value.markAsSold) {
                     cond += `  AND ot.markAsSold = 1 AND ot.markAsSoldStatus = '${value.markAsSold}'`;
                 } else {
                     cond += `  AND ot.markAsSold = 1`;
+                }
+            }
+
+            if (value.selling_type) {
+
+                if (value.selling_type === "THANGIV") {
+                    cond += ` AND ot.markAsSold <> 1`;
+                }
+
+                if (value.selling_type === "MARK_AS_SOLD") {
+                    cond += ` AND ot.markAsSold = 1`;
                 }
             }
 
