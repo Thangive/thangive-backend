@@ -603,13 +603,65 @@ const transactionController = {
                     AS DECIMAL(10,2)) AS overall_PL_percentage,
 
                     /* DAILY P/L */
-                    SUM((sp.today_prices - sp.prev_price) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) AS daily_PL,
-
+                    /* SUM((sp.today_prices - sp.prev_price) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) AS daily_PL, */
+                    /* DAILY P/L */
+                        SUM(
+                            CASE 
+                                WHEN DATE(ot.created_at) = CURDATE() THEN
+                                    /* Bought/Sold TODAY -> compare against transaction price, not prev_price */
+                                    (sp.today_prices - ot.price_per_share) * 
+                                    CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                        WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity 
+                                        ELSE 0 END
+                                ELSE
+                                    /* Held from before today -> compare against yesterday's close */
+                                    (sp.today_prices - sp.prev_price) * 
+                                    CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                        WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity 
+                                        ELSE 0 END
+                            END
+                        ) AS daily_PL,
                     /* DAILY P/L % */
-                    CAST(
+                    /* CAST(
                         (SUM((sp.today_prices - sp.prev_price) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END) /
                         NULLIF(SUM(sp.prev_price * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END), 0) * 100)
-                    AS DECIMAL(10,2)) AS daily_PL_percentage,
+                    AS DECIMAL(10,2)) AS daily_PL_percentage, */
+                    /* DAILY P/L % */
+                        CAST(
+                            (
+                                SUM(
+                                    CASE 
+                                        WHEN DATE(ot.created_at) = CURDATE() THEN
+                                            (sp.today_prices - ot.price_per_share) * 
+                                            CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                                WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity 
+                                                ELSE 0 END
+                                        ELSE
+                                            (sp.today_prices - sp.prev_price) * 
+                                            CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                                WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity 
+                                                ELSE 0 END
+                                    END
+                                )
+                                /
+                                NULLIF(
+                                    SUM(
+                                        CASE 
+                                            WHEN DATE(ot.created_at) = CURDATE() THEN
+                                                ot.price_per_share * 
+                                                CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                                    WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity 
+                                                    ELSE 0 END
+                                            ELSE
+                                                sp.prev_price * 
+                                                CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                                                    WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity 
+                                                    ELSE 0 END
+                                        END
+                                    ), 0
+                                ) * 100
+                            )
+                        AS DECIMAL(10,2)) AS daily_PL_percentage,
 
                         ot.rm_status,
                         ot.am_status,
@@ -1734,10 +1786,26 @@ const transactionController = {
                     ) AS overall_PL,
 
                     /* DAILY PL */
-                    SUM(
+                    /* SUM(
                         (sp.today_prices - sp.prev_price) *
                         CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
                             WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END
+                    ) AS daily_PL */
+
+                    /* DAILY PL */
+                    SUM(
+                        CASE 
+                            WHEN DATE(ot.created_at) = CURDATE() THEN
+                                /* Aaj ke buy/sell -> CMP vs transaction price (prev_price irrelevant hai in ke liye) */
+                                (sp.today_prices - ot.price_per_share) *
+                                CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+                                    WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END
+                            ELSE
+                                /* Purani holdings -> CMP vs yesterday's close */
+                                (sp.today_prices - sp.prev_price) *
+                                CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+                                    WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END
+                        END
                     ) AS daily_PL
 
                 FROM thangiveTest.order_transactions ot
@@ -1834,8 +1902,22 @@ const transactionController = {
                         ) AS overall_PL,
 
                         /* DAILY PL */
-                        SUM((sp.today_prices - sp.prev_price) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
+                        /* SUM((sp.today_prices - sp.prev_price) * CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity 
                                                                     WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END
+                        ) AS daily_PL */
+
+                        /* DAILY PL */
+                        SUM(
+                            CASE 
+                                WHEN DATE(ot.created_at) = CURDATE() THEN
+                                    (sp.today_prices - ot.price_per_share) *
+                                    CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+                                        WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END
+                                ELSE
+                                    (sp.today_prices - sp.prev_price) *
+                                    CASE WHEN UPPER(ot.transaction_type) = 'BUY' THEN ot.quantity
+                                        WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END
+                            END
                         ) AS daily_PL
 
                     FROM thangiveTest.order_transactions ot
