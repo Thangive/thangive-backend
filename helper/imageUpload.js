@@ -3,9 +3,7 @@ import path from 'path';
 import fs from 'fs-extra';
 import { SERVER_HOST } from '../config/index.js';
 
-const serverpath = SERVER_HOST === 'true'
-    ? 'our url'
-    : 'uploads/upload/';
+const serverpath = 'uploads/upload/';
 
 // Ensure upload directory exists
 fs.ensureDirSync(serverpath);
