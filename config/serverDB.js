@@ -11,9 +11,9 @@ const isServer = (process.env.SERVER_HOST !== true);
 const credentil = isServer
     ? {
         host: "194.164.151.204",
-        user: "thangiveTest",
-        password: "thangiveTest@@@123",
-        database: "thangiveTest",
+        user: "ThangiveTest",
+        password: "ThangiveTestDatabase@@@123",
+        database: "ThangiveTestDatabase",
         port: 3306,
         ssl: { rejectUnauthorized: false }
     }
@@ -30,7 +30,10 @@ let con;
  * ✅ SAFE CONNECTION HANDLER
  */
 function handleDisconnect() {
-    con = mysql.createConnection(credentil);
+    con = mysql.createConnection({
+        ...credentil,
+        dateStrings: true
+    });
 
     con.connect((err) => {
         if (err) {

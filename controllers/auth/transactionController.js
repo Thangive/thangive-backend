@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { getData, insertData } from '../../config/index.js';
+import { getData, insertData, DB_NAME } from '../../config/index.js';
 import { CustomErrorHandler } from "../../service/index.js";
 import paginationQuery from '../../helper/paginationQuery.js';
 import commonFunction from '../../helper/commonFunction.js';
@@ -615,14 +615,14 @@ const transactionController = {
                         ot.am_status,
                         ot.st_status,
                         ot.payments_count
-                    FROM thangiveTest.order_transactions ot
-                    JOIN thangiveTest.stock_details st ON ot.stock_details_id = st.stock_details_id
-                    JOIN thangiveTest.advisor ad ON ad.advisor_id = ot.advisor_id
-                    JOIN thangiveTest.broker bro ON bro.broker_id = ot.broker_id
-                    JOIN thangiveTest.stock_price sp ON sp.stock_details_id = st.stock_details_id
+                    FROM ${DB_NAME}.order_transactions ot
+                    JOIN ${DB_NAME}.stock_details st ON ot.stock_details_id = st.stock_details_id
+                    JOIN ${DB_NAME}.advisor ad ON ad.advisor_id = ot.advisor_id
+                    JOIN ${DB_NAME}.broker bro ON bro.broker_id = ot.broker_id
+                    JOIN ${DB_NAME}.stock_price sp ON sp.stock_details_id = st.stock_details_id
                     JOIN (
                         SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
-                        FROM thangiveTest.stock_price 
+                        FROM ${DB_NAME}.stock_price 
                         GROUP BY stock_details_id
                     ) latest ON latest.latest_id = sp.stock_price_id
                 `;
@@ -634,7 +634,7 @@ const transactionController = {
                 /* THIS ENSURES WE ONLY SHOW THE ACTIVE HOLDING CYCLE */
                 AND ot.position_group = (
                     SELECT MAX(position_group) 
-                    FROM thangiveTest.order_transactions 
+                    FROM ${DB_NAME}.order_transactions 
                     WHERE user_id = ot.user_id 
                     AND stock_details_id = ot.stock_details_id 
                     AND broker_id = ot.broker_id
@@ -1740,19 +1740,19 @@ const transactionController = {
                             WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END
                     ) AS daily_PL
 
-                FROM thangiveTest.order_transactions ot
-                JOIN thangiveTest.stock_details st ON ot.stock_details_id = st.stock_details_id
-                JOIN thangiveTest.stock_price sp   ON sp.stock_details_id = st.stock_details_id
+                FROM ${DB_NAME}.order_transactions ot
+                JOIN ${DB_NAME}.stock_details st ON ot.stock_details_id = st.stock_details_id
+                JOIN ${DB_NAME}.stock_price sp   ON sp.stock_details_id = st.stock_details_id
                 JOIN (
                     SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
-                    FROM thangiveTest.stock_price 
+                    FROM ${DB_NAME}.stock_price 
                     GROUP BY stock_details_id
                 ) latest ON latest.latest_id = sp.stock_price_id
 
                 WHERE ot.user_id = ${value.user_id}
                 AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'
                 AND ot.position_group = (
-                    SELECT MAX(position_group) FROM thangiveTest.order_transactions 
+                    SELECT MAX(position_group) FROM ${DB_NAME}.order_transactions 
                     WHERE user_id = ot.user_id 
                         AND stock_details_id = ot.stock_details_id 
                         AND broker_id = ot.broker_id
@@ -1838,14 +1838,14 @@ const transactionController = {
                                                                     WHEN UPPER(ot.transaction_type) = 'SELL' THEN -ot.quantity ELSE 0 END
                         ) AS daily_PL
 
-                    FROM thangiveTest.order_transactions ot
-                    JOIN thangiveTest.advisor ad       ON ad.advisor_id = ot.advisor_id
-                    JOIN thangiveTest.broker bro       ON bro.broker_id = ot.broker_id
-                    JOIN thangiveTest.stock_details st ON ot.stock_details_id = st.stock_details_id
-                    JOIN thangiveTest.stock_price sp   ON sp.stock_details_id = st.stock_details_id
+                    FROM ${DB_NAME}.order_transactions ot
+                    JOIN ${DB_NAME}.advisor ad       ON ad.advisor_id = ot.advisor_id
+                    JOIN ${DB_NAME}.broker bro       ON bro.broker_id = ot.broker_id
+                    JOIN ${DB_NAME}.stock_details st ON ot.stock_details_id = st.stock_details_id
+                    JOIN ${DB_NAME}.stock_price sp   ON sp.stock_details_id = st.stock_details_id
                     JOIN (
                         SELECT stock_details_id, MAX(stock_price_id) AS latest_id 
-                        FROM thangiveTest.stock_price 
+                        FROM ${DB_NAME}.stock_price 
                         GROUP BY stock_details_id
                     ) latest ON latest.latest_id = sp.stock_price_id
 
@@ -1853,7 +1853,7 @@ const transactionController = {
                     AND st.stock_type != 'ANGEL INVESTING'
                     AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'
                     AND ot.position_group = (
-                        SELECT MAX(position_group) FROM thangiveTest.order_transactions 
+                        SELECT MAX(position_group) FROM ${DB_NAME}.order_transactions 
                         WHERE user_id = ot.user_id 
                             AND stock_details_id = ot.stock_details_id 
                             AND broker_id = ot.broker_id

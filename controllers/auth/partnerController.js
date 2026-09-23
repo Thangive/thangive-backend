@@ -148,12 +148,13 @@ const partnerController = {
 
                 email: Joi.string().email().required(),
                 phone_number: Joi.string().required(),
+                whatsapp_number: Joi.string().required(),
 
-                state: Joi.string().allow(""),
-                contry: Joi.string().allow(""),
-                city: Joi.string().allow(""),
-                address: Joi.string().allow(""),
-                zipcode: Joi.string().allow(""),
+                state: Joi.string().required(),
+                contry: Joi.string().required(),
+                city: Joi.string().required(),
+                address: Joi.string().required(),
+                zipcode: Joi.string().required(),
 
                 profile: Joi.string().allow(""),
 
@@ -392,10 +393,30 @@ const partnerController = {
             const financialSchema = Joi.object({
                 partner_financial_id: Joi.number().integer().optional(),
                 user_id: Joi.number().integer().required(),
-                business_type: Joi.string().allow('').optional(),
-                business_name: Joi.string().allow('').optional(),
-                contact_phone: Joi.string().allow('').optional(),
-                pan_number: Joi.string().allow('').optional(),
+                type: Joi.string()
+                    .valid("financial", "address")
+                    .required(),
+                business_type: Joi.when("type", {
+                    is: "financial",
+                    then: Joi.string().required(),
+                    otherwise: Joi.string().allow("").optional()
+                }),
+                business_name: Joi.when("type", {
+                    is: "financial",
+                    then: Joi.string().required(),
+                    otherwise: Joi.string().allow("").optional()
+                }),
+
+                contact_phone: Joi.when("type", {
+                    is: "financial",
+                    then: Joi.string().required(),
+                    otherwise: Joi.string().allow("").optional()
+                }),
+                pan_number: Joi.when("type", {
+                    is: "financial",
+                    then: Joi.string().required(),
+                    otherwise: Joi.string().allow("").optional()
+                }),
                 gst_number: Joi.string().allow('').optional(),
                 cin_number: Joi.string().allow('').optional(),
                 company_website: Joi.string().allow('').optional(),
@@ -414,17 +435,47 @@ const partnerController = {
                 stamp_signature: Joi.string().allow('').optional(),
 
                 /* ------------------ Address ------------------ */
-                address_line_1: Joi.string().allow('').optional(),
-                address_line_2: Joi.string().allow('').optional(),
-                city: Joi.string().allow('').optional(),
-                state: Joi.string().allow('').optional(),
-                country: Joi.string().allow('').optional(),
-                postcode: Joi.string().allow('').optional(),
+                address_line_1: Joi.when("type", {
+                    is: "address",
+                    then: Joi.string().required(),
+                    otherwise: Joi.string().allow("").optional()
+                }),
 
+                address_line_2: Joi.string().allow('').optional(),
+                city: Joi.when("type", {
+                    is: "address",
+                    then: Joi.string().required(),
+                    otherwise: Joi.string().allow("").optional()
+                }),
+
+                state: Joi.when("type", {
+                    is: "address",
+                    then: Joi.string().required(),
+                    otherwise: Joi.string().allow("").optional()
+                }),
+                country: Joi.when("type", {
+                    is: "address",
+                    then: Joi.string().required(),
+                    otherwise: Joi.string().allow("").optional()
+                }),
+
+                postcode: Joi.when("type", {
+                    is: "address",
+                    then: Joi.string().required(),
+                    otherwise: Joi.string().allow("").optional()
+                })
             });
 
             /* ------------------ Prepare Data ------------------ */
             let dataObj = { ...req.body };
+
+
+            if (!["financial", "address"].includes(dataObj.type)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid type. Allowed values: financial, address"
+                });
+            }
 
             /* ------------------ Handle File Upload ------------------ */
 
@@ -471,7 +522,7 @@ const partnerController = {
             if (error) {
                 return next(error);
             }
-
+            delete dataObj.type;
             /* ------------------ Check Existing ------------------ */
             const checkQuery = `
                 SELECT partner_financial_id
@@ -566,11 +617,12 @@ const partnerController = {
         }
     },
     async updatePartnerBankInformation(req, res, next) {
-        console.log(req.body);
+        // console.log(req.body);
         try {
             /* ------------------ Validation ------------------ */
             const bankSchema = Joi.object({
                 partner_bank_id: Joi.number().integer().optional(),
+                type: Joi.string().optional(),
                 user_id: Joi.number().integer().required(),
                 bank_account_name: Joi.string().allow('').optional(),
                 bank_account_number: Joi.string().allow('').optional(),
@@ -587,6 +639,7 @@ const partnerController = {
             if (error) {
                 return next(error);
             }
+            delete dataObj.type;
             /* ------------------ Check Existing ------------------ */
             const checkQuery = `
                 SELECT partner_bank_id

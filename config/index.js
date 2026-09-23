@@ -5,6 +5,6 @@ export const WEB_PORT = process.env.WEB_PORT;
 export const DEBUG_MODE = process.env.DEBUG_MODE;
 export const SERVER_HOST = process.env.SERVER_HOST;
 export const JWT_SECRET = process.env.JWT_SECRET;
-
-
+export const DB_NAME = process.env.DB_NAME;
+console.log("SERVER_HOST:", process.env.SERVER_HOST);
 export { getData, insertData, getCount } from './database.js';
