@@ -1244,7 +1244,8 @@ const transactionController = {
                     br.broker_id,
                     cmr.client_id,
                     br.broker_email,
-                    br.broker_contact
+                    br.broker_contact,
+                    cmr.cmr_document
                 FROM broker br
                 JOIN user_cmr_details cmr 
                     ON cmr.broker_id = br.broker_id

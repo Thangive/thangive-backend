@@ -1235,6 +1235,7 @@ const partnerController = {
                         CONVERT_TZ(pso.created_at, '+00:00', '+05:30'),
                         '%d-%m-%Y %h:%i %p'
                     ) AS date,
+                pso.created_at,
                 pp.client_firm_name,
                 pp.phone,
                 pp.email,
