@@ -11,10 +11,33 @@ const partnerController = {
 
             /* ------------------ Base Query ------------------ */
             let query = `
-                SELECT * 
-                FROM users 
-                WHERE is_deleted = 0 AND is_verified = 1
-                AND user_type = 'PARTNER'
+                SELECT 
+                    u.*,
+                    p.partner_financial_id,
+                    p.business_type,
+                    p.gst_compliant,
+                    p.gst_number,
+                    p.aadhar_number,
+                    p.pan_number,
+                    p.aadharcard_copy,
+                    p.pancard_copy,
+                    p.cmr_copy,
+                    p.stamp_signature,
+                    p.aadhar_status,
+                    p.pan_status,
+                    p.cmr_status,
+                    p.stamp_signature_status,
+                    p.is_deleted AS financial_is_deleted,
+                    p.franchise_upload_date,
+                    p.created_at AS financial_created_at,
+                    p.updated_on AS financial_updated_on
+                FROM users u
+                LEFT JOIN partner_financial_details p
+                    ON p.user_id = u.user_id
+                    AND p.is_deleted = 0
+                WHERE u.is_deleted = 0
+                AND u.is_verified = 1
+                AND u.user_type = 'PARTNER'
             `;
 
             let cond = '';
@@ -43,35 +66,35 @@ const partnerController = {
             /* ------------------ Filters ------------------ */
 
             if (req.query.user_id) {
-                cond += ` AND user_id = ${req.query.user_id}`;
+                cond += ` AND u.user_id = ${req.query.user_id}`;
             }
 
             if (req.query.assign_to) {
-                cond += ` AND assign_to = ${req.query.assign_to}`;
+                cond += ` AND u.assign_to = ${req.query.assign_to}`;
             }
 
             if (req.query.username) {
-                cond += ` AND username LIKE '%${req.query.username}%'`;
+                cond += ` AND u.username LIKE '%${req.query.username}%'`;
             }
 
             if (req.query.email) {
-                cond += ` AND email LIKE '%${req.query.email}%'`;
+                cond += ` AND u.email LIKE '%${req.query.email}%'`;
             }
 
             if (req.query.phone_number) {
-                cond += ` AND phone_number LIKE '%${req.query.phone_number}%'`;
+                cond += ` AND u.phone_number LIKE '%${req.query.phone_number}%'`;
             }
 
             if (req.query.search) {
                 const search = req.query.search;
 
                 cond += ` AND (
-                    username LIKE '%${search}%'
-                    OR phone_number LIKE '%${search}%'
+                    u.username LIKE '%${search}%'
+                    OR u.phone_number LIKE '%${search}%'
                     OR CONCAT(
-                        COALESCE(first_name, ''), ' ',
-                        COALESCE(middle_name, ''), ' ',
-                        COALESCE(last_name, '')
+                        COALESCE(u.first_name, ''), ' ',
+                        COALESCE(u.middle_name, ''), ' ',
+                        COALESCE(u.last_name, '')
                     ) LIKE '%${search}%'
                 )`;
             }
@@ -80,9 +103,9 @@ const partnerController = {
                 const search = req.query.searchUsernamePhone_numberEmail;
 
                 cond += ` AND (
-                    username LIKE '%${search}%'
-                    OR phone_number LIKE '%${search}%'
-                    OR email LIKE '%${search}%'
+                    u.username LIKE '%${search}%'
+                    OR u.phone_number LIKE '%${search}%'
+                    OR u.email LIKE '%${search}%'
                 )`;
             }
 
@@ -121,74 +144,331 @@ const partnerController = {
         }
     },
     async updatePartnerProfile(req, res, next) {
+    },
+    // async PartnerProfileCreateUpdate(req, res, next) {
+    //     // console.log(req.body);
+    //     try {
+    //         /* ------------------ Prepare Data ------------------ */
+    //         let dataObj = { ...req.body };
+    //         /* ------------------ Validation ------------------ */
+    //         const partnerSchema = Joi.object({
+    //             user_id: Joi.number().integer().required(),
 
+    //             first_name: Joi.string().required(),
+    //             middle_name: Joi.string().allow(""),
+    //             last_name: Joi.string().required(),
+
+    //             email: Joi.string().email().required(),
+    //             phone_number: Joi.string().required(),
+    //             whatsapp_number: Joi.string().required(),
+
+    //             state: Joi.string().required(),
+    //             contry: Joi.string().required(),
+    //             city: Joi.string().required(),
+    //             address: Joi.string().required(),
+    //             zipcode: Joi.string().required(),
+
+    //             profile: Joi.string().allow(""),
+
+    //             business_type: Joi.string().required(),
+    //             gst_compliant: Joi.string().allow(""),
+    //             gst_number: Joi.string().allow(""),
+    //         });
+
+    //         // console.log("BODY KEYS:", Object.keys(dataObj));
+    //         // console.log("JOI KEYS:", Object.keys(partnerSchema.describe().keys));
+
+    //         const { error } = partnerSchema.validate(dataObj, {
+    //             abortEarly: false,
+    //             allowUnknown: false,
+    //         });
+
+    //         if (error) {
+    //             console.log("JOI ERROR:", error.details);
+    //             return next(error);
+    //         }
+    //         /* ------------------ Check Partner Exists ------------------ */
+    //         const checkPartnerQuery = `
+    //             SELECT *
+    //             FROM users
+    //             WHERE user_id = '${dataObj.user_id}'
+    //             AND user_type = 'PARTNER'
+    //             AND is_deleted = 0
+    //         `;
+    //         const checkPartner = await getData(
+    //             checkPartnerQuery,
+    //             next
+    //         );
+    //         if (!checkPartner.length) {
+    //             return next(
+    //                 CustomErrorHandler.notFound("Partner not found")
+    //             );
+    //         }
+    //         /* ------------------ Duplicate Email / Phone Check ------------------ */
+    //         const duplicateQuery = `
+    //             SELECT user_id
+    //             FROM users
+    //             WHERE (
+    //                 email = '${dataObj.email}'
+    //                 OR phone_number = '${dataObj.phone_number}'
+    //             )
+    //             AND user_type = 'PARTNER'
+    //             AND user_id != '${dataObj.user_id}'
+    //             AND is_deleted = 0
+    //         `;
+    //         const duplicateUser = await getData(
+    //             duplicateQuery,
+    //             next
+    //         );
+    //         if (duplicateUser.length > 0) {
+    //             return next(
+    //                 CustomErrorHandler.alreadyExist(
+    //                     "Email or phone number already exists"
+    //                 )
+    //             );
+    //         }
+    //         /* ------------------ Update Users Table ------------------ */
+    //         const userData = {
+    //             first_name: dataObj.first_name,
+    //             middle_name: dataObj.middle_name,
+    //             last_name: dataObj.last_name,
+    //             email: dataObj.email,
+    //             phone_number: dataObj.phone_number,
+    //             whatsapp_number: dataObj.whatsapp_number,
+    //             state: dataObj.state,
+    //             contry: dataObj.contry,
+    //             city: dataObj.city,
+    //             address: dataObj.address,
+    //             zipcode: dataObj.zipcode,
+    //         };
+    //         // Update profile only when a new image is uploaded
+    //         if (req.files?.profile?.length > 0) {
+    //             const file = req.files.profile[0];
+    //             userData.profile = `uploads/upload/${file.filename}`;
+    //         }
+
+    //         const updateUserQuery = `
+    //             UPDATE users
+    //             SET ?
+    //             WHERE user_id = '${dataObj.user_id}'
+    //             AND user_type = 'PARTNER'
+    //             AND is_deleted = 0
+    //         `;
+
+    //         await insertData(
+    //             updateUserQuery,
+    //             userData,
+    //             next
+    //         );
+    //         /* ------------------ Check Financial Details ------------------ */
+    //         const checkFinancialQuery = `
+    //             SELECT partner_financial_id
+    //             FROM partner_financial_details
+    //             WHERE user_id = '${dataObj.user_id}'
+    //             AND is_deleted = 0
+    //         `;
+    //         const checkFinancial = await getData(
+    //             checkFinancialQuery,
+    //             next
+    //         );
+    //         /* ------------------ Financial Data ------------------ */
+    //         const financialData = {
+    //             business_type: dataObj.business_type,
+    //             gst_compliant: dataObj.gst_compliant,
+    //             gst_number: dataObj.gst_number
+    //         };
+    //         /* ------------------ Update / Create Financial Details ------------------ */
+    //         if (checkFinancial.length > 0) {
+    //             /* -------- Update Existing Financial Details -------- */
+    //             const updateFinancialQuery = `
+    //                 UPDATE partner_financial_details
+    //                 SET ?
+    //                 WHERE user_id = '${dataObj.user_id}'
+    //                 AND is_deleted = 0
+    //             `;
+    //             await insertData(
+    //                 updateFinancialQuery,
+    //                 financialData,
+    //                 next
+    //             );
+    //         } else {
+    //             /* -------- Create New Financial Details -------- */
+    //             financialData.user_id = dataObj.user_id;
+    //             const insertFinancialQuery = `
+    //                     INSERT INTO partner_financial_details
+    //                     SET ?
+    //                 `;
+    //             await insertData(
+    //                 insertFinancialQuery,
+    //                 financialData,
+    //                 next
+    //             );
+    //         }
+    //         /* ------------------ Get Updated Partner ------------------ */
+    //         const updatedPartnerQuery = `
+    //                 SELECT
+    //                     u.*,
+    //                     p.partner_financial_id,
+    //                     p.business_type,
+    //                     p.pan_number,
+    //                     p.gst_number,
+    //                     p.cin_number,
+    //                     p.gst_compliant,
+    //                     p.aadharcard_copy,
+    //                     p.pancard_copy,
+    //                     p.cmr_copy,
+    //                     p.cancelled_cheque,
+    //                     p.franchise_agreement,
+    //                     p.stamp_signature,
+    //                     p.is_deleted AS financial_is_deleted,
+    //                     p.franchise_upload_date,
+    //                     p.created_at AS financial_created_at,
+    //                     p.updated_on AS financial_updated_on
+    //                 FROM users u
+    //                 LEFT JOIN partner_financial_details p
+    //                     ON p.user_id = u.user_id
+    //                     AND p.is_deleted = 0
+    //                 WHERE u.user_id = '${dataObj.user_id}'
+    //                 AND u.user_type = 'PARTNER'
+    //                 AND u.is_deleted = 0
+    //             `;
+    //         const updatedPartner = await getData(
+    //             updatedPartnerQuery,
+    //             next
+    //         );
+    //         /* ------------------ Response ------------------ */
+    //         return res.json({
+    //             success: true,
+    //             message: "Partner profile updated successfully",
+    //             data: updatedPartner
+    //         });
+    //     } catch (error) {
+    //         next(error);
+    //     }
+    // },
+    async PartnerProfileCreateUpdate(req, res, next) {
         try {
 
-            /* ------------------ Prepare Data ------------------ */
+            /* =========================================================
+               PREPARE DATA
+            ========================================================= */
 
             let dataObj = { ...req.body };
 
-            if (req.files?.profile?.length > 0) {
 
-                const file = req.files.profile[0];
+            /* =========================================================
+               BASIC VALIDATION
+            ========================================================= */
 
-                dataObj.profile = `uploads/upload/${file.filename}`;
-
-            }
-
-            /* ------------------ Validation ------------------ */
-
-            const partnerSchema = Joi.object({
-
-                user_id: Joi.number().integer().required(),
-
-                first_name: Joi.string().required(),
-                middle_name: Joi.string().allow(""),
-                last_name: Joi.string().required(),
-
-                email: Joi.string().email().required(),
-                phone_number: Joi.string().required(),
-                whatsapp_number: Joi.string().required(),
-
-                state: Joi.string().required(),
-                contry: Joi.string().required(),
-                city: Joi.string().required(),
-                address: Joi.string().required(),
-                zipcode: Joi.string().required(),
-
-                profile: Joi.string().allow(""),
-
+            const basicSchema = Joi.object({
+                user_id: Joi.number().integer().required()
             });
 
-            const { error } = partnerSchema.validate(dataObj);
+            const { error: basicError } = basicSchema.validate({
+                user_id: dataObj.user_id
+            });
 
-            if (error) {
-                return next(error);
+            if (basicError) {
+                return next(basicError);
             }
 
-            /* ------------------ Check Partner Exists ------------------ */
+
+            /* =========================================================
+               CHECK PARTNER EXISTS
+            ========================================================= */
 
             const checkPartnerQuery = `
-                SELECT *
-                FROM users
-                WHERE user_id = '${dataObj.user_id}'
-                AND user_type = 'PARTNER'
-                AND is_deleted = 0
-            `;
+            SELECT *
+            FROM users
+            WHERE user_id = '${dataObj.user_id}'
+            AND user_type = 'PARTNER'
+            AND is_deleted = 0
+        `;
 
-            const checkPartner = await getData(checkPartnerQuery, next);
+            const checkPartner = await getData(
+                checkPartnerQuery,
+                next
+            );
 
             if (!checkPartner.length) {
-
                 return next(
                     CustomErrorHandler.notFound("Partner not found")
                 );
-
             }
 
-            /* ------------------ Duplicate Email / Phone Check ------------------ */
 
-            const duplicateQuery = `
+            /* =========================================================
+               CHECK REQUEST TYPE
+            ========================================================= */
+
+            const hasProfileData =
+                dataObj.first_name !== undefined ||
+                dataObj.last_name !== undefined ||
+                dataObj.email !== undefined ||
+                dataObj.phone_number !== undefined ||
+                dataObj.business_type !== undefined;
+
+            const hasKycFiles =
+                req.files?.aadharCard?.length > 0 ||
+                req.files?.panCard?.length > 0 ||
+                req.files?.cmr?.length > 0 ||
+                req.files?.sealSignature?.length > 0;
+
+
+            /* =========================================================
+               PROFILE + BUSINESS DETAILS
+            ========================================================= */
+
+            if (hasProfileData) {
+
+                /* ------------------ Validation ------------------ */
+
+                const partnerSchema = Joi.object({
+
+                    user_id: Joi.number().integer().required(),
+
+                    first_name: Joi.string().required(),
+                    middle_name: Joi.string().allow(""),
+                    last_name: Joi.string().required(),
+
+                    email: Joi.string().email().required(),
+                    phone_number: Joi.string().required(),
+                    whatsapp_number: Joi.string().required(),
+
+                    state: Joi.string().required(),
+                    contry: Joi.string().required(),
+                    city: Joi.string().required(),
+                    address: Joi.string().required(),
+                    zipcode: Joi.string().required(),
+
+                    profile: Joi.string().allow("").optional(),
+
+                    business_type: Joi.string().required(),
+                    gst_compliant: Joi.string().allow(""),
+                    gst_number: Joi.string().allow("")
+
+                });
+
+
+                const { error } = partnerSchema.validate(
+                    dataObj,
+                    {
+                        abortEarly: false,
+                        allowUnknown: false
+                    }
+                );
+
+                if (error) {
+                    console.log("JOI ERROR:", error.details);
+                    return next(error);
+                }
+
+
+                /* =====================================================
+                   DUPLICATE EMAIL / PHONE CHECK
+                ===================================================== */
+
+                const duplicateQuery = `
                 SELECT user_id
                 FROM users
                 WHERE (
@@ -200,47 +480,409 @@ const partnerController = {
                 AND is_deleted = 0
             `;
 
-            const duplicateUser = await getData(duplicateQuery, next);
-
-            if (duplicateUser.length > 0) {
-
-                return next(
-                    CustomErrorHandler.alreadyExist(
-                        "Email or phone number already exists"
-                    )
+                const duplicateUser = await getData(
+                    duplicateQuery,
+                    next
                 );
 
-            }
+                if (duplicateUser.length > 0) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            "Email or phone number already exists"
+                        )
+                    );
+                }
 
-            /* ------------------ Update Partner ------------------ */
 
-            const updateQuery = `
+                /* =====================================================
+                   UPDATE USERS TABLE
+                ===================================================== */
+
+                const userData = {
+
+                    first_name: dataObj.first_name,
+                    middle_name: dataObj.middle_name,
+                    last_name: dataObj.last_name,
+
+                    email: dataObj.email,
+                    phone_number: dataObj.phone_number,
+                    whatsapp_number: dataObj.whatsapp_number,
+
+                    state: dataObj.state,
+                    contry: dataObj.contry,
+                    city: dataObj.city,
+                    address: dataObj.address,
+                    zipcode: dataObj.zipcode
+
+                };
+
+
+                /* ------------------ Profile Image ------------------ */
+
+                if (req.files?.profile?.length > 0) {
+
+                    const file = req.files.profile[0];
+
+                    userData.profile = file.path;
+                }
+
+
+                const updateUserQuery = `
                 UPDATE users
                 SET ?
-                WHERE user_id = '${dataObj.user_id}'
-                AND user_type = 'PARTNER'
-            `;
-
-            await insertData(updateQuery, dataObj, next);
-
-            /* ------------------ Get Updated Data ------------------ */
-
-            const updatedPartnerQuery = `
-                SELECT *
-                FROM users
                 WHERE user_id = '${dataObj.user_id}'
                 AND user_type = 'PARTNER'
                 AND is_deleted = 0
             `;
 
-            const updatedPartner = await getData(updatedPartnerQuery, next);
+                await insertData(
+                    updateUserQuery,
+                    userData,
+                    next
+                );
 
-            /* ------------------ Response ------------------ */
+
+                /* =====================================================
+                   CHECK FINANCIAL DETAILS
+                ===================================================== */
+
+                const checkFinancialQuery = `
+                SELECT partner_financial_id
+                FROM partner_financial_details
+                WHERE user_id = '${dataObj.user_id}'
+                AND is_deleted = 0
+            `;
+
+                const checkFinancial = await getData(
+                    checkFinancialQuery,
+                    next
+                );
+
+
+                /* =====================================================
+                   FINANCIAL DATA
+                ===================================================== */
+
+                const financialData = {
+
+                    business_type: dataObj.business_type,
+                    gst_compliant: dataObj.gst_compliant,
+                    gst_number: dataObj.gst_number
+
+                };
+
+
+                /* =====================================================
+                   KYC FILES IF SENT WITH PROFILE
+                ===================================================== */
+
+                /* ------------------ Aadhar ------------------ */
+
+                if (req.files?.aadharCard?.length > 0) {
+
+                    const file = req.files.aadharCard[0];
+
+                    financialData.aadharcard_copy = file.path;
+
+                    financialData.aadhar_status = "Pending";
+                }
+
+
+                /* ------------------ Aadhar Number ------------------ */
+
+                if (dataObj.aadharNumber !== undefined) {
+
+                    financialData.aadhar_number =
+                        dataObj.aadharNumber;
+                }
+
+
+                /* ------------------ PAN ------------------ */
+
+                if (req.files?.panCard?.length > 0) {
+
+                    const file = req.files.panCard[0];
+
+                    financialData.pancard_copy = file.path;
+
+                    financialData.pan_status = "Pending";
+                }
+
+
+                /* ------------------ PAN Number ------------------ */
+
+                if (dataObj.panNumber !== undefined) {
+
+                    financialData.pan_number =
+                        dataObj.panNumber;
+                }
+
+
+                /* ------------------ CMR ------------------ */
+
+                if (req.files?.cmr?.length > 0) {
+
+                    const file = req.files.cmr[0];
+
+                    financialData.cmr_copy = file.path;
+
+                    financialData.cmr_status = "Pending";
+                }
+
+
+                /* ------------------ Seal / Signature ------------------ */
+
+                if (req.files?.sealSignature?.length > 0) {
+
+                    const file = req.files.sealSignature[0];
+
+                    financialData.stamp_signature = file.path;
+
+                    financialData.stamp_signature_status =
+                        "Pending";
+                }
+
+
+                /* =====================================================
+                   UPDATE / INSERT FINANCIAL DETAILS
+                ===================================================== */
+
+                if (checkFinancial.length > 0) {
+
+                    const updateFinancialQuery = `
+                    UPDATE partner_financial_details
+                    SET ?
+                    WHERE user_id = '${dataObj.user_id}'
+                    AND is_deleted = 0
+                `;
+
+                    await insertData(
+                        updateFinancialQuery,
+                        financialData,
+                        next
+                    );
+
+                } else {
+
+                    financialData.user_id =
+                        dataObj.user_id;
+
+                    const insertFinancialQuery = `
+                    INSERT INTO partner_financial_details
+                    SET ?
+                `;
+
+                    await insertData(
+                        insertFinancialQuery,
+                        financialData,
+                        next
+                    );
+                }
+
+            }
+
+
+            /* =========================================================
+               KYC ONLY
+            ========================================================= */
+
+            else if (hasKycFiles) {
+
+                /* =====================================================
+                   CHECK FINANCIAL DETAILS
+                ===================================================== */
+
+                const checkFinancialQuery = `
+                SELECT partner_financial_id
+                FROM partner_financial_details
+                WHERE user_id = '${dataObj.user_id}'
+                AND is_deleted = 0
+            `;
+
+                const checkFinancial = await getData(
+                    checkFinancialQuery,
+                    next
+                );
+
+
+                /* =====================================================
+                   KYC DATA
+                ===================================================== */
+
+                const kycData = {};
+
+
+                /* ------------------ Aadhar Card ------------------ */
+
+                if (req.files?.aadharCard?.length > 0) {
+
+                    const file = req.files.aadharCard[0];
+
+                    kycData.aadharcard_copy = file.path;
+
+                    kycData.aadhar_status = "Pending";
+                }
+
+
+                /* ------------------ Aadhar Number ------------------ */
+
+                if (dataObj.aadharNumber !== undefined) {
+
+                    kycData.aadhar_number =
+                        dataObj.aadharNumber;
+                }
+
+
+                /* ------------------ PAN Card ------------------ */
+
+                if (req.files?.panCard?.length > 0) {
+
+                    const file = req.files.panCard[0];
+
+                    kycData.pancard_copy = file.path;
+
+                    kycData.pan_status = "Pending";
+                }
+
+
+                /* ------------------ PAN Number ------------------ */
+
+                if (dataObj.panNumber !== undefined) {
+
+                    kycData.pan_number =
+                        dataObj.panNumber;
+                }
+
+
+                /* ------------------ CMR ------------------ */
+
+                if (req.files?.cmr?.length > 0) {
+
+                    const file = req.files.cmr[0];
+
+                    kycData.cmr_copy = file.path;
+
+                    kycData.cmr_status = "Pending";
+                }
+
+
+                /* ------------------ Seal / Signature ------------------ */
+
+                if (req.files?.sealSignature?.length > 0) {
+
+                    const file = req.files.sealSignature[0];
+
+                    kycData.stamp_signature = file.path;
+
+                    kycData.stamp_signature_status =
+                        "Pending";
+                }
+
+
+                /* =====================================================
+                   UPDATE / INSERT KYC
+                ===================================================== */
+
+                if (checkFinancial.length > 0) {
+
+                    const updateFinancialQuery = `
+                    UPDATE partner_financial_details
+                    SET ?
+                    WHERE user_id = '${dataObj.user_id}'
+                    AND is_deleted = 0
+                `;
+
+                    await insertData(
+                        updateFinancialQuery,
+                        kycData,
+                        next
+                    );
+
+                } else {
+
+                    kycData.user_id =
+                        dataObj.user_id;
+
+                    const insertFinancialQuery = `
+                    INSERT INTO partner_financial_details
+                    SET ?
+                `;
+
+                    await insertData(
+                        insertFinancialQuery,
+                        kycData,
+                        next
+                    );
+                }
+
+            }
+
+
+            /* =========================================================
+               GET UPDATED PARTNER
+            ========================================================= */
+
+            const updatedPartnerQuery = `
+            SELECT
+
+                u.*,
+
+                p.partner_financial_id,
+                p.business_type,
+
+                p.aadhar_number,
+                p.pan_number,
+                p.gst_number,
+                p.cin_number,
+
+                p.gst_compliant,
+
+                p.aadharcard_copy,
+                p.pancard_copy,
+                p.cmr_copy,
+                p.stamp_signature,
+
+                p.aadhar_status,
+                p.pan_status,
+                p.cmr_status,
+                p.stamp_signature_status,
+
+                p.franchise_agreement,
+
+                p.is_deleted AS financial_is_deleted,
+
+                p.franchise_upload_date,
+
+                p.created_at AS financial_created_at,
+                p.updated_on AS financial_updated_on
+
+            FROM users u
+
+            LEFT JOIN partner_financial_details p
+                ON p.user_id = u.user_id
+                AND p.is_deleted = 0
+
+            WHERE u.user_id = '${dataObj.user_id}'
+            AND u.user_type = 'PARTNER'
+            AND u.is_deleted = 0
+        `;
+
+            const updatedPartner = await getData(
+                updatedPartnerQuery,
+                next
+            );
+
+
+            /* =========================================================
+               RESPONSE
+            ========================================================= */
 
             return res.json({
 
                 success: true,
+
                 message: "Partner profile updated successfully",
+
                 data: updatedPartner
 
             });
@@ -617,105 +1259,653 @@ const partnerController = {
         }
     },
     async updatePartnerBankInformation(req, res, next) {
-        // console.log(req.body);
         try {
+
             /* ------------------ Validation ------------------ */
+
             const bankSchema = Joi.object({
-                partner_bank_id: Joi.number().integer().optional(),
-                type: Joi.string().optional(),
-                user_id: Joi.number().integer().required(),
-                bank_account_name: Joi.string().allow('').optional(),
-                bank_account_number: Joi.string().allow('').optional(),
-                account_type: Joi.string().allow('').optional(),
-                bank_name: Joi.string().allow('').optional(),
-                neft_code: Joi.string().allow('').optional(),
-                swift_code: Joi.string().allow('').optional(),
-                micr_code: Joi.string().allow('').optional(),
-                bank_branch_address: Joi.string().allow('').optional(),
+
+                partner_bank_id:
+                    Joi.number()
+                        .integer()
+                        .optional(),
+
+                user_id:
+                    Joi.number()
+                        .integer()
+                        .required(),
+
+                bank_account_name:
+                    Joi.string()
+                        .allow("")
+                        .optional(),
+
+                bank_account_number:
+                    Joi.string()
+                        .allow("")
+                        .optional(),
+
+                account_type:
+                    Joi.string()
+                        .allow("")
+                        .optional(),
+
+                bank_name:
+                    Joi.string()
+                        .allow("")
+                        .optional(),
+
+                neft_code:
+                    Joi.string()
+                        .allow("")
+                        .optional(),
+
+                bank_branch_address:
+                    Joi.string()
+                        .allow("")
+                        .optional(),
+
+                status:
+                    Joi.string()
+                        .valid("Active", "Inactive")
+                        .optional(),
+
+                set_as_default:
+                    Joi.string()
+                        .valid("Yes", "No")
+                        .optional(),
+
             });
-            let dataObj = { ...req.body };
+
+
+            /* ------------------ Request Data ------------------ */
+
+            let dataObj = {
+                ...req.body
+            };
+
+
             /* ------------------ Validate ------------------ */
-            const { error } = bankSchema.validate(dataObj);
+
+            const { error } =
+                bankSchema.validate(dataObj);
+
             if (error) {
                 return next(error);
             }
-            delete dataObj.type;
-            /* ------------------ Check Existing ------------------ */
-            const checkQuery = `
+
+
+            /* =====================================================
+               BANK DOCUMENT
+            ===================================================== */
+
+            if (
+                req.files?.bank_document &&
+                req.files.bank_document.length > 0
+            ) {
+
+                const file =
+                    req.files.bank_document[0];
+
+                dataObj.bank_document =
+                    file.path;
+
+            }
+
+
+            /* =====================================================
+               UPDATE EXISTING BANK
+               
+               partner_bank_id present
+            ===================================================== */
+
+            if (dataObj.partner_bank_id) {
+
+                /* ------------------ Check Bank ------------------ */
+
+                const checkQuery = `
                 SELECT partner_bank_id
                 FROM partner_bank_information
-                WHERE user_id = ${dataObj.user_id}
+                WHERE partner_bank_id =
+                    ${dataObj.partner_bank_id}
+                AND user_id =
+                    ${dataObj.user_id}
+                LIMIT 1
             `;
-            const exists = await getData(checkQuery, next);
-            let query = '';
-            /* ------------------ Update ------------------ */
-            if (exists.length > 0) {
-                dataObj.updated_at = new Date();
-                query = `
+
+
+                const exists =
+                    await getData(
+                        checkQuery,
+                        next
+                    );
+
+
+                if (exists.length === 0) {
+
+                    return res.status(404).json({
+
+                        success: false,
+
+                        message:
+                            "Partner bank information not found."
+
+                    });
+
+                }
+
+
+                /* ------------------ Update Data ------------------ */
+
+                dataObj.updated_at =
+                    new Date();
+
+
+                /*
+                 * These are only used
+                 * in WHERE condition.
+                 */
+
+                const partnerBankId =
+                    dataObj.partner_bank_id;
+
+                const userId =
+                    dataObj.user_id;
+
+
+                delete dataObj.partner_bank_id;
+
+                delete dataObj.user_id;
+
+
+                /* ------------------ Update ------------------ */
+
+                const updateQuery = `
                 UPDATE partner_bank_information
+
                 SET ?
-                WHERE user_id = ${dataObj.user_id}
+
+                WHERE partner_bank_id =
+                    ${partnerBankId}
+
+                AND user_id =
+                    ${userId}
             `;
-                dataObj.partner_bank_id = exists[0].partner_bank_id;
-            } else {
-                /* ------------------ Insert ------------------ */
-                dataObj.created_at = new Date();
-                query = `
-                INSERT INTO partner_bank_information
-                SET ?
+
+
+                await insertData(
+                    updateQuery,
+                    dataObj,
+                    next
+                );
+
+
+                /* =================================================
+                   IF THIS BANK IS DEFAULT
+                   MAKE OTHER BANKS NON DEFAULT
+                ================================================= */
+
+                if (
+                    dataObj.set_as_default === "Yes"
+                ) {
+
+                    const removeDefaultQuery = `
+                    UPDATE partner_bank_information
+
+                    SET set_as_default = 'No'
+
+                    WHERE user_id =
+                        ${userId}
+
+                    AND partner_bank_id !=
+                        ${partnerBankId}
+                `;
+
+
+                    await insertData(
+                        removeDefaultQuery,
+                        {},
+                        next
+                    );
+
+                }
+
+
+                /* ------------------ Latest Data ------------------ */
+
+                const getQuery = `
+                SELECT
+                    partner_bank_id,
+                    user_id,
+                    bank_account_name,
+                    bank_account_number,
+                    account_type,
+                    bank_name,
+                    neft_code,
+                    bank_branch_address,
+                    status,
+                    set_as_default,
+                    bank_document,
+                    created_at,
+                    updated_at
+
+                FROM partner_bank_information
+
+                WHERE partner_bank_id =
+                    ${partnerBankId}
+
+                AND user_id =
+                    ${userId}
+
+                LIMIT 1
             `;
+
+
+                const latestData =
+                    await getData(
+                        getQuery,
+                        next
+                    );
+
+
+                return res.json({
+
+                    success: true,
+
+                    message:
+                        "Partner bank information updated successfully",
+
+                    data:
+                        latestData.length > 0
+                            ? latestData[0]
+                            : {}
+
+                });
+
             }
-            const result = await insertData(query, dataObj, next);
-            if (result.insertId) {
-                dataObj.partner_bank_id = result.insertId;
+
+
+            /* =====================================================
+               ADD NEW BANK
+               
+               partner_bank_id NOT present
+               => ALWAYS INSERT NEW ROW
+            ===================================================== */
+
+            dataObj.created_at =
+                new Date();
+
+            dataObj.updated_at =
+                new Date();
+
+
+            const insertQuery = `
+            INSERT INTO partner_bank_information
+            SET ?
+        `;
+
+
+            const result =
+                await insertData(
+                    insertQuery,
+                    dataObj,
+                    next
+                );
+
+
+            const partnerBankId =
+                result.insertId;
+
+
+            /* =====================================================
+               IF NEW BANK IS DEFAULT
+               MAKE OTHER BANKS NON DEFAULT
+            ===================================================== */
+
+            if (
+                dataObj.set_as_default === "Yes"
+            ) {
+
+                const removeDefaultQuery = `
+                UPDATE partner_bank_information
+
+                SET set_as_default = 'No'
+
+                WHERE user_id =
+                    ${req.body.user_id}
+
+                AND partner_bank_id !=
+                    ${partnerBankId}
+            `;
+
+
+                await insertData(
+                    removeDefaultQuery,
+                    {},
+                    next
+                );
+
             }
+
+
             /* ------------------ Latest Data ------------------ */
+
             const getQuery = `
-                SELECT 
-                    pfd.*,
+            SELECT
+                partner_bank_id,
+                user_id,
+                bank_account_name,
+                bank_account_number,
+                account_type,
+                bank_name,
+                neft_code,
+                bank_branch_address,
+                status,
+                set_as_default,
+                bank_document,
+                created_at,
+                updated_at
 
-                    pbi.partner_bank_id,
-                    pbi.bank_account_name,
-                    pbi.bank_account_number,
-                    pbi.account_type,
-                    pbi.bank_name,
-                    pbi.neft_code,
-                    pbi.swift_code,
-                    pbi.micr_code,
-                    pbi.bank_branch_address
+            FROM partner_bank_information
 
-                FROM partner_financial_details pfd
+            WHERE partner_bank_id =
+                ${partnerBankId}
 
-                LEFT JOIN partner_bank_information pbi
-                    ON pbi.user_id = pfd.user_id
+            AND user_id =
+                ${req.body.user_id}
 
-                WHERE pfd.user_id = ${dataObj.user_id}
-            `;
-            const latestData = await getData(getQuery, next);
-            latestData.forEach((item) => {
-                item.bankinfo = {
-                    partner_bank_id: item.partner_bank_id || "",
-                    bank_account_name: item.bank_account_name || "",
-                    bank_account_number: item.bank_account_number || "",
-                    account_type: item.account_type || "",
-                    bank_name: item.bank_name || "",
-                    neft_code: item.neft_code || "",
-                    swift_code: item.swift_code || "",
-                    micr_code: item.micr_code || "",
-                    bank_branch_address: item.bank_branch_address || ""
-                };
-            });
+            LIMIT 1
+        `;
+
+
+            const latestData =
+                await getData(
+                    getQuery,
+                    next
+                );
+
+
+            /* ------------------ Response ------------------ */
+
             return res.json({
+
                 success: true,
-                message: exists.length > 0
-                    ? 'Partner bank information updated successfully'
-                    : 'Partner bank information added successfully',
-                data: latestData
+
+                message:
+                    "Partner bank information added successfully",
+
+                data:
+                    latestData.length > 0
+                        ? latestData[0]
+                        : {}
+
             });
+
+
         } catch (error) {
+
             next(error);
+
         }
     },
+    async getPartnerBanks(req, res, next) {
+        try {
+
+            /* ------------------ Base Query ------------------ */
+
+            let query = `
+            SELECT
+                partner_bank_id,
+                user_id,
+                bank_account_name,
+                bank_account_number,
+                account_type,
+                bank_name,
+                neft_code,
+                bank_branch_address,
+                status,
+                set_as_default,
+                bank_document,
+                created_at,
+                updated_at
+            FROM partner_bank_information
+            WHERE 1 = 1
+        `;
+
+            let cond = '';
+            let page = { pageQuery: '' };
+
+
+            /* ------------------ Validation Schema ------------------ */
+
+            const bankSchema = Joi.object({
+                partner_bank_id: Joi.number().integer(),
+                user_id: Joi.number().integer(),
+                bank_account_name: Joi.string(),
+                bank_account_number: Joi.string(),
+                bank_name: Joi.string(),
+                status: Joi.string().valid("Active", "Inactive"),
+                set_as_default: Joi.string().valid("Yes", "No"),
+                search: Joi.string(),
+                pagination: Joi.boolean(),
+                current_page: Joi.number().integer(),
+                per_page_records: Joi.number().integer(),
+            });
+
+
+            const { error } = bankSchema.validate(req.query);
+
+            if (error) {
+                return next(error);
+            }
+
+
+            /* ------------------ Filters ------------------ */
+
+            if (req.query.partner_bank_id) {
+                cond += `
+                AND partner_bank_id = ${req.query.partner_bank_id}
+            `;
+            }
+
+            if (req.query.user_id) {
+                cond += `
+                AND user_id = ${req.query.user_id}
+            `;
+            }
+
+            if (req.query.bank_account_name) {
+                cond += `
+                AND bank_account_name LIKE '%${req.query.bank_account_name}%'
+            `;
+            }
+
+            if (req.query.bank_account_number) {
+                cond += `
+                AND bank_account_number LIKE '%${req.query.bank_account_number}%'
+            `;
+            }
+
+            if (req.query.bank_name) {
+                cond += `
+                AND bank_name LIKE '%${req.query.bank_name}%'
+            `;
+            }
+
+            if (req.query.status) {
+                cond += `
+                AND status = '${req.query.status}'
+            `;
+            }
+
+            if (req.query.set_as_default) {
+                cond += `
+                AND set_as_default = '${req.query.set_as_default}'
+            `;
+            }
+
+
+            /* ------------------ Search ------------------ */
+
+            if (req.query.search) {
+
+                const search = req.query.search;
+
+                cond += `
+                AND (
+                    bank_account_name LIKE '%${search}%'
+                    OR bank_account_number LIKE '%${search}%'
+                    OR bank_name LIKE '%${search}%'
+                    OR neft_code LIKE '%${search}%'
+                    OR bank_branch_address LIKE '%${search}%'
+                )
+            `;
+            }
+
+
+            /* ------------------ Pagination ------------------ */
+
+            if (req.query.pagination) {
+
+                page = await paginationQuery(
+                    query + cond,
+                    next,
+                    req.query.current_page,
+                    req.query.per_page_records
+                );
+
+            }
+
+
+            query += cond + page.pageQuery;
+
+
+            /* ------------------ Fetch Partner Banks ------------------ */
+
+            const partnerBanks = await getData(
+                query,
+                next
+            );
+
+
+            /* ------------------ Response ------------------ */
+
+            return res.json({
+                message: 'success',
+                total_records: page.total_rec ?? partnerBanks.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: partnerBanks.length,
+                data: partnerBanks
+            });
+
+
+        } catch (error) {
+
+            next(error);
+
+        }
+    },
+    // async updatePartnerBankInformation(req, res, next) {
+    //     // console.log(req.body);
+    //     try {
+    //         /* ------------------ Validation ------------------ */
+    //         const bankSchema = Joi.object({
+    //             partner_bank_id: Joi.number().integer().optional(),
+    //             type: Joi.string().optional(),
+    //             user_id: Joi.number().integer().required(),
+    //             bank_account_name: Joi.string().allow('').optional(),
+    //             bank_account_number: Joi.string().allow('').optional(),
+    //             account_type: Joi.string().allow('').optional(),
+    //             bank_name: Joi.string().allow('').optional(),
+    //             neft_code: Joi.string().allow('').optional(),
+    //             swift_code: Joi.string().allow('').optional(),
+    //             micr_code: Joi.string().allow('').optional(),
+    //             bank_branch_address: Joi.string().allow('').optional(),
+    //         });
+    //         let dataObj = { ...req.body };
+    //         /* ------------------ Validate ------------------ */
+    //         const { error } = bankSchema.validate(dataObj);
+    //         if (error) {
+    //             return next(error);
+    //         }
+    //         delete dataObj.type;
+    //         /* ------------------ Check Existing ------------------ */
+    //         const checkQuery = `
+    //             SELECT partner_bank_id
+    //             FROM partner_bank_information
+    //             WHERE user_id = ${dataObj.user_id}
+    //         `;
+    //         const exists = await getData(checkQuery, next);
+    //         let query = '';
+    //         /* ------------------ Update ------------------ */
+    //         if (exists.length > 0) {
+    //             dataObj.updated_at = new Date();
+    //             query = `
+    //             UPDATE partner_bank_information
+    //             SET ?
+    //             WHERE user_id = ${dataObj.user_id}
+    //         `;
+    //             dataObj.partner_bank_id = exists[0].partner_bank_id;
+    //         } else {
+    //             /* ------------------ Insert ------------------ */
+    //             dataObj.created_at = new Date();
+    //             query = `
+    //             INSERT INTO partner_bank_information
+    //             SET ?
+    //         `;
+    //         }
+    //         const result = await insertData(query, dataObj, next);
+    //         if (result.insertId) {
+    //             dataObj.partner_bank_id = result.insertId;
+    //         }
+    //         /* ------------------ Latest Data ------------------ */
+    //         const getQuery = `
+    //             SELECT 
+    //                 pfd.*,
+
+    //                 pbi.partner_bank_id,
+    //                 pbi.bank_account_name,
+    //                 pbi.bank_account_number,
+    //                 pbi.account_type,
+    //                 pbi.bank_name,
+    //                 pbi.neft_code,
+    //                 pbi.swift_code,
+    //                 pbi.micr_code,
+    //                 pbi.bank_branch_address
+
+    //             FROM partner_financial_details pfd
+
+    //             LEFT JOIN partner_bank_information pbi
+    //                 ON pbi.user_id = pfd.user_id
+
+    //             WHERE pfd.user_id = ${dataObj.user_id}
+    //         `;
+    //         const latestData = await getData(getQuery, next);
+    //         latestData.forEach((item) => {
+    //             item.bankinfo = {
+    //                 partner_bank_id: item.partner_bank_id || "",
+    //                 bank_account_name: item.bank_account_name || "",
+    //                 bank_account_number: item.bank_account_number || "",
+    //                 account_type: item.account_type || "",
+    //                 bank_name: item.bank_name || "",
+    //                 neft_code: item.neft_code || "",
+    //                 swift_code: item.swift_code || "",
+    //                 micr_code: item.micr_code || "",
+    //                 bank_branch_address: item.bank_branch_address || ""
+    //             };
+    //         });
+    //         return res.json({
+    //             success: true,
+    //             message: exists.length > 0
+    //                 ? 'Partner bank information updated successfully'
+    //                 : 'Partner bank information added successfully',
+    //             data: latestData
+    //         });
+    //     } catch (error) {
+    //         next(error);
+    //     }
+    // },
     async updatePartnerProspectInformation(req, res, next) {
         try {
             /* ------------------ Validation ------------------ */

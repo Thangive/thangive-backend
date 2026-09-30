@@ -159,10 +159,12 @@ router.post("/addBlogView", blogController.addBlogView);
 
 //Partner APIS
 router.get('/Partners', auth, partnerController.getPartners);
+router.get('/getPartnerBanks', auth, partnerController.getPartnerBanks);
 router.post('/partnerProfileUpdate', auth, imageUpload, partnerController.updatePartnerProfile);
+router.post('/PartnerProfileCreateUpdate', auth, imageUpload, partnerController.PartnerProfileCreateUpdate);
 router.get('/PartnersFinancialInfo', auth, partnerController.getPartnersFinancialInfo);
 router.post('/partnerFinancialInformation', auth,imageUpload, partnerController.updatePartnerFinancialInformation);
-router.post('/updatePartnerBankInformation', auth,forms, partnerController.updatePartnerBankInformation);
+router.post('/updatePartnerBankInformation', auth,imageUpload, partnerController.updatePartnerBankInformation);
 router.post('/updatePartnerProspectInformation', auth,imageUpload, partnerController.updatePartnerProspectInformation);
 router.get('/getPartnerProspects',auth, partnerController.getPartnerProspects);
 router.get('/getPartnerProspectsIndividual',auth, partnerController.getPartnerProspectsIndividual);

@@ -99,6 +99,12 @@ const imageUpload = multer({
     { name: 'cancel_cheque_copy', maxCount: 1 },
     { name: 'fund_transfer_document', maxCount: 1 },
     { name: 'payment_doc', maxCount: 1 },
+
+    // Partner KYC
+    { name: 'aadharCard', maxCount: 1 },
+    { name: 'panCard', maxCount: 1 },
+    { name: 'cmr', maxCount: 1 },
+    { name: 'sealSignature', maxCount: 1 },
 ]);
 
 export default imageUpload;
