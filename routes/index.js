@@ -173,5 +173,6 @@ router.get('/getPartnerOrders', auth, partnerController.getPartnerOrders);
 router.post('/OrderCommissionAdd', auth, imageUpload, partnerController.addPartnerCommission);
 router.get('/getOrderCommissionPartner', auth, partnerController.getOrderCommissionPartner);
 router.get('/CountPartnerLeadAndProspects', auth, partnerController.CountPartnerLeadAndProspects);
+router.post('/updatePartnerKycStatus', auth, forms, partnerController.updatePartnerKycStatus);
 
 export default router;

@@ -893,6 +893,123 @@ const partnerController = {
 
         }
     },
+    async updatePartnerKycStatus(req, res, next) {
+        try {
+            const { user_id, document_type, status } = req.body;
+            const basicSchema = Joi.object({
+                user_id: Joi.number().integer().required(),
+
+                document_type: Joi.string()
+                    .valid(
+                        "aadhar",
+                        "pan",
+                        "cmr",
+                        "stamp_signature"
+                    )
+                    .required(),
+
+                status: Joi.string()
+                    .valid(
+                        "Pending",
+                        "Verified",
+                        "Rejected"
+                    )
+                    .required(),
+            });
+
+
+            const { error } = basicSchema.validate(req.body, {
+                abortEarly: false,
+                allowUnknown: false,
+            });
+
+            if (error) {
+                return next(error);
+            }
+            const checkPartnerQuery = `
+            SELECT user_id
+            FROM users
+            WHERE user_id = '${user_id}'
+            AND user_type = 'PARTNER'
+            AND is_deleted = 0
+        `;
+
+            const partner = await getData(
+                checkPartnerQuery,
+                next
+            );
+
+            if (!partner.length) {
+                return next(
+                    CustomErrorHandler.notFound(
+                        "Partner not found"
+                    )
+                );
+            }
+
+            const statusFieldMap = {
+                aadhar: "aadhar_status",
+                pan: "pan_status",
+                cmr: "cmr_status",
+                stamp_signature: "stamp_signature_status",
+            };
+
+            const statusField =
+                statusFieldMap[document_type];
+
+            const checkFinancialQuery = `
+            SELECT partner_financial_id
+            FROM partner_financial_details
+            WHERE user_id = '${user_id}'
+            AND is_deleted = 0
+        `;
+
+            const financialDetails = await getData(
+                checkFinancialQuery,
+                next
+            );
+
+            if (!financialDetails.length) {
+                return next(
+                    CustomErrorHandler.notFound(
+                        "Partner KYC details not found"
+                    )
+                );
+            }
+
+            const updateKycQuery = `
+            UPDATE partner_financial_details
+            SET ${statusField} = ?
+            WHERE user_id = '${user_id}'
+            AND is_deleted = 0
+        `;
+
+            await insertData(
+                updateKycQuery,
+                [status],
+                next
+            );
+
+            return res.json({
+                success: true,
+
+                message:
+                    `${document_type} document status updated successfully`,
+
+                data: {
+                    user_id,
+                    document_type,
+                    status,
+                },
+            });
+
+
+        } catch (error) {
+
+            next(error);
+
+        }
+    },
     async getPartnersFinancialInfo(req, res, next) {
         try {
             /* ------------------ Validation ------------------ */
