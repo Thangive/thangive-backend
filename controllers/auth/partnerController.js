@@ -29,6 +29,8 @@ const partnerController = {
                     p.stamp_signature_status,
                     p.is_deleted AS financial_is_deleted,
                     p.franchise_upload_date,
+                    p.franchise_status,
+                    p.franchise_agreement,
                     p.created_at AS financial_created_at,
                     p.updated_on AS financial_updated_on
                 FROM users u
@@ -1373,6 +1375,67 @@ const partnerController = {
 
             next(error);
 
+        }
+    },
+    async updateFranchiseAgreement(req, res, next) {
+        try {
+            const schema = Joi.object({
+                user_id: Joi.number().integer().required(),
+                franchise_upload_date: Joi.string().allow("").optional(),
+                franchise_agreement: Joi.string()
+                    .allow("")
+                    .optional(),
+                franchise_status: Joi.string().valid("Pending", "Verified", "Rejected").required()
+            });
+
+            const dataObj = { ...req.body };
+
+            if (req.files?.franchise_agreement?.length > 0) {
+                const file = req.files.franchise_agreement[0];
+                dataObj.franchise_agreement = file.path;
+            }
+
+            const { error } = schema.validate(dataObj);
+            if (error) {
+                return next(error);
+            }
+
+            const checkQuery = `SELECT partner_financial_id, franchise_agreement FROM partner_financial_details WHERE user_id = ${dataObj.user_id} AND is_deleted = 0`;
+
+            const existingData = await getData(checkQuery, next);
+
+            if (!existingData.length) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Partner financial information not found"
+                });
+            }
+
+            const updateData = {
+                franchise_upload_date: dataObj.franchise_upload_date || null,
+                franchise_status: dataObj.franchise_status,
+                updated_on: new Date()
+            };
+
+            if (dataObj.franchise_agreement) {
+                updateData.franchise_agreement = dataObj.franchise_agreement;
+            }
+
+            const updateQuery = `UPDATE partner_financial_details SET ? WHERE user_id = ${dataObj.user_id} AND is_deleted = 0`;
+
+            await insertData(updateQuery, updateData, next);
+
+            const getQuery = `SELECT partner_financial_id, user_id, franchise_agreement, franchise_upload_date, franchise_status, updated_on FROM partner_financial_details WHERE user_id = ${dataObj.user_id} AND is_deleted = 0`;
+
+            const latestData = await getData(getQuery, next);
+
+            return res.json({
+                success: true,
+                message: "Franchise Agreement updated successfully",
+                data: latestData
+            });
+        } catch (error) {
+            next(error);
         }
     },
     async updatePartnerBankInformation(req, res, next) {

@@ -174,5 +174,7 @@ router.post('/OrderCommissionAdd', auth, imageUpload, partnerController.addPartn
 router.get('/getOrderCommissionPartner', auth, partnerController.getOrderCommissionPartner);
 router.get('/CountPartnerLeadAndProspects', auth, partnerController.CountPartnerLeadAndProspects);
 router.post('/updatePartnerKycStatus', auth, forms, partnerController.updatePartnerKycStatus);
+router.post('/updateFranchiseAgreement', auth,imageUpload, partnerController.updateFranchiseAgreement);
+
 
 export default router;
