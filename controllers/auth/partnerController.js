@@ -57,6 +57,7 @@ const partnerController = {
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),
+                status: Joi.string()
             });
 
             const { error } = userSchema.validate(req.query);
@@ -110,6 +111,32 @@ const partnerController = {
                     OR u.email LIKE '%${search}%'
                 )`;
             }
+
+            // --- NEW STATUS FILTER LOGIC ---
+            if (req.query.status) {
+                const status = req.query.status.toLowerCase();
+
+                if (status === 'pending') {
+                    // Fetch if ANY of the statuses is NOT 'Verified' (or if it is null)
+                    cond += ` AND (
+                        COALESCE(p.aadhar_status, '') != 'Verified'
+                        OR COALESCE(p.pan_status, '') != 'Verified'
+                        OR COALESCE(p.cmr_status, '') != 'Verified'
+                        OR COALESCE(p.stamp_signature_status, '') != 'Verified'
+                        OR COALESCE(p.franchise_status, '') != 'Verified'
+                    )`;
+                } else if (status === 'verified') {
+                    // Fetch ONLY if ALL of the statuses are 'Verified'
+                    cond += ` AND (
+                        p.aadhar_status = 'Verified'
+                        AND p.pan_status = 'Verified'
+                        AND p.cmr_status = 'Verified'
+                        AND p.stamp_signature_status = 'Verified'
+                        AND p.franchise_status = 'Verified'
+                    )`;
+                }
+            }
+            // -------------------------------
 
             /* ------------------ Pagination ------------------ */
 
