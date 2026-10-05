@@ -922,6 +922,226 @@ const partnerController = {
 
         }
     },
+    async createPartnerAdmin(req, res, next) {
+        try {
+            // ------------------ Validation ------------------
+            const schema = Joi.object({
+                user_id: Joi.number().integer().optional(),
+
+                username: Joi.string().when('user_id', {
+                    is: Joi.exist(),
+                    then: Joi.optional(),
+                    otherwise: Joi.required()
+                }),
+
+                first_name: Joi.string().required(),
+                middle_name: Joi.string().allow("").optional(),
+                last_name: Joi.string().required(),
+
+                email: Joi.string().email().required(),
+                phone_number: Joi.string().required(),
+                whatsapp_number: Joi.string().allow("").optional(),
+
+                address: Joi.string().required(),
+                zipcode: Joi.string().required(),
+                city: Joi.string().required(),
+                state: Joi.string().required(),
+                contry: Joi.string().required(),
+
+                business_type: Joi.string().required(),
+                gst_compliant: Joi.string().allow("").optional(),
+                gst_number: Joi.string().allow("").optional(),
+
+                profile: Joi.string().allow("").optional(),
+            });
+
+            const dataObj = { ...req.body };
+
+            const { error } = schema.validate(dataObj, { abortEarly: false, allowUnknown: false });
+            if (error) return next(error);
+
+            const isUpdate = !!dataObj.user_id;
+            const condition = isUpdate ? ` AND user_id != '${dataObj.user_id}'` : "";
+
+            // ------------------ Update: partner must exist ------------------
+            if (isUpdate) {
+                const exist = await getData(
+                    `SELECT user_id FROM users
+                 WHERE user_id='${dataObj.user_id}' AND user_type='PARTNER' AND is_deleted=0`,
+                    next
+                );
+                if (!exist.length) {
+                    return next(CustomErrorHandler.notFound("Partner not found"));
+                }
+            }
+
+            // ------------------ Duplicate Email / Phone / WhatsApp ------------------
+            const hasWhatsapp = !!dataObj.whatsapp_number?.trim();
+
+            const duplicateData = await getData(`
+            SELECT user_id, email, phone_number, whatsapp_number, is_deleted, is_verified
+            FROM users
+            WHERE user_type='PARTNER'
+            ${condition}
+            AND (
+                email='${dataObj.email}'
+                OR phone_number='${dataObj.phone_number}'
+                OR whatsapp_number='${dataObj.phone_number}'
+                ${hasWhatsapp ? `
+                    OR phone_number='${dataObj.whatsapp_number}'
+                    OR whatsapp_number='${dataObj.whatsapp_number}'` : ""}
+            )
+        `, next);
+
+            const verifiedDuplicate = duplicateData.find(
+                (row) => row.is_deleted == '0' && row.is_verified == 1
+            );
+
+            if (verifiedDuplicate) {
+                const emailExists = verifiedDuplicate.email == dataObj.email;
+                const phoneExists =
+                    verifiedDuplicate.phone_number == dataObj.phone_number ||
+                    verifiedDuplicate.whatsapp_number == dataObj.phone_number;
+                const whatsappExists = hasWhatsapp
+                    ? (verifiedDuplicate.phone_number == dataObj.whatsapp_number ||
+                        verifiedDuplicate.whatsapp_number == dataObj.whatsapp_number)
+                    : false;
+
+                const found = [];
+                if (emailExists) found.push("Email");
+                if (phoneExists) found.push("Phone number");
+                if (whatsappExists) found.push("WhatsApp number");
+
+                if (found.length) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(
+                            `${found.join(" and ")} already ${found.length > 1 ? "exist" : "exists"}`
+                        )
+                    );
+                }
+            }
+
+            // ------------------ Duplicate Username (create only if sent) ------------------
+            if (dataObj.username) {
+                const usernameCheck = await getData(
+                    `SELECT user_id, is_deleted, is_verified FROM users
+                 WHERE username='${dataObj.username}' ${condition}`,
+                    next
+                );
+                const verifiedUsernameDuplicate = usernameCheck.find(
+                    (row) => row.is_deleted == '0' && row.is_verified == 1
+                );
+                if (verifiedUsernameDuplicate) {
+                    return next(
+                        CustomErrorHandler.alreadyExist(`${dataObj.username} Username already exists`)
+                    );
+                }
+            }
+
+            // ------------------ Split data: users table / financial table ------------------
+            const userData = {
+                first_name: dataObj.first_name,
+                middle_name: dataObj.middle_name ?? "",
+                last_name: dataObj.last_name,
+                email: dataObj.email,
+                phone_number: dataObj.phone_number,
+                whatsapp_number: dataObj.whatsapp_number ?? "",
+                address: dataObj.address,
+                zipcode: dataObj.zipcode,
+                city: dataObj.city,
+                state: dataObj.state,
+                contry: dataObj.contry,
+            };
+
+            if (req.files?.profile?.length > 0) {
+                userData.profile = req.files.profile[0].path;
+            }
+
+            const isIndividual = dataObj.business_type === "Individual";
+            const gstCompliant = ["Yes", "No"].includes(dataObj.gst_compliant) ? dataObj.gst_compliant : null;
+
+            const financialData = {
+                business_type: dataObj.business_type,
+                // never send '' to an ENUM column
+                gst_compliant: isIndividual ? null : gstCompliant,
+                gst_number: (!isIndividual && gstCompliant === "Yes") ? (dataObj.gst_number ?? "") : ""
+            };
+
+            // ------------------ Insert / Update users ------------------
+            let partnerId;
+
+            if (isUpdate) {
+                await insertData(
+                    `UPDATE users SET ? WHERE user_id='${dataObj.user_id}' AND user_type='PARTNER' AND is_deleted=0`,
+                    userData,
+                    next
+                );
+                partnerId = dataObj.user_id;
+            } else {
+                userData.username = dataObj.username;
+                userData.user_type = 'PARTNER';
+                userData.password = md5(String(dataObj.phone_number).trim()); // password = mobile number
+                userData.is_deleted = 0;
+                userData.is_verified = 1; // admin-created -> no OTP
+
+                // Re-use a soft-deleted OR unverified (abandoned self-signup) partner row
+                const reusable = duplicateData.find(
+                    (row) => row.is_deleted != '0' || row.is_verified == 0
+                );
+
+                if (reusable) {
+                    await insertData(
+                        `UPDATE users SET ? WHERE user_id='${reusable.user_id}'`,
+                        userData,
+                        next
+                    );
+                    partnerId = reusable.user_id;
+                } else {
+                    const result = await insertData(`INSERT INTO users SET ?`, userData, next);
+                    partnerId = result.insertId;
+                }
+            }
+
+            // ------------------ Upsert partner_financial_details ------------------
+            const checkFinancial = await getData(
+                `SELECT partner_financial_id FROM partner_financial_details
+             WHERE user_id='${partnerId}' AND is_deleted=0`,
+                next
+            );
+
+            if (checkFinancial.length > 0) {
+                await insertData(
+                    `UPDATE partner_financial_details SET ? WHERE user_id='${partnerId}' AND is_deleted=0`,
+                    financialData,
+                    next
+                );
+            } else {
+                financialData.user_id = partnerId;
+                await insertData(`INSERT INTO partner_financial_details SET ?`, financialData, next);
+            }
+
+            // ------------------ Response ------------------
+            const partner = await getData(`
+                SELECT u.user_id, u.username, u.first_name, u.middle_name, u.last_name,
+                    u.email, u.phone_number, u.whatsapp_number, u.address, u.zipcode,
+                    u.city, u.state, u.contry, u.profile,
+                    p.partner_financial_id, p.business_type, p.gst_compliant, p.gst_number
+                FROM users u
+                LEFT JOIN partner_financial_details p
+                    ON p.user_id = u.user_id AND p.is_deleted = 0
+                WHERE u.user_id='${partnerId}' AND u.user_type='PARTNER'
+            `, next);
+
+            return res.json({
+                success: true,
+                message: isUpdate ? "Partner updated successfully" : "Partner created successfully",
+                data: partner[0] || { user_id: partnerId }
+            });
+
+        } catch (error) {
+            next(error);
+        }
+    },
     async updatePartnerKycStatus(req, res, next) {
         try {
             const { user_id, document_type, status } = req.body;
