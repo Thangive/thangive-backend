@@ -737,6 +737,7 @@ const transactionController = {
                     ) AS partner_name,
                     partner_user.phone_number AS partner_phone,
                     partner_user.user_id AS partner_id,
+                    partner_user.user_custum_id AS partner_userID,
                     ad.advisor_name,
                     bro.broker_name,
                     st.company_name,

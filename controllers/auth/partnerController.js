@@ -2651,6 +2651,7 @@ const partnerController = {
                         ELSE '' 
                     END
                 ) AS partnerName,
+                u.user_custum_id AS partner_userID,
             cu.user_id AS client_userID,
             cu.first_name AS client_first_name,
             cu.middle_name AS client_middle_name,
