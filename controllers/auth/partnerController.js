@@ -592,12 +592,23 @@ const partnerController = {
                    FINANCIAL DATA
                 ===================================================== */
 
+                // const financialData = {
+
+                //     business_type: dataObj.business_type,
+                //     gst_compliant: dataObj.gst_compliant,
+
+                //     gst_number: dataObj.gst_number
+
+                // };
+
+                const isIndividual = dataObj.business_type === "Individual";
+                const gstCompliant = ["Yes", "No"].includes(dataObj.gst_compliant) ? dataObj.gst_compliant : null;
+
                 const financialData = {
-
                     business_type: dataObj.business_type,
-                    gst_compliant: dataObj.gst_compliant,
-                    gst_number: dataObj.gst_number
-
+                    // never send '' to an ENUM column
+                    gst_compliant: isIndividual ? null : gstCompliant,
+                    gst_number: (!isIndividual && gstCompliant === "Yes") ? (dataObj.gst_number ?? "") : ""
                 };
 
 
