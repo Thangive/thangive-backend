@@ -174,207 +174,6 @@ const partnerController = {
     },
     async updatePartnerProfile(req, res, next) {
     },
-    // async PartnerProfileCreateUpdate(req, res, next) {
-    //     // console.log(req.body);
-    //     try {
-    //         /* ------------------ Prepare Data ------------------ */
-    //         let dataObj = { ...req.body };
-    //         /* ------------------ Validation ------------------ */
-    //         const partnerSchema = Joi.object({
-    //             user_id: Joi.number().integer().required(),
-
-    //             first_name: Joi.string().required(),
-    //             middle_name: Joi.string().allow(""),
-    //             last_name: Joi.string().required(),
-
-    //             email: Joi.string().email().required(),
-    //             phone_number: Joi.string().required(),
-    //             whatsapp_number: Joi.string().required(),
-
-    //             state: Joi.string().required(),
-    //             contry: Joi.string().required(),
-    //             city: Joi.string().required(),
-    //             address: Joi.string().required(),
-    //             zipcode: Joi.string().required(),
-
-    //             profile: Joi.string().allow(""),
-
-    //             business_type: Joi.string().required(),
-    //             gst_compliant: Joi.string().allow(""),
-    //             gst_number: Joi.string().allow(""),
-    //         });
-
-    //         // console.log("BODY KEYS:", Object.keys(dataObj));
-    //         // console.log("JOI KEYS:", Object.keys(partnerSchema.describe().keys));
-
-    //         const { error } = partnerSchema.validate(dataObj, {
-    //             abortEarly: false,
-    //             allowUnknown: false,
-    //         });
-
-    //         if (error) {
-    //             console.log("JOI ERROR:", error.details);
-    //             return next(error);
-    //         }
-    //         /* ------------------ Check Partner Exists ------------------ */
-    //         const checkPartnerQuery = `
-    //             SELECT *
-    //             FROM users
-    //             WHERE user_id = '${dataObj.user_id}'
-    //             AND user_type = 'PARTNER'
-    //             AND is_deleted = 0
-    //         `;
-    //         const checkPartner = await getData(
-    //             checkPartnerQuery,
-    //             next
-    //         );
-    //         if (!checkPartner.length) {
-    //             return next(
-    //                 CustomErrorHandler.notFound("Partner not found")
-    //             );
-    //         }
-    //         /* ------------------ Duplicate Email / Phone Check ------------------ */
-    //         const duplicateQuery = `
-    //             SELECT user_id
-    //             FROM users
-    //             WHERE (
-    //                 email = '${dataObj.email}'
-    //                 OR phone_number = '${dataObj.phone_number}'
-    //             )
-    //             AND user_type = 'PARTNER'
-    //             AND user_id != '${dataObj.user_id}'
-    //             AND is_deleted = 0
-    //         `;
-    //         const duplicateUser = await getData(
-    //             duplicateQuery,
-    //             next
-    //         );
-    //         if (duplicateUser.length > 0) {
-    //             return next(
-    //                 CustomErrorHandler.alreadyExist(
-    //                     "Email or phone number already exists"
-    //                 )
-    //             );
-    //         }
-    //         /* ------------------ Update Users Table ------------------ */
-    //         const userData = {
-    //             first_name: dataObj.first_name,
-    //             middle_name: dataObj.middle_name,
-    //             last_name: dataObj.last_name,
-    //             email: dataObj.email,
-    //             phone_number: dataObj.phone_number,
-    //             whatsapp_number: dataObj.whatsapp_number,
-    //             state: dataObj.state,
-    //             contry: dataObj.contry,
-    //             city: dataObj.city,
-    //             address: dataObj.address,
-    //             zipcode: dataObj.zipcode,
-    //         };
-    //         // Update profile only when a new image is uploaded
-    //         if (req.files?.profile?.length > 0) {
-    //             const file = req.files.profile[0];
-    //             userData.profile = `uploads/upload/${file.filename}`;
-    //         }
-
-    //         const updateUserQuery = `
-    //             UPDATE users
-    //             SET ?
-    //             WHERE user_id = '${dataObj.user_id}'
-    //             AND user_type = 'PARTNER'
-    //             AND is_deleted = 0
-    //         `;
-
-    //         await insertData(
-    //             updateUserQuery,
-    //             userData,
-    //             next
-    //         );
-    //         /* ------------------ Check Financial Details ------------------ */
-    //         const checkFinancialQuery = `
-    //             SELECT partner_financial_id
-    //             FROM partner_financial_details
-    //             WHERE user_id = '${dataObj.user_id}'
-    //             AND is_deleted = 0
-    //         `;
-    //         const checkFinancial = await getData(
-    //             checkFinancialQuery,
-    //             next
-    //         );
-    //         /* ------------------ Financial Data ------------------ */
-    //         const financialData = {
-    //             business_type: dataObj.business_type,
-    //             gst_compliant: dataObj.gst_compliant,
-    //             gst_number: dataObj.gst_number
-    //         };
-    //         /* ------------------ Update / Create Financial Details ------------------ */
-    //         if (checkFinancial.length > 0) {
-    //             /* -------- Update Existing Financial Details -------- */
-    //             const updateFinancialQuery = `
-    //                 UPDATE partner_financial_details
-    //                 SET ?
-    //                 WHERE user_id = '${dataObj.user_id}'
-    //                 AND is_deleted = 0
-    //             `;
-    //             await insertData(
-    //                 updateFinancialQuery,
-    //                 financialData,
-    //                 next
-    //             );
-    //         } else {
-    //             /* -------- Create New Financial Details -------- */
-    //             financialData.user_id = dataObj.user_id;
-    //             const insertFinancialQuery = `
-    //                     INSERT INTO partner_financial_details
-    //                     SET ?
-    //                 `;
-    //             await insertData(
-    //                 insertFinancialQuery,
-    //                 financialData,
-    //                 next
-    //             );
-    //         }
-    //         /* ------------------ Get Updated Partner ------------------ */
-    //         const updatedPartnerQuery = `
-    //                 SELECT
-    //                     u.*,
-    //                     p.partner_financial_id,
-    //                     p.business_type,
-    //                     p.pan_number,
-    //                     p.gst_number,
-    //                     p.cin_number,
-    //                     p.gst_compliant,
-    //                     p.aadharcard_copy,
-    //                     p.pancard_copy,
-    //                     p.cmr_copy,
-    //                     p.cancelled_cheque,
-    //                     p.franchise_agreement,
-    //                     p.stamp_signature,
-    //                     p.is_deleted AS financial_is_deleted,
-    //                     p.franchise_upload_date,
-    //                     p.created_at AS financial_created_at,
-    //                     p.updated_on AS financial_updated_on
-    //                 FROM users u
-    //                 LEFT JOIN partner_financial_details p
-    //                     ON p.user_id = u.user_id
-    //                     AND p.is_deleted = 0
-    //                 WHERE u.user_id = '${dataObj.user_id}'
-    //                 AND u.user_type = 'PARTNER'
-    //                 AND u.is_deleted = 0
-    //             `;
-    //         const updatedPartner = await getData(
-    //             updatedPartnerQuery,
-    //             next
-    //         );
-    //         /* ------------------ Response ------------------ */
-    //         return res.json({
-    //             success: true,
-    //             message: "Partner profile updated successfully",
-    //             data: updatedPartner
-    //         });
-    //     } catch (error) {
-    //         next(error);
-    //     }
-    // },
     async PartnerProfileCreateUpdate(req, res, next) {
         try {
 
@@ -1752,6 +1551,7 @@ const partnerController = {
                     Joi.string()
                         .valid("Yes", "No")
                         .optional(),
+                verification_status: Joi.string().valid("Pending", "Verified", "Rejected").optional(),
 
             });
 
@@ -1999,7 +1799,9 @@ const partnerController = {
                IF NEW BANK IS DEFAULT
                MAKE OTHER BANKS NON DEFAULT
             ===================================================== */
-
+            if (!dataObj.verification_status) {
+                dataObj.verification_status = 'Pending';
+            }
             if (
                 dataObj.set_as_default === "Yes"
             ) {
@@ -2104,6 +1906,7 @@ const partnerController = {
                 status,
                 set_as_default,
                 bank_document,
+                verification_status,
                 created_at,
                 updated_at
             FROM partner_bank_information
@@ -2124,6 +1927,7 @@ const partnerController = {
                 bank_name: Joi.string(),
                 status: Joi.string().valid("Active", "Inactive"),
                 set_as_default: Joi.string().valid("Yes", "No"),
+                verification_status: Joi.string().valid("Pending", "Verified", "Rejected"),
                 search: Joi.string(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
@@ -2174,6 +1978,9 @@ const partnerController = {
                 cond += `
                 AND status = '${req.query.status}'
             `;
+            }
+            if (req.query.verification_status) {
+                cond += ` AND verification_status = '${req.query.verification_status}' `;
             }
 
             if (req.query.set_as_default) {
@@ -2244,106 +2051,40 @@ const partnerController = {
 
         }
     },
-    // async updatePartnerBankInformation(req, res, next) {
-    //     // console.log(req.body);
-    //     try {
-    //         /* ------------------ Validation ------------------ */
-    //         const bankSchema = Joi.object({
-    //             partner_bank_id: Joi.number().integer().optional(),
-    //             type: Joi.string().optional(),
-    //             user_id: Joi.number().integer().required(),
-    //             bank_account_name: Joi.string().allow('').optional(),
-    //             bank_account_number: Joi.string().allow('').optional(),
-    //             account_type: Joi.string().allow('').optional(),
-    //             bank_name: Joi.string().allow('').optional(),
-    //             neft_code: Joi.string().allow('').optional(),
-    //             swift_code: Joi.string().allow('').optional(),
-    //             micr_code: Joi.string().allow('').optional(),
-    //             bank_branch_address: Joi.string().allow('').optional(),
-    //         });
-    //         let dataObj = { ...req.body };
-    //         /* ------------------ Validate ------------------ */
-    //         const { error } = bankSchema.validate(dataObj);
-    //         if (error) {
-    //             return next(error);
-    //         }
-    //         delete dataObj.type;
-    //         /* ------------------ Check Existing ------------------ */
-    //         const checkQuery = `
-    //             SELECT partner_bank_id
-    //             FROM partner_bank_information
-    //             WHERE user_id = ${dataObj.user_id}
-    //         `;
-    //         const exists = await getData(checkQuery, next);
-    //         let query = '';
-    //         /* ------------------ Update ------------------ */
-    //         if (exists.length > 0) {
-    //             dataObj.updated_at = new Date();
-    //             query = `
-    //             UPDATE partner_bank_information
-    //             SET ?
-    //             WHERE user_id = ${dataObj.user_id}
-    //         `;
-    //             dataObj.partner_bank_id = exists[0].partner_bank_id;
-    //         } else {
-    //             /* ------------------ Insert ------------------ */
-    //             dataObj.created_at = new Date();
-    //             query = `
-    //             INSERT INTO partner_bank_information
-    //             SET ?
-    //         `;
-    //         }
-    //         const result = await insertData(query, dataObj, next);
-    //         if (result.insertId) {
-    //             dataObj.partner_bank_id = result.insertId;
-    //         }
-    //         /* ------------------ Latest Data ------------------ */
-    //         const getQuery = `
-    //             SELECT 
-    //                 pfd.*,
+    async verifyPartnerBank(req, res, next) {
+        try {
+            const schema = Joi.object({
+                partner_bank_id: Joi.number().integer().required(),
+                verification_status: Joi.string().valid('Verified', 'Rejected').required(),
+            });
 
-    //                 pbi.partner_bank_id,
-    //                 pbi.bank_account_name,
-    //                 pbi.bank_account_number,
-    //                 pbi.account_type,
-    //                 pbi.bank_name,
-    //                 pbi.neft_code,
-    //                 pbi.swift_code,
-    //                 pbi.micr_code,
-    //                 pbi.bank_branch_address
+            const { error } = schema.validate(req.body);
+            if (error) return next(error);
 
-    //             FROM partner_financial_details pfd
+            const { partner_bank_id, verification_status } = req.body;
 
-    //             LEFT JOIN partner_bank_information pbi
-    //                 ON pbi.user_id = pfd.user_id
+            const exists = await getData(
+                `SELECT partner_bank_id FROM partner_bank_information WHERE partner_bank_id = ${partner_bank_id} LIMIT 1`,
+                next
+            );
+            if (exists.length === 0) {
+                return res.status(404).json({ success: false, message: "Bank not found." });
+            }
+            console.log(`Updating bank ${partner_bank_id} to status ${verification_status}`);
+            await insertData(
+                `UPDATE partner_bank_information SET ? WHERE partner_bank_id = ${partner_bank_id}`,
+                { verification_status, updated_at: new Date() },
+                next
+            );
 
-    //             WHERE pfd.user_id = ${dataObj.user_id}
-    //         `;
-    //         const latestData = await getData(getQuery, next);
-    //         latestData.forEach((item) => {
-    //             item.bankinfo = {
-    //                 partner_bank_id: item.partner_bank_id || "",
-    //                 bank_account_name: item.bank_account_name || "",
-    //                 bank_account_number: item.bank_account_number || "",
-    //                 account_type: item.account_type || "",
-    //                 bank_name: item.bank_name || "",
-    //                 neft_code: item.neft_code || "",
-    //                 swift_code: item.swift_code || "",
-    //                 micr_code: item.micr_code || "",
-    //                 bank_branch_address: item.bank_branch_address || ""
-    //             };
-    //         });
-    //         return res.json({
-    //             success: true,
-    //             message: exists.length > 0
-    //                 ? 'Partner bank information updated successfully'
-    //                 : 'Partner bank information added successfully',
-    //             data: latestData
-    //         });
-    //     } catch (error) {
-    //         next(error);
-    //     }
-    // },
+            return res.json({
+                success: true,
+                message: `Bank ${verification_status.toLowerCase()} successfully`,
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
     async updatePartnerProspectInformation(req, res, next) {
         try {
             /* ------------------ Validation ------------------ */
@@ -2375,6 +2116,7 @@ const partnerController = {
                     .valid('Prospects', 'Deal Closed', 'Not Interested', 'In discussion')
                     .allow('')
                     .optional(),
+                created_by: Joi.number().integer().optional(),
             });
             /* ------------------ PREPARE DATA ------------------ */
             let dataObj = { ...req.body };
@@ -2425,6 +2167,7 @@ const partnerController = {
             /* ------------------ UPDATE ------------------ */
             if (exists.length > 0) {
                 dataObj.updated_at = new Date();
+                delete dataObj.created_by;
                 query = `
                     UPDATE partner_prospects
                     SET ?
@@ -2433,6 +2176,7 @@ const partnerController = {
             } else {
                 /* ------------------ INSERT ------------------ */
                 dataObj.created_at = new Date();
+                dataObj.created_by = dataObj.created_by || dataObj.user_id;
                 query = `INSERT INTO partner_prospects SET ? `;
             }
             /* ------------------ REMOVE STOCKS FIELD ------------------ */
@@ -2763,6 +2507,7 @@ const partnerController = {
 
                 order_id: Joi.number().integer().optional(),
                 addedUserId: Joi.number().integer().optional(),
+                created_by: Joi.number().integer().optional(),
 
                 order_type: Joi.when('partener_order_id', {
                     is: Joi.exist(),
@@ -2802,14 +2547,16 @@ const partnerController = {
             }
             let query = "";
             if (dataObj.partener_order_id) {
+                delete dataObj.created_by;
                 query = `UPDATE partner_stock_orders SET ? WHERE partener_order_id = ${dataObj.partener_order_id}`;
                 dataObj.updated_at = new Date();
             } else {
+                dataObj.created_by = dataObj.created_by || dataObj.user_id;
                 query = `INSERT INTO partner_stock_orders SET ?`;
                 dataObj.created_at = new Date();
-                dataObj.partnerQty = dataObj.quantity,
-                    dataObj.partnerPrice = dataObj.price,
-                    dataObj.partnerBrokerPrice = dataObj.broker_price
+                dataObj.partnerQty = dataObj.quantity;
+                dataObj.partnerPrice = dataObj.price;
+                dataObj.partnerBrokerPrice = dataObj.broker_price;
             }
             const result = await insertData(query, dataObj, next);
             if (result.insertId) {
