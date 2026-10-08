@@ -1323,7 +1323,7 @@ const userController = {
                     user.bankDetails = bankDetails ?? [];
                 }
             }
-            
+
             /* ------------------ Bank  Details ------------------ */
             if (users.length) {
                 for (const user of users) {
@@ -1361,7 +1361,19 @@ const userController = {
     async RMuserList(req, res, next) {
         try {
             /* ------------------ Base Query ------------------ */
-            let query = "SELECT * FROM users WHERE 1 AND user_type='user' AND is_deleted = 0 AND is_verified = 1 AND user_type != 'ADMIN'";
+            // let query = "SELECT * FROM users WHERE 1 AND user_type='user' AND is_deleted = 0 AND is_verified = 1 AND user_type != 'ADMIN'";
+            let query = `
+                SELECT 
+                    u.*,
+                    TRIM(CONCAT_WS(' ', p.first_name, p.middle_name, p.last_name)) AS partner_name,
+                    p.user_custum_id AS partner_id
+                FROM users u
+                LEFT JOIN users p ON p.user_id = u.assign_partner
+                WHERE 1 
+                AND u.user_type = 'user' 
+                AND u.is_deleted = 0 
+                AND u.is_verified = 1 
+                AND u.user_type != 'ADMIN'`;
             let cond = '';
             let page = { pageQuery: '' };
 
@@ -1385,39 +1397,39 @@ const userController = {
 
             /* ------------------ Filters ------------------ */
             if (req.query.user_id) {
-                cond += ` AND user_id = ${req.query.user_id}`;
+                cond += ` AND u.user_id = ${req.query.user_id}`;
             }
 
             if (req.query.username) {
-                cond += ` AND username LIKE '%${req.query.username}%'`;
+                cond += ` AND u.username LIKE '%${req.query.username}%'`;
             }
 
             if (req.query.email) {
-                cond += ` AND email LIKE '%${req.query.email}%'`;
+                cond += ` AND u.email LIKE '%${req.query.email}%'`;
             }
 
             if (req.query.phone_number) {
-                cond += ` AND phone_number LIKE '%${req.query.phone_number}%'`;
+                cond += ` AND u.phone_number LIKE '%${req.query.phone_number}%'`;
             }
 
             if (req.query.assign_to) {
-                cond += ` AND assign_to LIKE '%${req.query.assign_to}%'`;
+                cond += ` AND u.assign_to LIKE '%${req.query.assign_to}%'`;
             }
 
             if (req.query.assign_partner) {
-                cond += ` AND assign_partner LIKE '%${req.query.assign_partner}%'`;
+                cond += ` AND u.assign_partner LIKE '%${req.query.assign_partner}%'`;
             }
 
             if (req.query.search) {
                 const search = req.query.search;
 
                 cond += ` AND (
-                    username LIKE '%${search}%'
-                    OR phone_number LIKE '%${search}%'
+                    u.username LIKE '%${search}%'
+                    OR u.phone_number LIKE '%${search}%'
                     OR CONCAT(
-                        COALESCE(first_name, ''), ' ',
-                        COALESCE(middle_name, ''), ' ',
-                        COALESCE(last_name, '')
+                        COALESCE(u.first_name, ''), ' ',
+                        COALESCE(u.middle_name, ''), ' ',
+                        COALESCE(u.last_name, '')
                     ) LIKE '%${search}%'
                 )`;
             }
@@ -1426,13 +1438,13 @@ const userController = {
                 const search = req.query.searchUsernamePhone_numberEmail;
 
                 cond += ` AND (
-                    username LIKE '%${search}%'
-                    OR phone_number LIKE '%${search}%'
-                    OR email LIKE '%${search}%'
+                    u.username LIKE '%${search}%'
+                    OR u.phone_number LIKE '%${search}%'
+                    OR u.email LIKE '%${search}%'
                 )`;
             }
 
-            cond += `ORDER BY user_id DESC`;
+            cond += `ORDER BY u.user_id DESC`;
             /* ------------------ Pagination ------------------ */
             if (req.query.pagination) {
                 page = await paginationQuery(

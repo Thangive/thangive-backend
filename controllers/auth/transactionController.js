@@ -2023,6 +2023,7 @@ const transactionController = {
 
                 company_name: Joi.string().optional(),
                 am_status: Joi.string().valid("PENDING", "RECEVIED").optional(),
+                payment_type: Joi.string().valid("FULL", "PARTIAL").optional(),
                 from_date: Joi.string().optional(),
                 to_date: Joi.string().optional(),
 
@@ -2115,6 +2116,7 @@ const transactionController = {
             LEFT JOIN stock_details st
                 ON st.stock_details_id = ot.stock_details_id
             WHERE 1 = 1
+            AND ot.rm_status NOT IN ('CANCEL', 'REJECTED')
         `;
 
             /* ------------------ Filters ------------------ */
@@ -2158,6 +2160,10 @@ const transactionController = {
 
             if (value.am_status) {
                 cond += ` AND pt.am_status = '${value.am_status}'`;
+            }
+
+            if (value.payment_type) {
+                cond += ` AND pt.payment_type = '${value.payment_type}'`;
             }
 
             if (value.from_date) {
