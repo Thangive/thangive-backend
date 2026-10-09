@@ -13,6 +13,10 @@ const partnerController = {
             let query = `
                 SELECT 
                     u.*,
+                    CASE
+                        WHEN u.created_id IS NOT NULL THEN 'Admin'
+                        ELSE 'Self'
+                    END AS created_by,
                     p.partner_financial_id,
                     p.business_type,
                     p.gst_compliant,
@@ -151,7 +155,7 @@ const partnerController = {
 
             }
 
-            query += cond + page.pageQuery;
+            query += cond + ` ORDER BY u.created_at DESC ` + page.pageQuery;
 
             /* ------------------ Fetch Partners ------------------ */
 
@@ -763,6 +767,7 @@ const partnerController = {
                 gst_number: Joi.string().allow("").optional(),
 
                 profile: Joi.string().allow("").optional(),
+                created_id: Joi.number().integer().optional(),
             });
 
             const dataObj = { ...req.body };
@@ -861,6 +866,7 @@ const partnerController = {
                 city: dataObj.city,
                 state: dataObj.state,
                 contry: dataObj.contry,
+                created_id: dataObj.created_id || null
             };
 
             if (req.files?.profile?.length > 0) {
@@ -2856,15 +2862,13 @@ const partnerController = {
             const query = `
             SELECT
                 pc.*,
-
-                pfd.business_name,
+                CONCAT_WS(' ', NULLIF(u.first_name, ''), NULLIF(u.middle_name, ''), NULLIF(u.last_name, '')) AS business_name,
+                u.address AS address_line_1,
+                u.city,
+                u.state,
+                u.contry AS country,
+                u.zipcode AS postcode,
                 pfd.pan_number,
-                pfd.address_line_1,
-                pfd.address_line_2,
-                pfd.city,
-                pfd.state,
-                pfd.country,
-                pfd.postcode,
 
                 pbi.bank_account_name,
                 pbi.bank_account_number,
@@ -2876,9 +2880,11 @@ const partnerController = {
                 pbi.bank_branch_address
 
             FROM partner_financial_details pfd
-
+            INNER JOIN users u
+                ON u.user_id = pfd.user_id
             LEFT JOIN partner_bank_information pbi
                 ON pbi.user_id = pfd.user_id
+                AND pbi.set_as_default = 'Yes'
 
             LEFT JOIN partner_commission pc
                 ON pc.order_id = ${req.query.order_id}
@@ -2890,14 +2896,6 @@ const partnerController = {
         `;
 
             const data = await getData(query, next);
-
-            // if (!data.length) {
-            //     return res.json({
-            //         success: false,
-            //         message: "Commission not found",
-            //         data: {}
-            //     });
-            // }
 
             const item = data[0];
             const response = {
@@ -2928,7 +2926,7 @@ const partnerController = {
                     business_name: item.business_name || "",
                     pan_number: item.pan_number || "",
                     address_line_1: item.address_line_1 || "",
-                    address_line_2: item.address_line_2 || "",
+                    address_line_2: "",
                     city: item.city || "",
                     state: item.state || "",
                     country: item.country || "",
