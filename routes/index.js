@@ -177,6 +177,6 @@ router.post('/updatePartnerKycStatus', auth, forms, partnerController.updatePart
 router.post('/updateFranchiseAgreement', auth,imageUpload, partnerController.updateFranchiseAgreement);
 router.post('/createPartnerAdmin', auth, imageUpload, partnerController.createPartnerAdmin);
 router.post('/verifyPartnerBank', auth, forms, partnerController.verifyPartnerBank);
-
+router.post('/PartnerKycUpdate', auth, imageUpload, partnerController.PartnerKycUpdate);
 
 export default router;

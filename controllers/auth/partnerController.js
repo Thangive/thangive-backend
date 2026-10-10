@@ -736,6 +736,144 @@ const partnerController = {
 
         }
     },
+    async PartnerKycUpdate(req, res, next) {
+        try {
+            const dataObj = { ...req.body };
+            const files = req.files || {};
+            const AADHAR_REGEX = /^[0-9]{12}$/;
+            const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+            const hasFile = (name) => files[name]?.length > 0;
+            const isAdmin =
+                dataObj.is_admin === "1" ||
+                dataObj.is_admin === 1 ||
+                dataObj.is_admin === true ||
+                dataObj.is_admin === "true";
+            const fileStatus = isAdmin ? "Verified" : "Pending";
+            const { error } = Joi.object({
+                user_id: Joi.number().integer().required(),
+                aadharNumber: Joi.string().pattern(AADHAR_REGEX),
+                panNumber: Joi.string().pattern(PAN_REGEX),
+            }).validate(
+                {
+                    user_id: dataObj.user_id,
+                    aadharNumber: dataObj.aadharNumber,
+                    panNumber: dataObj.panNumber,
+                },
+                { abortEarly: false }
+            );
+            if (error) return next(error);
+            const checkPartner = await getData(
+                `SELECT user_id
+                    FROM users
+                    WHERE user_id = '${dataObj.user_id}'
+                    AND user_type = 'PARTNER'
+                    AND is_deleted = 0`,
+                next
+            );
+
+            if (!checkPartner.length) {
+                return next(CustomErrorHandler.notFound("Partner not found"));
+            }
+
+            const kycData = {};
+
+            if (hasFile("aadharCard")) {
+                kycData.aadharcard_copy = files.aadharCard[0].path;
+                kycData.aadhar_status = fileStatus;
+            }
+
+            if (dataObj.aadharNumber !== undefined) {
+                kycData.aadhar_number = dataObj.aadharNumber;
+            }
+
+            if (hasFile("panCard")) {
+                kycData.pancard_copy = files.panCard[0].path;
+                kycData.pan_status = fileStatus;
+            }
+
+            if (dataObj.panNumber !== undefined) {
+                kycData.pan_number = dataObj.panNumber;
+            }
+
+            if (hasFile("cmr")) {
+                kycData.cmr_copy = files.cmr[0].path;
+                kycData.cmr_status = fileStatus;
+            }
+
+            if (hasFile("sealSignature")) {
+                kycData.stamp_signature = files.sealSignature[0].path;
+                kycData.stamp_signature_status = fileStatus;
+            }
+
+            if (Object.keys(kycData).length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "No KYC data provided",
+                });
+            }
+
+            const existing = await getData(
+                `SELECT partner_financial_id
+                    FROM partner_financial_details
+                    WHERE user_id = '${dataObj.user_id}'
+                    AND is_deleted = 0`,
+                        next
+            );
+
+            if (existing.length > 0) {
+                await insertData(
+                    `UPDATE partner_financial_details
+                        SET ?
+                        WHERE user_id = '${dataObj.user_id}'
+                        AND is_deleted = 0`,
+                    kycData,
+                    next
+                );
+            } else {
+                await insertData(
+                    `INSERT INTO partner_financial_details SET ?`,
+                    { ...kycData, user_id: dataObj.user_id },
+                    next
+                );
+            }
+
+            const updated = await getData(
+                `SELECT
+                        u.user_id,
+                        p.partner_financial_id,
+
+                        p.aadhar_number,
+                        p.pan_number,
+
+                        p.aadharcard_copy,
+                        p.pancard_copy,
+                        p.cmr_copy,
+                        p.stamp_signature,
+
+                        p.aadhar_status,
+                        p.pan_status,
+                        p.cmr_status,
+                        p.stamp_signature_status
+
+                    FROM users u
+                    LEFT JOIN partner_financial_details p
+                        ON p.user_id = u.user_id
+                        AND p.is_deleted = 0
+                    WHERE u.user_id = '${dataObj.user_id}'
+                    AND u.user_type = 'PARTNER'
+                    AND u.is_deleted = 0`,
+                next
+            );
+
+            return res.json({
+                success: true,
+                message: "KYC details updated successfully",
+                data: updated,
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
     async createPartnerAdmin(req, res, next) {
         try {
             // ------------------ Validation ------------------
