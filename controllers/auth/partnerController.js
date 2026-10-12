@@ -2775,6 +2775,7 @@ const partnerController = {
                 ) AS partnerName,
                 u.user_custum_id AS partner_userID,
             cu.user_id AS client_userID,
+            cu.user_custum_id AS user_custum_id,
             cu.first_name AS client_first_name,
             cu.middle_name AS client_middle_name,
             cu.last_name AS client_last_name
