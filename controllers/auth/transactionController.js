@@ -46,6 +46,7 @@ const transactionController = {
                     }),
 
                 added_qty: Joi.number().optional(),
+                added_price: Joi.number().optional(),
                 partner_price: Joi.number().optional()
             });
 
@@ -54,7 +55,7 @@ const transactionController = {
             /* ------------------ Validate ------------------ */
             const { error } = orderSchema.validate(dataObj);
             if (error) return next(error);
-
+            const buyPrice = Number(dataObj.added_price ?? dataObj.price_per_share);
             const posQuery = `
                 SELECT 
                     COALESCE(MAX(position_group), 1) AS last_group,
@@ -93,8 +94,8 @@ const transactionController = {
                     user_quantity: Number(dataObj.added_qty),
                     order_type: 'LIMIT',
                     transaction_type: 'BUY',
-                    price_per_share: Number(dataObj.price_per_share),
-                    user_share_price: Number(dataObj.price_per_share),
+                    price_per_share: buyPrice,
+                    user_share_price: buyPrice,
                     current_share_price: Number(dataObj.current_share_price),
                     rm_status: 'COMPLETED',
                     am_status: 'COMPLETED',
@@ -102,7 +103,7 @@ const transactionController = {
                     position_group: buyGroup,
                     created_at: new Date(),
                     addedUserId: dataObj.addedUserId || null,
-                    addedPartnerID: dataObj.addedPartnerID || null,
+                    // addedPartnerID: dataObj.addedPartnerID || null,
                     partner_price: dataObj.partner_price || null
                 };
 
@@ -111,6 +112,7 @@ const transactionController = {
                 lastGroup = buyGroup;
                 remainingQty += Number(dataObj.added_qty);
                 delete dataObj.added_qty;
+                delete dataObj.added_price;
             }
             /* ------------------ MARKET price handling ------------------ */
             if (dataObj.order_type === 'MARKET') {
