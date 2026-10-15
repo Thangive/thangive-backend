@@ -817,7 +817,7 @@ const partnerController = {
                     FROM partner_financial_details
                     WHERE user_id = '${dataObj.user_id}'
                     AND is_deleted = 0`,
-                        next
+                next
             );
 
             if (existing.length > 0) {
@@ -2392,6 +2392,129 @@ const partnerController = {
             next(error);
         }
     },
+    // async getPartnerProspects(req, res, next) {
+    //     try {
+    //         /* ---------------- VALIDATION ---------------- */
+    //         const prospectSchema = Joi.object({
+    //             partner_prospect_id: Joi.number().integer().optional(),
+    //             user_id: Joi.number().integer().optional(),
+    //             client_type: Joi.string().optional(),
+    //             search: Joi.string().optional(),
+    //             client_firm_name: Joi.string().optional(),
+    //             gst_number: Joi.string().optional(),
+    //             email: Joi.string().optional(),
+    //             phone: Joi.string().optional(),
+    //             rm_name: Joi.string().optional(),
+    //             lead_type: Joi.string().optional(),
+    //             pagination: Joi.boolean().optional(),
+    //             current_page: Joi.number().integer().optional(),
+    //             per_page_records: Joi.number().integer().optional(),
+    //             lead_status: Joi.string().optional(),
+    //         });
+    //         const { error } = prospectSchema.validate(req.query);
+    //         if (error) {
+    //             return next(error);
+    //         }
+    //         /* ---------------- BASE QUERY ---------------- */
+    //         let query = `
+    //             SELECT *
+    //             FROM partner_prospects
+    //             WHERE is_deleted = 0
+    //         `;
+    //         let cond = '';
+    //         let page = { pageQuery: '' };
+    //         /* ---------------- FILTERS ---------------- */
+    //         if (req.query.partner_prospect_id) {
+    //             cond += `
+    //                 AND partner_prospect_id =
+    //                 '${req.query.partner_prospect_id}'
+    //             `;
+    //         }
+    //         if (req.query.user_id) {
+    //             cond += `AND user_id = '${req.query.user_id}'`;
+    //         }
+    //         if (req.query.client_type) {
+    //             cond += `
+    //             AND client_type =
+    //             '${req.query.client_type}'
+    //         `;
+    //         }
+    //         if (req.query.client_firm_name) {
+    //             cond += `
+    //             AND client_firm_name LIKE
+    //             '%${req.query.client_firm_name}%'
+    //         `;
+    //         }
+    //         if (req.query.search) {
+    //             cond += `
+    //             AND client_firm_name LIKE
+    //             '%${req.query.search}%'
+    //         `;
+    //         }
+    //         if (req.query.gst_number) {
+    //             cond += `
+    //             AND gst_number LIKE
+    //             '%${req.query.gst_number}%'
+    //         `;
+    //         }
+    //         if (req.query.email) {
+    //             cond += `
+    //             AND email LIKE
+    //             '%${req.query.email}%'
+    //         `;
+    //         }
+    //         if (req.query.phone) {
+    //             cond += `
+    //             AND phone LIKE
+    //             '%${req.query.phone}%'
+    //         `;
+    //         }
+    //         if (req.query.rm_name) {
+    //             cond += `
+    //             AND rm_name LIKE
+    //             '%${req.query.rm_name}%'
+    //         `;
+    //         }
+    //         if (req.query.lead_type) {
+    //             cond += `AND lead_type ='${req.query.lead_type}'`;
+    //         }
+    //         if (req.query.lead_status) {
+    //             cond += `AND lead_status ='${req.query.lead_status}'`;
+    //         }
+
+    //         cond += `ORDER BY created_at DESC`;
+    //         /* ---------------- PAGINATION ---------------- */
+    //         if (req.query.pagination) {
+    //             page = await paginationQuery(
+    //                 query + cond,
+    //                 next,
+    //                 req.query.current_page,
+    //                 req.query.per_page_records
+    //             );
+    //         }
+    //         query += cond + page.pageQuery;
+    //         /* ---------------- GET DATA ---------------- */
+    //         const prospectData = await getData(query, next);
+    //         /* ---------------- RESPONSE ---------------- */
+    //         return res.json({
+    //             success: true,
+    //             message:
+    //                 "Partner prospects fetched successfully",
+    //             total_records:
+    //                 page.total_rec ?? prospectData.length,
+    //             number_of_pages:
+    //                 page.number_of_pages || 1,
+    //             currentPage:
+    //                 page.currentPage || 1,
+    //             records:
+    //                 prospectData.length,
+    //             data:
+    //                 prospectData
+    //         });
+    //     } catch (error) {
+    //         next(error);
+    //     }
+    // },
     async getPartnerProspects(req, res, next) {
         try {
             /* ---------------- VALIDATION ---------------- */
@@ -2406,83 +2529,142 @@ const partnerController = {
                 phone: Joi.string().optional(),
                 rm_name: Joi.string().optional(),
                 lead_type: Joi.string().optional(),
+                lead_status: Joi.string().optional(),
+
+                // new filters
+                order_type: Joi.string().valid("buy", "sell").optional(),
+                date_field: Joi.string().valid("lead_creation_date", "followup_date").optional(),
+                from_date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional(),
+                to_date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional(),
+
                 pagination: Joi.boolean().optional(),
                 current_page: Joi.number().integer().optional(),
                 per_page_records: Joi.number().integer().optional(),
-                lead_status: Joi.string().optional(),
             });
             const { error } = prospectSchema.validate(req.query);
             if (error) {
                 return next(error);
             }
+
+            /* ---------------- SAFE ESCAPE HELPER ---------------- */
+            const esc = (v) =>
+                String(v)
+                    .replace(/\\/g, "\\\\")
+                    .replace(/'/g, "\\'")
+                    .replace(/"/g, '\\"')
+                    .replace(/\0/g, "")
+                    .replace(/\n/g, "\\n")
+                    .replace(/\r/g, "\\r")
+                    .replace(/\x1a/g, "\\Z");
+
             /* ---------------- BASE QUERY ---------------- */
             let query = `
-                SELECT *
-                FROM partner_prospects
-                WHERE is_deleted = 0
-            `;
-            let cond = '';
-            let page = { pageQuery: '' };
+            SELECT
+                pp.*,
+                ls.stock_name,
+                ls.broker_name,
+                ls.buy_sell,
+                ls.quantity,
+                ls.price,
+                ROUND(ls.quantity * ls.price, 2) AS deal_value,
+                COALESCE(sc.stock_count, 0) AS stock_count
+            FROM partner_prospects pp
+            LEFT JOIN (
+                SELECT
+                    partner_prospect_id,
+                    COUNT(*) AS stock_count,
+                    MAX(partner_prospect_stock_id) AS latest_stock_id
+                FROM partner_prospect_stocks
+                GROUP BY partner_prospect_id
+            ) sc ON sc.partner_prospect_id = pp.partner_prospect_id
+            LEFT JOIN partner_prospect_stocks ls
+                ON ls.partner_prospect_stock_id = sc.latest_stock_id
+            WHERE pp.is_deleted = 0
+        `;
+
+            let cond = "";
+            let page = { pageQuery: "" };
+
             /* ---------------- FILTERS ---------------- */
             if (req.query.partner_prospect_id) {
-                cond += `
-                    AND partner_prospect_id =
-                    '${req.query.partner_prospect_id}'
-                `;
+                cond += ` AND pp.partner_prospect_id = ${Number(req.query.partner_prospect_id)} `;
             }
             if (req.query.user_id) {
-                cond += `AND user_id = '${req.query.user_id}'`;
+                cond += ` AND pp.user_id = ${Number(req.query.user_id)} `;
             }
             if (req.query.client_type) {
-                cond += `
-                AND client_type =
-                '${req.query.client_type}'
-            `;
+                cond += ` AND pp.client_type = '${esc(req.query.client_type)}' `;
             }
             if (req.query.client_firm_name) {
-                cond += `
-                AND client_firm_name LIKE
-                '%${req.query.client_firm_name}%'
-            `;
-            }
-            if (req.query.search) {
-                cond += `
-                AND client_firm_name LIKE
-                '%${req.query.search}%'
-            `;
+                cond += ` AND pp.client_firm_name LIKE '%${esc(req.query.client_firm_name)}%' `;
             }
             if (req.query.gst_number) {
-                cond += `
-                AND gst_number LIKE
-                '%${req.query.gst_number}%'
-            `;
+                cond += ` AND pp.gst_number LIKE '%${esc(req.query.gst_number)}%' `;
             }
             if (req.query.email) {
-                cond += `
-                AND email LIKE
-                '%${req.query.email}%'
-            `;
+                cond += ` AND pp.email LIKE '%${esc(req.query.email)}%' `;
             }
             if (req.query.phone) {
-                cond += `
-                AND phone LIKE
-                '%${req.query.phone}%'
-            `;
+                cond += ` AND pp.phone LIKE '%${esc(req.query.phone)}%' `;
             }
             if (req.query.rm_name) {
-                cond += `
-                AND rm_name LIKE
-                '%${req.query.rm_name}%'
-            `;
+                cond += ` AND pp.rm_name LIKE '%${esc(req.query.rm_name)}%' `;
             }
             if (req.query.lead_type) {
-                cond += `AND lead_type ='${req.query.lead_type}'`;
+                cond += ` AND pp.lead_type = '${esc(req.query.lead_type)}' `;
             }
             if (req.query.lead_status) {
-                cond += `AND lead_status ='${req.query.lead_status}'`;
+                cond += ` AND pp.lead_status = '${esc(req.query.lead_status)}' `;
             }
 
-            cond += `ORDER BY created_at DESC`;
+            /* ---------- UNIVERSAL SEARCH ---------- */
+            if (req.query.search && req.query.search.trim()) {
+                const s = esc(req.query.search.trim());
+                cond += `
+                AND (
+                    CAST(pp.partner_prospect_id AS CHAR) LIKE '%${s}%'
+                    OR pp.client_firm_name LIKE '%${s}%'
+                    OR pp.client_type LIKE '%${s}%'
+                    OR pp.email LIKE '%${s}%'
+                    OR pp.phone LIKE '%${s}%'
+                    OR pp.gst_number LIKE '%${s}%'
+                    OR pp.note LIKE '%${s}%'
+                    OR pp.rm_name LIKE '%${s}%'
+                    OR ls.stock_name LIKE '%${s}%'
+                    OR ls.broker_name LIKE '%${s}%'
+                )
+            `;
+            }
+
+            /* ---------- ORDER TYPE (latest stock) ---------- */
+            if (req.query.order_type) {
+                cond += ` AND LOWER(ls.buy_sell) = '${esc(req.query.order_type)}' `;
+            }
+
+            /* ---------- DATE FILTER ---------- */
+            const dateColumns = {
+                lead_creation_date: "pp.lead_creation_date",
+                followup_date: "pp.followup_date",
+            };
+            const dateCol = dateColumns[req.query.date_field] || dateColumns.lead_creation_date;
+
+            if (req.query.from_date) {
+                cond += ` AND DATE(${dateCol}) >= '${esc(req.query.from_date)}' `;
+            }
+            if (req.query.to_date) {
+                cond += ` AND DATE(${dateCol}) <= '${esc(req.query.to_date)}' `;
+            }
+
+            // if (req.query.order_type) {
+            //     cond += ` AND EXISTS (
+            //         SELECT 1 FROM partner_prospect_stocks x
+            //         WHERE x.partner_prospect_id = pp.partner_prospect_id
+            //         AND LOWER(x.buy_sell) = '${esc(req.query.order_type)}'
+            //     ) `;
+            // }
+
+            cond += ` ORDER BY pp.created_at DESC `;
+
             /* ---------------- PAGINATION ---------------- */
             if (req.query.pagination) {
                 page = await paginationQuery(
@@ -2492,24 +2674,21 @@ const partnerController = {
                     req.query.per_page_records
                 );
             }
+
             query += cond + page.pageQuery;
+
             /* ---------------- GET DATA ---------------- */
             const prospectData = await getData(query, next);
+
             /* ---------------- RESPONSE ---------------- */
             return res.json({
                 success: true,
-                message:
-                    "Partner prospects fetched successfully",
-                total_records:
-                    page.total_rec ?? prospectData.length,
-                number_of_pages:
-                    page.number_of_pages || 1,
-                currentPage:
-                    page.currentPage || 1,
-                records:
-                    prospectData.length,
-                data:
-                    prospectData
+                message: "Partner prospects fetched successfully",
+                total_records: page.total_rec ?? prospectData.length,
+                number_of_pages: page.number_of_pages || 1,
+                currentPage: page.currentPage || 1,
+                records: prospectData.length,
+                data: prospectData,
             });
         } catch (error) {
             next(error);
