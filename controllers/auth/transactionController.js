@@ -2088,6 +2088,17 @@ const transactionController = {
                     IF(rm_user.middle_name IS NOT NULL AND rm_user.middle_name != '', ' ', ''),
                     rm_user.last_name
                 ) AS rm_name,
+                
+                /* Partner Info */
+                partner_user.user_id AS partner_id,
+                partner_user.user_custum_id AS partner_userID,
+                partner_user.phone_number AS partner_phone,
+                CONCAT(
+                    partner_user.first_name, ' ',
+                    IFNULL(partner_user.middle_name, ''),
+                    IF(partner_user.middle_name IS NOT NULL AND partner_user.middle_name != '', ' ', ''),
+                    partner_user.last_name
+                ) AS partner_name,
 
                 /* Payment Info */
                 pt.rm_Datetime AS payment_date,
@@ -2113,6 +2124,8 @@ const transactionController = {
                 ON u.user_id = ot.user_id
             LEFT JOIN users rm_user
                 ON rm_user.user_id = u.assign_to
+            LEFT JOIN users partner_user
+                ON partner_user.user_id = ot.addedPartnerID
             LEFT JOIN user_bank_details b
                 ON b.bank_id = pt.bank_id
             LEFT JOIN stock_details st
@@ -2167,6 +2180,10 @@ const transactionController = {
             if (value.payment_type) {
                 cond += ` AND pt.payment_type = '${value.payment_type}'`;
             }
+
+            // if (value.employee_id && value.employee_type === "PARTNER") {
+            //     cond += ` AND ot.addedPartnerID = ${value.employee_id}`;
+            // }
 
             if (value.from_date) {
                 cond += ` AND DATE(pt.rm_Datetime) >= '${value.from_date}'`;

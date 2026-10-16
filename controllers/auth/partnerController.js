@@ -31,6 +31,10 @@ const partnerController = {
                     p.pan_status,
                     p.cmr_status,
                     p.stamp_signature_status,
+                    p.aadhar_password,         
+                    p.pan_password,            
+                    p.cmr_password,            
+                    p.stamp_signature_password,
                     p.is_deleted AS financial_is_deleted,
                     p.franchise_upload_date,
                     p.franchise_status,
@@ -178,61 +182,50 @@ const partnerController = {
     },
     async updatePartnerProfile(req, res, next) {
     },
+
     async PartnerProfileCreateUpdate(req, res, next) {
         try {
-
             /* =========================================================
                PREPARE DATA
             ========================================================= */
-
-            let dataObj = { ...req.body };
-
+            const dataObj = { ...req.body };
 
             /* =========================================================
                BASIC VALIDATION
             ========================================================= */
-
             const basicSchema = Joi.object({
-                user_id: Joi.number().integer().required()
+                user_id: Joi.number().integer().required(),
             });
 
             const { error: basicError } = basicSchema.validate({
-                user_id: dataObj.user_id
+                user_id: dataObj.user_id,
             });
 
             if (basicError) {
                 return next(basicError);
             }
 
-
             /* =========================================================
                CHECK PARTNER EXISTS
             ========================================================= */
-
-            const checkPartnerQuery = `
+            const checkPartner = await getData(
+                `
             SELECT *
             FROM users
             WHERE user_id = '${dataObj.user_id}'
             AND user_type = 'PARTNER'
             AND is_deleted = 0
-        `;
-
-            const checkPartner = await getData(
-                checkPartnerQuery,
+            `,
                 next
             );
 
             if (!checkPartner.length) {
-                return next(
-                    CustomErrorHandler.notFound("Partner not found")
-                );
+                return next(CustomErrorHandler.notFound("Partner not found"));
             }
-
 
             /* =========================================================
                CHECK REQUEST TYPE
             ========================================================= */
-
             const hasProfileData =
                 dataObj.first_name !== undefined ||
                 dataObj.last_name !== undefined ||
@@ -240,23 +233,19 @@ const partnerController = {
                 dataObj.phone_number !== undefined ||
                 dataObj.business_type !== undefined;
 
-            const hasKycFiles =
-                req.files?.aadharCard?.length > 0 ||
-                req.files?.panCard?.length > 0 ||
-                req.files?.cmr?.length > 0 ||
-                req.files?.sealSignature?.length > 0;
-
+            // KYC request = any KYC file OR a KYC number
+            // (numbers alone must also be saved when no new file is picked)
+            const hasKycData =
+                KYC_FILES.some(({ file }) => req.files?.[file]?.length > 0) ||
+                dataObj.aadharNumber !== undefined ||
+                dataObj.panNumber !== undefined;
 
             /* =========================================================
                PROFILE + BUSINESS DETAILS
             ========================================================= */
-
             if (hasProfileData) {
-
                 /* ------------------ Validation ------------------ */
-
                 const partnerSchema = Joi.object({
-
                     user_id: Joi.number().integer().required(),
 
                     first_name: Joi.string().required(),
@@ -277,30 +266,22 @@ const partnerController = {
 
                     business_type: Joi.string().required(),
                     gst_compliant: Joi.string().allow(""),
-                    gst_number: Joi.string().allow("")
-
+                    gst_number: Joi.string().allow(""),
                 });
 
-
-                const { error } = partnerSchema.validate(
-                    dataObj,
-                    {
-                        abortEarly: false,
-                        allowUnknown: false
-                    }
-                );
+                const { error } = partnerSchema.validate(dataObj, {
+                    abortEarly: false,
+                    allowUnknown: false,
+                });
 
                 if (error) {
                     console.log("JOI ERROR:", error.details);
                     return next(error);
                 }
 
-
-                /* =====================================================
-                   DUPLICATE EMAIL / PHONE CHECK
-                ===================================================== */
-
-                const duplicateQuery = `
+                /* ------------- Duplicate email / phone ------------- */
+                const duplicateUser = await getData(
+                    `
                 SELECT user_id
                 FROM users
                 WHERE (
@@ -310,10 +291,7 @@ const partnerController = {
                 AND user_type = 'PARTNER'
                 AND user_id != '${dataObj.user_id}'
                 AND is_deleted = 0
-            `;
-
-                const duplicateUser = await getData(
-                    duplicateQuery,
+                `,
                     next
                 );
 
@@ -325,13 +303,8 @@ const partnerController = {
                     );
                 }
 
-
-                /* =====================================================
-                   UPDATE USERS TABLE
-                ===================================================== */
-
+                /* ------------------ Update users ------------------ */
                 const userData = {
-
                     first_name: dataObj.first_name,
                     middle_name: dataObj.middle_name,
                     last_name: dataObj.last_name,
@@ -344,330 +317,62 @@ const partnerController = {
                     contry: dataObj.contry,
                     city: dataObj.city,
                     address: dataObj.address,
-                    zipcode: dataObj.zipcode
-
+                    zipcode: dataObj.zipcode,
                 };
 
-
-                /* ------------------ Profile Image ------------------ */
-
                 if (req.files?.profile?.length > 0) {
-
-                    const file = req.files.profile[0];
-
-                    userData.profile = file.path;
+                    userData.profile = req.files.profile[0].path;
                 }
 
-
-                const updateUserQuery = `
+                await insertData(
+                    `
                 UPDATE users
                 SET ?
                 WHERE user_id = '${dataObj.user_id}'
                 AND user_type = 'PARTNER'
                 AND is_deleted = 0
-            `;
-
-                await insertData(
-                    updateUserQuery,
+                `,
                     userData,
                     next
                 );
 
-
-                /* =====================================================
-                   CHECK FINANCIAL DETAILS
-                ===================================================== */
-
-                const checkFinancialQuery = `
-                SELECT partner_financial_id
-                FROM partner_financial_details
-                WHERE user_id = '${dataObj.user_id}'
-                AND is_deleted = 0
-            `;
-
-                const checkFinancial = await getData(
-                    checkFinancialQuery,
-                    next
-                );
-
-
-                /* =====================================================
-                   FINANCIAL DATA
-                ===================================================== */
-
-                // const financialData = {
-
-                //     business_type: dataObj.business_type,
-                //     gst_compliant: dataObj.gst_compliant,
-
-                //     gst_number: dataObj.gst_number
-
-                // };
-
+                /* ------------------ Financial data ------------------ */
                 const isIndividual = dataObj.business_type === "Individual";
-                const gstCompliant = ["Yes", "No"].includes(dataObj.gst_compliant) ? dataObj.gst_compliant : null;
+                const gstCompliant = ["Yes", "No"].includes(dataObj.gst_compliant)
+                    ? dataObj.gst_compliant
+                    : null;
 
                 const financialData = {
                     business_type: dataObj.business_type,
                     // never send '' to an ENUM column
                     gst_compliant: isIndividual ? null : gstCompliant,
-                    gst_number: (!isIndividual && gstCompliant === "Yes") ? (dataObj.gst_number ?? "") : ""
+                    gst_number:
+                        !isIndividual && gstCompliant === "Yes"
+                            ? dataObj.gst_number ?? ""
+                            : "",
+                    // KYC files / numbers / passwords if sent together
+                    ...buildKycData(req, dataObj),
                 };
 
-
-                /* =====================================================
-                   KYC FILES IF SENT WITH PROFILE
-                ===================================================== */
-
-                /* ------------------ Aadhar ------------------ */
-
-                if (req.files?.aadharCard?.length > 0) {
-
-                    const file = req.files.aadharCard[0];
-
-                    financialData.aadharcard_copy = file.path;
-
-                    financialData.aadhar_status = "Pending";
-                }
-
-
-                /* ------------------ Aadhar Number ------------------ */
-
-                if (dataObj.aadharNumber !== undefined) {
-
-                    financialData.aadhar_number =
-                        dataObj.aadharNumber;
-                }
-
-
-                /* ------------------ PAN ------------------ */
-
-                if (req.files?.panCard?.length > 0) {
-
-                    const file = req.files.panCard[0];
-
-                    financialData.pancard_copy = file.path;
-
-                    financialData.pan_status = "Pending";
-                }
-
-
-                /* ------------------ PAN Number ------------------ */
-
-                if (dataObj.panNumber !== undefined) {
-
-                    financialData.pan_number =
-                        dataObj.panNumber;
-                }
-
-
-                /* ------------------ CMR ------------------ */
-
-                if (req.files?.cmr?.length > 0) {
-
-                    const file = req.files.cmr[0];
-
-                    financialData.cmr_copy = file.path;
-
-                    financialData.cmr_status = "Pending";
-                }
-
-
-                /* ------------------ Seal / Signature ------------------ */
-
-                if (req.files?.sealSignature?.length > 0) {
-
-                    const file = req.files.sealSignature[0];
-
-                    financialData.stamp_signature = file.path;
-
-                    financialData.stamp_signature_status =
-                        "Pending";
-                }
-
-
-                /* =====================================================
-                   UPDATE / INSERT FINANCIAL DETAILS
-                ===================================================== */
-
-                if (checkFinancial.length > 0) {
-
-                    const updateFinancialQuery = `
-                    UPDATE partner_financial_details
-                    SET ?
-                    WHERE user_id = '${dataObj.user_id}'
-                    AND is_deleted = 0
-                `;
-
-                    await insertData(
-                        updateFinancialQuery,
-                        financialData,
-                        next
-                    );
-
-                } else {
-
-                    financialData.user_id =
-                        dataObj.user_id;
-
-                    const insertFinancialQuery = `
-                    INSERT INTO partner_financial_details
-                    SET ?
-                `;
-
-                    await insertData(
-                        insertFinancialQuery,
-                        financialData,
-                        next
-                    );
-                }
-
+                await saveFinancialDetails(dataObj.user_id, financialData, next);
             }
-
 
             /* =========================================================
                KYC ONLY
             ========================================================= */
+            else if (hasKycData) {
+                const kycData = buildKycData(req, dataObj);
 
-            else if (hasKycFiles) {
-
-                /* =====================================================
-                   CHECK FINANCIAL DETAILS
-                ===================================================== */
-
-                const checkFinancialQuery = `
-                SELECT partner_financial_id
-                FROM partner_financial_details
-                WHERE user_id = '${dataObj.user_id}'
-                AND is_deleted = 0
-            `;
-
-                const checkFinancial = await getData(
-                    checkFinancialQuery,
-                    next
-                );
-
-
-                /* =====================================================
-                   KYC DATA
-                ===================================================== */
-
-                const kycData = {};
-
-
-                /* ------------------ Aadhar Card ------------------ */
-
-                if (req.files?.aadharCard?.length > 0) {
-
-                    const file = req.files.aadharCard[0];
-
-                    kycData.aadharcard_copy = file.path;
-
-                    kycData.aadhar_status = "Pending";
-                }
-
-
-                /* ------------------ Aadhar Number ------------------ */
-
-                if (dataObj.aadharNumber !== undefined) {
-
-                    kycData.aadhar_number =
-                        dataObj.aadharNumber;
-                }
-
-
-                /* ------------------ PAN Card ------------------ */
-
-                if (req.files?.panCard?.length > 0) {
-
-                    const file = req.files.panCard[0];
-
-                    kycData.pancard_copy = file.path;
-
-                    kycData.pan_status = "Pending";
-                }
-
-
-                /* ------------------ PAN Number ------------------ */
-
-                if (dataObj.panNumber !== undefined) {
-
-                    kycData.pan_number =
-                        dataObj.panNumber;
-                }
-
-
-                /* ------------------ CMR ------------------ */
-
-                if (req.files?.cmr?.length > 0) {
-
-                    const file = req.files.cmr[0];
-
-                    kycData.cmr_copy = file.path;
-
-                    kycData.cmr_status = "Pending";
-                }
-
-
-                /* ------------------ Seal / Signature ------------------ */
-
-                if (req.files?.sealSignature?.length > 0) {
-
-                    const file = req.files.sealSignature[0];
-
-                    kycData.stamp_signature = file.path;
-
-                    kycData.stamp_signature_status =
-                        "Pending";
-                }
-
-
-                /* =====================================================
-                   UPDATE / INSERT KYC
-                ===================================================== */
-
-                if (checkFinancial.length > 0) {
-
-                    const updateFinancialQuery = `
-                    UPDATE partner_financial_details
-                    SET ?
-                    WHERE user_id = '${dataObj.user_id}'
-                    AND is_deleted = 0
-                `;
-
-                    await insertData(
-                        updateFinancialQuery,
-                        kycData,
-                        next
-                    );
-
-                } else {
-
-                    kycData.user_id =
-                        dataObj.user_id;
-
-                    const insertFinancialQuery = `
-                    INSERT INTO partner_financial_details
-                    SET ?
-                `;
-
-                    await insertData(
-                        insertFinancialQuery,
-                        kycData,
-                        next
-                    );
-                }
-
+                await saveFinancialDetails(dataObj.user_id, kycData, next);
             }
-
 
             /* =========================================================
                GET UPDATED PARTNER
+               (file passwords are intentionally NOT returned here)
             ========================================================= */
-
-            const updatedPartnerQuery = `
+            const updatedPartner = await getData(
+                `
             SELECT
-
                 u.*,
 
                 p.partner_financial_id,
@@ -708,34 +413,718 @@ const partnerController = {
             WHERE u.user_id = '${dataObj.user_id}'
             AND u.user_type = 'PARTNER'
             AND u.is_deleted = 0
-        `;
-
-            const updatedPartner = await getData(
-                updatedPartnerQuery,
+            `,
                 next
             );
-
 
             /* =========================================================
                RESPONSE
             ========================================================= */
-
             return res.json({
-
                 success: true,
-
                 message: "Partner profile updated successfully",
-
-                data: updatedPartner
-
+                data: updatedPartner,
             });
-
         } catch (error) {
-
             next(error);
-
         }
     },
+    // async PartnerProfileCreateUpdate(req, res, next) {
+    //     try {
+
+    //         /* =========================================================
+    //            PREPARE DATA
+    //         ========================================================= */
+
+    //         let dataObj = { ...req.body };
+
+
+    //         /* =========================================================
+    //            BASIC VALIDATION
+    //         ========================================================= */
+
+    //         const basicSchema = Joi.object({
+    //             user_id: Joi.number().integer().required()
+    //         });
+
+    //         const { error: basicError } = basicSchema.validate({
+    //             user_id: dataObj.user_id
+    //         });
+
+    //         if (basicError) {
+    //             return next(basicError);
+    //         }
+
+
+    //         /* =========================================================
+    //            CHECK PARTNER EXISTS
+    //         ========================================================= */
+
+    //         const checkPartnerQuery = `
+    //         SELECT *
+    //         FROM users
+    //         WHERE user_id = '${dataObj.user_id}'
+    //         AND user_type = 'PARTNER'
+    //         AND is_deleted = 0
+    //     `;
+
+    //         const checkPartner = await getData(
+    //             checkPartnerQuery,
+    //             next
+    //         );
+
+    //         if (!checkPartner.length) {
+    //             return next(
+    //                 CustomErrorHandler.notFound("Partner not found")
+    //             );
+    //         }
+
+
+    //         /* =========================================================
+    //            CHECK REQUEST TYPE
+    //         ========================================================= */
+
+    //         const hasProfileData =
+    //             dataObj.first_name !== undefined ||
+    //             dataObj.last_name !== undefined ||
+    //             dataObj.email !== undefined ||
+    //             dataObj.phone_number !== undefined ||
+    //             dataObj.business_type !== undefined;
+
+    //         const hasKycFiles =
+    //             req.files?.aadharCard?.length > 0 ||
+    //             req.files?.panCard?.length > 0 ||
+    //             req.files?.cmr?.length > 0 ||
+    //             req.files?.sealSignature?.length > 0;
+
+
+    //         /* =========================================================
+    //            PROFILE + BUSINESS DETAILS
+    //         ========================================================= */
+
+    //         if (hasProfileData) {
+
+    //             /* ------------------ Validation ------------------ */
+
+    //             const partnerSchema = Joi.object({
+
+    //                 user_id: Joi.number().integer().required(),
+
+    //                 first_name: Joi.string().required(),
+    //                 middle_name: Joi.string().allow(""),
+    //                 last_name: Joi.string().required(),
+
+    //                 email: Joi.string().email().required(),
+    //                 phone_number: Joi.string().required(),
+    //                 whatsapp_number: Joi.string().required(),
+
+    //                 state: Joi.string().required(),
+    //                 contry: Joi.string().required(),
+    //                 city: Joi.string().required(),
+    //                 address: Joi.string().required(),
+    //                 zipcode: Joi.string().required(),
+
+    //                 profile: Joi.string().allow("").optional(),
+
+    //                 business_type: Joi.string().required(),
+    //                 gst_compliant: Joi.string().allow(""),
+    //                 gst_number: Joi.string().allow("")
+
+    //             });
+
+
+    //             const { error } = partnerSchema.validate(
+    //                 dataObj,
+    //                 {
+    //                     abortEarly: false,
+    //                     allowUnknown: false
+    //                 }
+    //             );
+
+    //             if (error) {
+    //                 console.log("JOI ERROR:", error.details);
+    //                 return next(error);
+    //             }
+
+
+    //             /* =====================================================
+    //                DUPLICATE EMAIL / PHONE CHECK
+    //             ===================================================== */
+
+    //             const duplicateQuery = `
+    //             SELECT user_id
+    //             FROM users
+    //             WHERE (
+    //                 email = '${dataObj.email}'
+    //                 OR phone_number = '${dataObj.phone_number}'
+    //             )
+    //             AND user_type = 'PARTNER'
+    //             AND user_id != '${dataObj.user_id}'
+    //             AND is_deleted = 0
+    //         `;
+
+    //             const duplicateUser = await getData(
+    //                 duplicateQuery,
+    //                 next
+    //             );
+
+    //             if (duplicateUser.length > 0) {
+    //                 return next(
+    //                     CustomErrorHandler.alreadyExist(
+    //                         "Email or phone number already exists"
+    //                     )
+    //                 );
+    //             }
+
+
+    //             /* =====================================================
+    //                UPDATE USERS TABLE
+    //             ===================================================== */
+
+    //             const userData = {
+
+    //                 first_name: dataObj.first_name,
+    //                 middle_name: dataObj.middle_name,
+    //                 last_name: dataObj.last_name,
+
+    //                 email: dataObj.email,
+    //                 phone_number: dataObj.phone_number,
+    //                 whatsapp_number: dataObj.whatsapp_number,
+
+    //                 state: dataObj.state,
+    //                 contry: dataObj.contry,
+    //                 city: dataObj.city,
+    //                 address: dataObj.address,
+    //                 zipcode: dataObj.zipcode
+
+    //             };
+
+
+    //             /* ------------------ Profile Image ------------------ */
+
+    //             if (req.files?.profile?.length > 0) {
+
+    //                 const file = req.files.profile[0];
+
+    //                 userData.profile = file.path;
+    //             }
+
+
+    //             const updateUserQuery = `
+    //             UPDATE users
+    //             SET ?
+    //             WHERE user_id = '${dataObj.user_id}'
+    //             AND user_type = 'PARTNER'
+    //             AND is_deleted = 0
+    //         `;
+
+    //             await insertData(
+    //                 updateUserQuery,
+    //                 userData,
+    //                 next
+    //             );
+
+
+    //             /* =====================================================
+    //                CHECK FINANCIAL DETAILS
+    //             ===================================================== */
+
+    //             const checkFinancialQuery = `
+    //             SELECT partner_financial_id
+    //             FROM partner_financial_details
+    //             WHERE user_id = '${dataObj.user_id}'
+    //             AND is_deleted = 0
+    //         `;
+
+    //             const checkFinancial = await getData(
+    //                 checkFinancialQuery,
+    //                 next
+    //             );
+
+
+    //             /* =====================================================
+    //                FINANCIAL DATA
+    //             ===================================================== */
+
+    //             // const financialData = {
+
+    //             //     business_type: dataObj.business_type,
+    //             //     gst_compliant: dataObj.gst_compliant,
+
+    //             //     gst_number: dataObj.gst_number
+
+    //             // };
+
+    //             const isIndividual = dataObj.business_type === "Individual";
+    //             const gstCompliant = ["Yes", "No"].includes(dataObj.gst_compliant) ? dataObj.gst_compliant : null;
+
+    //             const financialData = {
+    //                 business_type: dataObj.business_type,
+    //                 // never send '' to an ENUM column
+    //                 gst_compliant: isIndividual ? null : gstCompliant,
+    //                 gst_number: (!isIndividual && gstCompliant === "Yes") ? (dataObj.gst_number ?? "") : ""
+    //             };
+
+
+    //             /* =====================================================
+    //                KYC FILES IF SENT WITH PROFILE
+    //             ===================================================== */
+
+    //             /* ------------------ Aadhar ------------------ */
+
+    //             if (req.files?.aadharCard?.length > 0) {
+
+    //                 const file = req.files.aadharCard[0];
+
+    //                 financialData.aadharcard_copy = file.path;
+
+    //                 financialData.aadhar_status = "Pending";
+    //             }
+
+
+    //             /* ------------------ Aadhar Number ------------------ */
+
+    //             if (dataObj.aadharNumber !== undefined) {
+
+    //                 financialData.aadhar_number =
+    //                     dataObj.aadharNumber;
+    //             }
+
+
+    //             /* ------------------ PAN ------------------ */
+
+    //             if (req.files?.panCard?.length > 0) {
+
+    //                 const file = req.files.panCard[0];
+
+    //                 financialData.pancard_copy = file.path;
+
+    //                 financialData.pan_status = "Pending";
+    //             }
+
+
+    //             /* ------------------ PAN Number ------------------ */
+
+    //             if (dataObj.panNumber !== undefined) {
+
+    //                 financialData.pan_number =
+    //                     dataObj.panNumber;
+    //             }
+
+
+    //             /* ------------------ CMR ------------------ */
+
+    //             if (req.files?.cmr?.length > 0) {
+
+    //                 const file = req.files.cmr[0];
+
+    //                 financialData.cmr_copy = file.path;
+
+    //                 financialData.cmr_status = "Pending";
+    //             }
+
+
+    //             /* ------------------ Seal / Signature ------------------ */
+
+    //             if (req.files?.sealSignature?.length > 0) {
+
+    //                 const file = req.files.sealSignature[0];
+
+    //                 financialData.stamp_signature = file.path;
+
+    //                 financialData.stamp_signature_status =
+    //                     "Pending";
+    //             }
+
+
+    //             /* =====================================================
+    //                UPDATE / INSERT FINANCIAL DETAILS
+    //             ===================================================== */
+
+    //             if (checkFinancial.length > 0) {
+
+    //                 const updateFinancialQuery = `
+    //                 UPDATE partner_financial_details
+    //                 SET ?
+    //                 WHERE user_id = '${dataObj.user_id}'
+    //                 AND is_deleted = 0
+    //             `;
+
+    //                 await insertData(
+    //                     updateFinancialQuery,
+    //                     financialData,
+    //                     next
+    //                 );
+
+    //             } else {
+
+    //                 financialData.user_id =
+    //                     dataObj.user_id;
+
+    //                 const insertFinancialQuery = `
+    //                 INSERT INTO partner_financial_details
+    //                 SET ?
+    //             `;
+
+    //                 await insertData(
+    //                     insertFinancialQuery,
+    //                     financialData,
+    //                     next
+    //                 );
+    //             }
+
+    //         }
+
+
+    //         /* =========================================================
+    //            KYC ONLY
+    //         ========================================================= */
+
+    //         else if (hasKycFiles) {
+
+    //             /* =====================================================
+    //                CHECK FINANCIAL DETAILS
+    //             ===================================================== */
+
+    //             const checkFinancialQuery = `
+    //             SELECT partner_financial_id
+    //             FROM partner_financial_details
+    //             WHERE user_id = '${dataObj.user_id}'
+    //             AND is_deleted = 0
+    //         `;
+
+    //             const checkFinancial = await getData(
+    //                 checkFinancialQuery,
+    //                 next
+    //             );
+
+
+    //             /* =====================================================
+    //                KYC DATA
+    //             ===================================================== */
+
+    //             const kycData = {};
+
+
+    //             /* ------------------ Aadhar Card ------------------ */
+
+    //             if (req.files?.aadharCard?.length > 0) {
+
+    //                 const file = req.files.aadharCard[0];
+
+    //                 kycData.aadharcard_copy = file.path;
+
+    //                 kycData.aadhar_status = "Pending";
+    //             }
+
+
+    //             /* ------------------ Aadhar Number ------------------ */
+
+    //             if (dataObj.aadharNumber !== undefined) {
+
+    //                 kycData.aadhar_number =
+    //                     dataObj.aadharNumber;
+    //             }
+
+
+    //             /* ------------------ PAN Card ------------------ */
+
+    //             if (req.files?.panCard?.length > 0) {
+
+    //                 const file = req.files.panCard[0];
+
+    //                 kycData.pancard_copy = file.path;
+
+    //                 kycData.pan_status = "Pending";
+    //             }
+
+
+    //             /* ------------------ PAN Number ------------------ */
+
+    //             if (dataObj.panNumber !== undefined) {
+
+    //                 kycData.pan_number =
+    //                     dataObj.panNumber;
+    //             }
+
+
+    //             /* ------------------ CMR ------------------ */
+
+    //             if (req.files?.cmr?.length > 0) {
+
+    //                 const file = req.files.cmr[0];
+
+    //                 kycData.cmr_copy = file.path;
+
+    //                 kycData.cmr_status = "Pending";
+    //             }
+
+
+    //             /* ------------------ Seal / Signature ------------------ */
+
+    //             if (req.files?.sealSignature?.length > 0) {
+
+    //                 const file = req.files.sealSignature[0];
+
+    //                 kycData.stamp_signature = file.path;
+
+    //                 kycData.stamp_signature_status =
+    //                     "Pending";
+    //             }
+
+
+    //             /* =====================================================
+    //                UPDATE / INSERT KYC
+    //             ===================================================== */
+
+    //             if (checkFinancial.length > 0) {
+
+    //                 const updateFinancialQuery = `
+    //                 UPDATE partner_financial_details
+    //                 SET ?
+    //                 WHERE user_id = '${dataObj.user_id}'
+    //                 AND is_deleted = 0
+    //             `;
+
+    //                 await insertData(
+    //                     updateFinancialQuery,
+    //                     kycData,
+    //                     next
+    //                 );
+
+    //             } else {
+
+    //                 kycData.user_id =
+    //                     dataObj.user_id;
+
+    //                 const insertFinancialQuery = `
+    //                 INSERT INTO partner_financial_details
+    //                 SET ?
+    //             `;
+
+    //                 await insertData(
+    //                     insertFinancialQuery,
+    //                     kycData,
+    //                     next
+    //                 );
+    //             }
+
+    //         }
+
+
+    //         /* =========================================================
+    //            GET UPDATED PARTNER
+    //         ========================================================= */
+
+    //         const updatedPartnerQuery = `
+    //         SELECT
+
+    //             u.*,
+
+    //             p.partner_financial_id,
+    //             p.business_type,
+
+    //             p.aadhar_number,
+    //             p.pan_number,
+    //             p.gst_number,
+    //             p.cin_number,
+
+    //             p.gst_compliant,
+
+    //             p.aadharcard_copy,
+    //             p.pancard_copy,
+    //             p.cmr_copy,
+    //             p.stamp_signature,
+
+    //             p.aadhar_status,
+    //             p.pan_status,
+    //             p.cmr_status,
+    //             p.stamp_signature_status,
+
+    //             p.franchise_agreement,
+
+    //             p.is_deleted AS financial_is_deleted,
+
+    //             p.franchise_upload_date,
+
+    //             p.created_at AS financial_created_at,
+    //             p.updated_on AS financial_updated_on
+
+    //         FROM users u
+
+    //         LEFT JOIN partner_financial_details p
+    //             ON p.user_id = u.user_id
+    //             AND p.is_deleted = 0
+
+    //         WHERE u.user_id = '${dataObj.user_id}'
+    //         AND u.user_type = 'PARTNER'
+    //         AND u.is_deleted = 0
+    //     `;
+
+    //         const updatedPartner = await getData(
+    //             updatedPartnerQuery,
+    //             next
+    //         );
+
+
+    //         /* =========================================================
+    //            RESPONSE
+    //         ========================================================= */
+
+    //         return res.json({
+
+    //             success: true,
+
+    //             message: "Partner profile updated successfully",
+
+    //             data: updatedPartner
+
+    //         });
+
+    //     } catch (error) {
+
+    //         next(error);
+
+    //     }
+    // },
+    // async PartnerKycUpdate(req, res, next) {
+    //     try {
+    //         const dataObj = { ...req.body };
+    //         const files = req.files || {};
+    //         const AADHAR_REGEX = /^[0-9]{12}$/;
+    //         const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+    //         const hasFile = (name) => files[name]?.length > 0;
+    //         const isAdmin =
+    //             dataObj.is_admin === "1" ||
+    //             dataObj.is_admin === 1 ||
+    //             dataObj.is_admin === true ||
+    //             dataObj.is_admin === "true";
+    //         const fileStatus = isAdmin ? "Verified" : "Pending";
+    //         const { error } = Joi.object({
+    //             user_id: Joi.number().integer().required(),
+    //             aadharNumber: Joi.string().pattern(AADHAR_REGEX),
+    //             panNumber: Joi.string().pattern(PAN_REGEX),
+    //         }).validate(
+    //             {
+    //                 user_id: dataObj.user_id,
+    //                 aadharNumber: dataObj.aadharNumber,
+    //                 panNumber: dataObj.panNumber,
+    //             },
+    //             { abortEarly: false }
+    //         );
+    //         if (error) return next(error);
+    //         const checkPartner = await getData(
+    //             `SELECT user_id
+    //                 FROM users
+    //                 WHERE user_id = '${dataObj.user_id}'
+    //                 AND user_type = 'PARTNER'
+    //                 AND is_deleted = 0`,
+    //             next
+    //         );
+
+    //         if (!checkPartner.length) {
+    //             return next(CustomErrorHandler.notFound("Partner not found"));
+    //         }
+
+    //         const kycData = {};
+
+    //         if (hasFile("aadharCard")) {
+    //             kycData.aadharcard_copy = files.aadharCard[0].path;
+    //             kycData.aadhar_status = fileStatus;
+    //         }
+
+    //         if (dataObj.aadharNumber !== undefined) {
+    //             kycData.aadhar_number = dataObj.aadharNumber;
+    //         }
+
+    //         if (hasFile("panCard")) {
+    //             kycData.pancard_copy = files.panCard[0].path;
+    //             kycData.pan_status = fileStatus;
+    //         }
+
+    //         if (dataObj.panNumber !== undefined) {
+    //             kycData.pan_number = dataObj.panNumber;
+    //         }
+
+    //         if (hasFile("cmr")) {
+    //             kycData.cmr_copy = files.cmr[0].path;
+    //             kycData.cmr_status = fileStatus;
+    //         }
+
+    //         if (hasFile("sealSignature")) {
+    //             kycData.stamp_signature = files.sealSignature[0].path;
+    //             kycData.stamp_signature_status = fileStatus;
+    //         }
+
+    //         if (Object.keys(kycData).length === 0) {
+    //             return res.status(400).json({
+    //                 success: false,
+    //                 message: "No KYC data provided",
+    //             });
+    //         }
+
+    //         const existing = await getData(
+    //             `SELECT partner_financial_id
+    //                 FROM partner_financial_details
+    //                 WHERE user_id = '${dataObj.user_id}'
+    //                 AND is_deleted = 0`,
+    //             next
+    //         );
+
+    //         if (existing.length > 0) {
+    //             await insertData(
+    //                 `UPDATE partner_financial_details
+    //                     SET ?
+    //                     WHERE user_id = '${dataObj.user_id}'
+    //                     AND is_deleted = 0`,
+    //                 kycData,
+    //                 next
+    //             );
+    //         } else {
+    //             await insertData(
+    //                 `INSERT INTO partner_financial_details SET ?`,
+    //                 { ...kycData, user_id: dataObj.user_id },
+    //                 next
+    //             );
+    //         }
+
+    //         const updated = await getData(
+    //             `SELECT
+    //                     u.user_id,
+    //                     p.partner_financial_id,
+
+    //                     p.aadhar_number,
+    //                     p.pan_number,
+
+    //                     p.aadharcard_copy,
+    //                     p.pancard_copy,
+    //                     p.cmr_copy,
+    //                     p.stamp_signature,
+
+    //                     p.aadhar_status,
+    //                     p.pan_status,
+    //                     p.cmr_status,
+    //                     p.stamp_signature_status
+
+    //                 FROM users u
+    //                 LEFT JOIN partner_financial_details p
+    //                     ON p.user_id = u.user_id
+    //                     AND p.is_deleted = 0
+    //                 WHERE u.user_id = '${dataObj.user_id}'
+    //                 AND u.user_type = 'PARTNER'
+    //                 AND u.is_deleted = 0`,
+    //             next
+    //         );
+
+    //         return res.json({
+    //             success: true,
+    //             message: "KYC details updated successfully",
+    //             data: updated,
+    //         });
+    //     } catch (error) {
+    //         next(error);
+    //     }
+    // },
     async PartnerKycUpdate(req, res, next) {
         try {
             const dataObj = { ...req.body };
@@ -780,6 +1169,7 @@ const partnerController = {
             if (hasFile("aadharCard")) {
                 kycData.aadharcard_copy = files.aadharCard[0].path;
                 kycData.aadhar_status = fileStatus;
+                kycData.aadhar_password = dataObj.aadharPassword || null; // optional
             }
 
             if (dataObj.aadharNumber !== undefined) {
@@ -789,6 +1179,7 @@ const partnerController = {
             if (hasFile("panCard")) {
                 kycData.pancard_copy = files.panCard[0].path;
                 kycData.pan_status = fileStatus;
+                kycData.pan_password = dataObj.panPassword || null; // optional
             }
 
             if (dataObj.panNumber !== undefined) {
@@ -798,11 +1189,13 @@ const partnerController = {
             if (hasFile("cmr")) {
                 kycData.cmr_copy = files.cmr[0].path;
                 kycData.cmr_status = fileStatus;
+                kycData.cmr_password = dataObj.cmrPassword || null; // optional
             }
 
             if (hasFile("sealSignature")) {
                 kycData.stamp_signature = files.sealSignature[0].path;
                 kycData.stamp_signature_status = fileStatus;
+                kycData.stamp_signature_password = dataObj.sealPassword || null; // optional
             }
 
             if (Object.keys(kycData).length === 0) {
@@ -874,6 +1267,7 @@ const partnerController = {
             next(error);
         }
     },
+
     async createPartnerAdmin(req, res, next) {
         try {
             // ------------------ Validation ------------------
@@ -1696,6 +2090,7 @@ const partnerController = {
                         .valid("Yes", "No")
                         .optional(),
                 verification_status: Joi.string().valid("Pending", "Verified", "Rejected").optional(),
+                bank_document_password: Joi.string().allow("").optional(),
 
             });
 
@@ -1721,16 +2116,20 @@ const partnerController = {
                BANK DOCUMENT
             ===================================================== */
 
-            if (
-                req.files?.bank_document &&
-                req.files.bank_document.length > 0
-            ) {
+            if (req.files?.bank_document && req.files.bank_document.length > 0) {
 
-                const file =
-                    req.files.bank_document[0];
+                const file = req.files.bank_document[0];
 
-                dataObj.bank_document =
-                    file.path;
+
+                dataObj.bank_document = file.path;
+
+                // optional; a new document replaces the old password
+                dataObj.bank_document_password = dataObj.bank_document_password || null;
+
+            } else {
+
+                // no new document => leave the saved password untouched
+                delete dataObj.bank_document_password;
 
             }
 
@@ -1868,6 +2267,7 @@ const partnerController = {
                     status,
                     set_as_default,
                     bank_document,
+                    bank_document_password,
                     created_at,
                     updated_at
 
@@ -1987,6 +2387,7 @@ const partnerController = {
                 status,
                 set_as_default,
                 bank_document,
+                bank_document_password,
                 created_at,
                 updated_at
 
@@ -2050,6 +2451,7 @@ const partnerController = {
                 status,
                 set_as_default,
                 bank_document,
+                bank_document_password,
                 verification_status,
                 created_at,
                 updated_at
@@ -3318,3 +3720,95 @@ const partnerController = {
 }
 
 export default partnerController;
+
+const KYC_FILES = [
+    {
+        file: "aadharCard",
+        copy: "aadharcard_copy",
+        status: "aadhar_status",
+        passwordDb: "aadhar_password",
+        passwordField: "aadharPassword",
+    },
+    {
+        file: "panCard",
+        copy: "pancard_copy",
+        status: "pan_status",
+        passwordDb: "pan_password",
+        passwordField: "panPassword",
+    },
+    {
+        file: "cmr",
+        copy: "cmr_copy",
+        status: "cmr_status",
+        passwordDb: "cmr_password",
+        passwordField: "cmrPassword",
+    },
+    {
+        file: "sealSignature",
+        copy: "stamp_signature",
+        status: "stamp_signature_status",
+        passwordDb: "stamp_signature_password",
+        passwordField: "sealPassword",
+    },
+];
+
+/* Builds the KYC columns to save, from uploaded files + body */
+const buildKycData = (req, dataObj) => {
+    const kyc = {};
+
+    KYC_FILES.forEach(({ file, copy, status, passwordDb, passwordField }) => {
+        const uploaded = req.files?.[file]?.[0];
+        if (!uploaded) return;
+
+        kyc[copy] = uploaded.path;
+        kyc[status] = "Pending";
+        // password is optional; a new upload replaces the old password
+        kyc[passwordDb] = dataObj[passwordField] || null;
+    });
+
+    if (dataObj.aadharNumber !== undefined) {
+        kyc.aadhar_number = dataObj.aadharNumber;
+    }
+    if (dataObj.panNumber !== undefined) {
+        kyc.pan_number = dataObj.panNumber;
+    }
+
+    return kyc;
+};
+
+/* Insert or update the partner_financial_details row */
+const saveFinancialDetails = async (userId, data, next) => {
+    if (!Object.keys(data).length) return;
+
+    const checkFinancial = await getData(
+        `
+        SELECT partner_financial_id
+        FROM partner_financial_details
+        WHERE user_id = '${userId}'
+        AND is_deleted = 0
+        `,
+        next
+    );
+
+    if (checkFinancial.length > 0) {
+        await insertData(
+            `
+            UPDATE partner_financial_details
+            SET ?
+            WHERE user_id = '${userId}'
+            AND is_deleted = 0
+            `,
+            data,
+            next
+        );
+    } else {
+        await insertData(
+            `
+            INSERT INTO partner_financial_details
+            SET ?
+            `,
+            { ...data, user_id: userId },
+            next
+        );
+    }
+}
