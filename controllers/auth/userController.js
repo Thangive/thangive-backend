@@ -1387,6 +1387,7 @@ const userController = {
                 phone_number: Joi.string(),
                 search: Joi.string(),
                 searchUsernamePhone_numberEmail: Joi.string(),
+                partner_name: Joi.string().optional(),
                 pagination: Joi.boolean(),
                 current_page: Joi.number().integer(),
                 per_page_records: Joi.number().integer(),
@@ -1441,6 +1442,18 @@ const userController = {
                     u.username LIKE '%${search}%'
                     OR u.phone_number LIKE '%${search}%'
                     OR u.email LIKE '%${search}%'
+                )`;
+            }
+
+            if (req.query.partner_name) {
+                const partnerName = req.query.partner_name.trim();
+
+                cond += ` AND (
+                    p.first_name LIKE '%${partnerName}%'
+                    OR p.middle_name LIKE '%${partnerName}%'
+                    OR p.last_name LIKE '%${partnerName}%'
+                    OR TRIM(CONCAT_WS(' ', p.first_name, p.middle_name, p.last_name))
+                        LIKE '%${partnerName}%'
                 )`;
             }
 

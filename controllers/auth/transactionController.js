@@ -875,6 +875,7 @@ const transactionController = {
                 rm_status: Joi.string().optional(),
                 am_status: Joi.string().optional(),
                 st_status: Joi.string().optional(),
+                partner_id: Joi.number().integer().optional(),
             });
 
             const { error, value } = holdingSchema.validate(req.query ?? {});
@@ -906,8 +907,15 @@ const transactionController = {
                 cond += ` AND ot.addedPartnerID = ${value.employee_id}`;
             }
 
-            if (value.order === "Partner") {
-                cond += ` AND ot.addedPartnerID IS NOT NULL`;
+            if (value.order === "Partner") 
+            {
+                if(value.partner_id) 
+                {
+                    cond += ` AND ot.addedPartnerID = ${value.partner_id}`;
+                }else
+                {
+                    cond += ` AND ot.addedPartnerID IS NOT NULL`;
+                }
             }
 
             if (value.verify === "verify") {
