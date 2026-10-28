@@ -907,15 +907,16 @@ const transactionController = {
                 cond += ` AND ot.addedPartnerID = ${value.employee_id}`;
             }
 
-            if (value.order === "Partner") 
-            {
-                if(value.partner_id) 
-                {
+            if (value.order === "Partner") {
+                if (value.partner_id) {
                     cond += ` AND ot.addedPartnerID = ${value.partner_id}`;
-                }else
-                {
+                } else {
                     cond += ` AND ot.addedPartnerID IS NOT NULL`;
                 }
+            }
+
+            if (value.partner_id) {
+                cond += ` AND ot.addedPartnerID = ${value.partner_id}`;
             }
 
             if (value.verify === "verify") {
