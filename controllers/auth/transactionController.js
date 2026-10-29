@@ -2047,6 +2047,7 @@ const transactionController = {
                     then: Joi.number().integer().required(),
                     otherwise: Joi.number().integer().optional()
                 }),
+                partner_id: Joi.number().integer().optional(),
 
                 pagination: Joi.boolean().optional(),
                 current_page: Joi.number().integer().optional(),
@@ -2164,6 +2165,9 @@ const transactionController = {
 
             if (value.company_name) {
                 cond += ` AND st.company_name LIKE '%${value.company_name}%'`;
+            }
+            if (value.partner_id) {
+                cond += ` AND ot.addedPartnerID = ${value.partner_id}`;
             }
 
             if (value.searchUser) {
