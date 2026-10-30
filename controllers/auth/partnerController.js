@@ -2007,10 +2007,13 @@ const partnerController = {
             }
 
             const updateData = {
-                franchise_upload_date: dataObj.franchise_upload_date || null,
                 franchise_status: dataObj.franchise_status,
                 updated_on: new Date()
             };
+
+            if (dataObj.franchise_upload_date) {
+                updateData.franchise_upload_date = dataObj.franchise_upload_date;
+            }
 
             if (dataObj.franchise_agreement) {
                 updateData.franchise_agreement = dataObj.franchise_agreement;
