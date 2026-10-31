@@ -1257,7 +1257,8 @@ const transactionController = {
                     cmr.client_id,
                     br.broker_email,
                     br.broker_contact,
-                    cmr.cmr_document
+                    cmr.cmr_document,
+                    cmr.cmr_password
                 FROM broker br
                 JOIN user_cmr_details cmr 
                     ON cmr.broker_id = br.broker_id
@@ -1274,7 +1275,9 @@ const transactionController = {
                     account_type,
                     account_no,
                     ifsc_code,
-                    branch
+                    branch,
+                    statement,
+                    doc_pass
                 FROM user_bank_details
                 WHERE is_deleted = 0
                   AND user_id = ${userId}

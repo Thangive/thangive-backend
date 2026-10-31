@@ -305,7 +305,12 @@ const userController = {
                 whatsapp_number: Joi.string().allow(""),
                 company_number: Joi.string().allow(""),
                 password: Joi.string().allow(""),
-                residency_status: Joi.string().allow("")
+                residency_status: Joi.string().allow(""),
+
+                dateofBirth: Joi.string().allow(""),
+                bloodGroup: Joi.string().allow(""),
+                address: Joi.string().allow(""),
+                tempAddress: Joi.string().allow("")
             };
 
             const userSchema = Joi.object(baseSchema)
@@ -371,6 +376,11 @@ const userController = {
                         username: Joi.string().required(),
                         password: Joi.string().optional(),
                         employee_id: Joi.string().optional(),
+
+                        dateofBirth: Joi.string().allow("").optional(),
+                        bloodGroup: Joi.string().allow("").optional(),
+                        address: Joi.string().allow("").optional(),
+                        tempAddress: Joi.string().allow("").optional()
                     })
                 });
 
@@ -1153,7 +1163,7 @@ const userController = {
                     .messages({
                         'any.required': 'CMR document (cmr_document) is required',
                     }),
-
+                cmr_password: Joi.string().allow('').optional(),
                 created_id: Joi.number().integer().optional(),
             }).when(Joi.object({ cmr_id: Joi.exist() }).unknown(), {
                 then: Joi.object({
