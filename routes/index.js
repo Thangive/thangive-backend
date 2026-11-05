@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController, refundController } from '../controllers/index.js';
+import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController, refundController, dashboardController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
 
@@ -74,6 +74,13 @@ router.post('/refundRequest', auth, forms, refundController.raiseRefundRequest);
 router.post('/refundRequestReview', auth, forms, refundController.reviewRefundRequest);
 router.post('/addRefundDetails', auth, imageUpload, refundController.addRefundDetails);
 router.get('/refundRequests', auth, refundController.getRefundRequests);
+
+// Dashboard APIs (RM dashboard; the RM role is checked inside from the users table)
+router.get('/dashboard/rm/overview', auth, dashboardController.rmOverview);
+router.get('/dashboard/rm/contest', auth, dashboardController.rmContest);
+router.get('/dashboard/rm/running-orders', auth, dashboardController.rmRunningOrders);
+router.get('/dashboard/rm/orders-summary', auth, dashboardController.rmOrdersSummary);
+router.get('/dashboard/rm/month-on-month', auth, dashboardController.rmMonthOnMonth);
 
 
 // Stock Details API
