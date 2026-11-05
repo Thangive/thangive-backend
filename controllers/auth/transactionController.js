@@ -516,7 +516,7 @@ const transactionController = {
 
             /* ------------------ Check Order Exists ------------------ */
             const checkQuery = `
-            SELECT order_id, verify
+            SELECT order_id, verify, partner_verified_at
             FROM order_transactions
             WHERE order_id = ${value.order_id}
             LIMIT 1
@@ -537,11 +537,19 @@ const transactionController = {
             WHERE order_id = ${value.order_id}
         `;
 
+            // Partner verification date: saved once, at the moment the partner verifies (IST, like the
+            // other app-entered dates). Un-verifying clears it only while the order is still at verify = 1.
+            const verifyUpdate = { verify: value.verify };
+            if (value.verify === 1 && !orderData[0].partner_verified_at) {
+                const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+                verifyUpdate.partner_verified_at = ist.toISOString().slice(0, 19).replace('T', ' ');
+            } else if (value.verify === 0 && Number(orderData[0].verify) === 1) {
+                verifyUpdate.partner_verified_at = null;
+            }
+
             await insertData(
                 updateQuery,
-                {
-                    verify: value.verify
-                },
+                verifyUpdate,
                 next
             );
 
@@ -800,6 +808,7 @@ const transactionController = {
                     ot.partner_price AS partner_price,
                     ot.verify,
                     ot.share_Debit_Invoice,
+                    ot.commission_inv_number,
                     ot.share_Debit_Datetime,
                     ot.markAsSoldStatus,
                     ot.markAsSold,
@@ -905,6 +914,8 @@ const transactionController = {
                 sort_order: Joi.string().optional(),
                 order: Joi.string().valid('Partner').optional(),
                 verify: Joi.string().valid('verify', 'notverify').optional(),
+                // partner confirmation on the Verify Invoices list: verified (verify = 1) or pending (verify = 0)
+                partner_verify: Joi.string().valid('verified', 'pending').optional(),
                 rm_status: Joi.string().optional(),
                 am_status: Joi.string().optional(),
                 st_status: Joi.string().optional(),
@@ -967,6 +978,12 @@ const transactionController = {
 
             if (value.verify === "notverify") {
                 cond += ` AND ot.verify != 2 `;
+            }
+
+            if (value.partner_verify === "verified") {
+                cond += ` AND ot.verify = 1 `;
+            } else if (value.partner_verify === "pending") {
+                cond += ` AND ot.verify = 0 `;
             }
 
 

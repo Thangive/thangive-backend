@@ -3599,7 +3599,10 @@ const partnerController = {
                 tds: Joi.number().required(),
                 gst: Joi.number().required(),
                 payment_id: Joi.string().required(),
+                // transaction date entered by the AM (date of the commission payment)
+                payment_date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}/).required(),
                 payment_doc: Joi.string().allow('').optional(),
+                // ignored: the invoice number is generated with the Share Debit ID, not here
                 inv_number: Joi.string().optional(),
             });
 
@@ -3618,14 +3621,45 @@ const partnerController = {
                 return next(error);
             }
 
+            /* ------------------ ORDER CHECKS ------------------ */
+            // The commission invoice number already exists (created with the Share Debit ID).
+            // Add Payment must not create it and must not run twice for one order.
+            const orderRows = await getData(
+                `SELECT order_id, addedPartnerID, verify, commission_inv_number
+                 FROM order_transactions WHERE order_id = ${Number(dataObj.order_id)} LIMIT 1`,
+                next
+            );
+            if (!orderRows || orderRows.length === 0) {
+                return next(CustomErrorHandler.notFound("Order not found"));
+            }
+            if (!orderRows[0].addedPartnerID) {
+                return next(CustomErrorHandler.badRequest("This is not a partner commission order"));
+            }
+            if (!orderRows[0].commission_inv_number) {
+                return next(CustomErrorHandler.badRequest(
+                    "The commission invoice number is not generated yet. It is created when the Share Debit ID is generated."
+                ));
+            }
+            if (Number(orderRows[0].verify) === 0) {
+                return next(CustomErrorHandler.badRequest("The partner has not verified this order yet"));
+            }
+            const existingCommission = await getData(
+                `SELECT commission_id FROM partner_commission WHERE order_id = ${Number(dataObj.order_id)} LIMIT 1`,
+                next
+            );
+            if (existingCommission && existingCommission.length > 0) {
+                return next(new CustomErrorHandler(409, "Commission payment is already added for this order"));
+            }
+
             /* ------------------ INSERT COMMISSION ------------------ */
+            // inv_number is copied from the order by the database trigger
             const commissionData = {
                 order_id: dataObj.order_id,
                 tds: dataObj.tds,
                 gst: dataObj.gst,
                 payment_id: dataObj.payment_id,
+                payment_date: String(dataObj.payment_date).slice(0, 10),
                 payment_doc: dataObj.payment_doc || "",
-                inv_number: dataObj.inv_number,
             };
 
             const insertQuery = `
@@ -3701,6 +3735,9 @@ const partnerController = {
             const query = `
             SELECT
                 pc.*,
+                DATE_FORMAT(pc.payment_date, '%Y-%m-%d') AS payment_date_text,
+                ot.commission_inv_number AS order_inv_number,
+                DATE_FORMAT(ot.partner_verified_at, '%Y-%m-%d %H:%i:%s') AS partner_verified_text,
                 CONCAT_WS(' ', NULLIF(u.first_name, ''), NULLIF(u.middle_name, ''), NULLIF(u.last_name, '')) AS business_name,
                 u.address AS address_line_1,
                 u.city,
@@ -3726,11 +3763,15 @@ const partnerController = {
                 AND pbi.set_as_default = 'Yes'
 
             LEFT JOIN partner_commission pc
-                ON pc.order_id = ${req.query.order_id}
+                ON pc.order_id = ${Number(req.query.order_id)}
 
-            WHERE pfd.user_id = ${req.query.user_id}
+            LEFT JOIN order_transactions ot
+                ON ot.order_id = ${Number(req.query.order_id)}
+
+            WHERE pfd.user_id = ${Number(req.query.user_id)}
             AND pfd.is_deleted = 0
 
+            ORDER BY pc.commission_id ASC
             LIMIT 1;
         `;
 
@@ -3745,7 +3786,12 @@ const partnerController = {
                     gst: item.gst || "",
                     payment_id: item.payment_id || "",
                     payment_doc: item.payment_doc || "",
-                    inv_number: item.inv_number || "",
+                    // the number is created with the Share Debit ID and kept on the order; it never changes
+                    inv_number: item.inv_number || item.order_inv_number || "",
+                    // actual date the partner verified the order (empty for old records)
+                    partner_verified_at: item.partner_verified_text || "",
+                    // transaction date entered by the AM with the commission payment
+                    payment_date: item.payment_date_text || "",
                     created_at: item.created_at || "",
                     updated_at: item.updated_at || ""
                 },
