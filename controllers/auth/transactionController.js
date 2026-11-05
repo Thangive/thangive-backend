@@ -508,6 +508,12 @@ const transactionController = {
                 return next(error);
             }
 
+            /* ------------------ ROLE CHECK (partner confirmation; RM is view-only) ------------------ */
+            const verifyActor = await refundHelper.getActor(req.user?._id, next);
+            if (!verifyActor || !['PARTNER', 'AM', 'ADMIN'].includes(verifyActor.user_type)) {
+                return next(new CustomErrorHandler(403, "You are not allowed to verify orders"));
+            }
+
             /* ------------------ Check Order Exists ------------------ */
             const checkQuery = `
             SELECT order_id, verify
@@ -946,6 +952,15 @@ const transactionController = {
                 cond += ` AND ot.addedPartnerID = ${value.partner_id}`;
             }
 
+            // Verify Invoices / Commission List: an RM only ever sees partner orders of their own clients,
+            // whatever employee_id / rm_id the request carries.
+            if (value.verify) {
+                const listActor = await refundHelper.getActor(req.user?._id, next);
+                if (listActor && listActor.user_type === 'RM') {
+                    cond += ` AND users.assign_to = ${Number(listActor.user_id)} AND ot.addedPartnerID IS NOT NULL`;
+                }
+            }
+
             if (value.verify === "verify") {
                 cond += ` AND ot.verify = 2 `;
             }
@@ -1320,7 +1335,7 @@ const transactionController = {
             const bankData = await getData(bankQuery, next);
 
             /* ------------------ Payment Details ------------------ */
-            const paymentQuery = `SELECT pt.payment_custom_id, DATE_FORMAT(pt.created_at, '%d-%m-%Y') AS date,b.bank_id,b.bank_name,pt.payment_id,pt.amount,pt.remaining_amount,pt.transaction_ref,pt.transaction_doc,pt.remark,pt.rm_status,pt.am_status,pt.payment_type,pt.user_Datetime,pt.rm_Datetime,pt.am_Datetime FROM payment_transactions pt LEFT JOIN user_bank_details b ON b.bank_id = pt.bank_id WHERE pt.order_id =  '${req.query.order_id}'`;
+            const paymentQuery = `SELECT pt.payment_custom_id, DATE_FORMAT(pt.created_at, '%d-%m-%Y') AS date,b.bank_id,b.bank_name,pt.payment_id,pt.amount,pt.remaining_amount,pt.transaction_ref,pt.transaction_doc,pt.remark,pt.rm_status,pt.am_status,pt.am_remark,pt.payment_type,pt.user_Datetime,pt.rm_Datetime,pt.am_Datetime FROM payment_transactions pt LEFT JOIN user_bank_details b ON b.bank_id = pt.bank_id WHERE pt.order_id =  '${req.query.order_id}'`;
 
             const paymentData = await getData(paymentQuery, next);
             const refundDetails = await refundHelper.getDetails(req.query.order_id, next);
@@ -1578,7 +1593,23 @@ const transactionController = {
                 }),
 
                 /* STATUS */
-                status: Joi.string().valid('RECEVIED', 'PENDING').required(),
+                /* NOT_RECEIVED is an AM-only value (BUY, checked again below) */
+                status: Joi.when('employee_type', {
+                    is: 'AM',
+                    then: Joi.string().valid('RECEVIED', 'PENDING', 'NOT_RECEIVED').required(),
+                    otherwise: Joi.string().valid('RECEVIED', 'PENDING').required()
+                }),
+
+                /* AM reason, mandatory when status = NOT_RECEIVED */
+                am_remark: Joi.when('employee_type', {
+                    is: 'AM',
+                    then: Joi.when('status', {
+                        is: 'NOT_RECEIVED',
+                        then: Joi.string().trim().min(1).max(500).required(),
+                        otherwise: Joi.forbidden()
+                    }),
+                    otherwise: Joi.forbidden()
+                }),
 
                 /* DOCUMENT */
                 transaction_doc: Joi.string().optional(),
@@ -1586,7 +1617,7 @@ const transactionController = {
                 /* ONLY AM CAN SEND TRANSACTION REF */
                 transaction_ref: Joi.when('employee_type', {
                     is: 'AM',
-                    then: Joi.string().optional(),
+                    then: Joi.string().allow('').optional(),
                     otherwise: Joi.forbidden()
                 }),
 
@@ -1615,6 +1646,47 @@ const transactionController = {
                 ));
             }
 
+            /* ------------------ NOT_RECEIVED GUARDS (BUY + AM only) ------------------ */
+            let previousAmStatus = null;
+            if (dataObj.payment_id) {
+                const prevRows = await getData(
+                    `SELECT order_id, am_status FROM payment_transactions WHERE payment_id = ${Number(dataObj.payment_id)} LIMIT 1`,
+                    next
+                );
+                previousAmStatus = prevRows && prevRows.length ? prevRows[0].am_status : null;
+                if (
+                    (dataObj.status === 'NOT_RECEIVED' || previousAmStatus === 'NOT_RECEIVED') &&
+                    prevRows[0].order_id !== Number(dataObj.order_id)
+                ) {
+                    return next(CustomErrorHandler.badRequest("Payment does not belong to this order"));
+                }
+            }
+            if (dataObj.status === 'NOT_RECEIVED') {
+                if (dataObj.employee_type !== 'AM' || dataObj.transaction_type !== 'BUY') {
+                    return next(CustomErrorHandler.badRequest("NOT_RECEIVED is allowed only for AM on BUY orders"));
+                }
+                // role comes from the token user, never from the request body
+                const actor = await refundHelper.getActor(req.user?._id, next);
+                if (!actor || actor.user_type !== 'AM') {
+                    return next(new CustomErrorHandler(403, "Only the Account Manager can mark a payment as NOT_RECEIVED"));
+                }
+                if (!dataObj.payment_id || previousAmStatus === null) {
+                    return next(CustomErrorHandler.badRequest("Payment entry not found"));
+                }
+                const ordRows = await getData(
+                    `SELECT transaction_type, st_status FROM order_transactions WHERE order_id = ${Number(dataObj.order_id)} LIMIT 1`,
+                    next
+                );
+                if (!ordRows || !ordRows.length || ordRows[0].transaction_type !== 'BUY') {
+                    return next(CustomErrorHandler.badRequest("NOT_RECEIVED is allowed only on BUY orders"));
+                }
+                if (ordRows[0].st_status === 'COMPLETED') {
+                    return next(CustomErrorHandler.badRequest("Share transfer is completed. Payment status cannot be changed."));
+                }
+            }
+            // a payment that was NOT_RECEIVED has its status/remark touched (see below)
+            const wasNotReceived = previousAmStatus === 'NOT_RECEIVED';
+
             /* ------------------ FETCH ORDER TOTAL ------------------ */
             const orderAmountQuery = `
             SELECT COALESCE(SUM(price_per_share * quantity), 0) AS order_amount
@@ -1633,6 +1705,7 @@ const transactionController = {
             FROM payment_transactions
             WHERE order_id = ${dataObj.order_id}
               AND (rm_status = 'RECEVIED' OR am_status = 'RECEVIED')
+              AND IFNULL(am_status, '') <> 'NOT_RECEIVED'
         `;
             if (dataObj.payment_id) {
                 paidAmountQuery += ` AND payment_id <> ${dataObj.payment_id}`;
@@ -1668,6 +1741,12 @@ const transactionController = {
                     rm_status: dataObj.status,
                     transaction_doc: dataObj.transaction_doc || null
                 };
+                // RM re-submits a payment the AM marked NOT_RECEIVED: it goes back to the AM as PENDING.
+                // The previous AM remark stays on the row and every change is kept in payment_status_log.
+                if (wasNotReceived) {
+                    finalObj.am_status = 'PENDING';
+                    finalObj.last_action_by = req.user?._id;
+                }
             }
 
             /* ============================
@@ -1679,6 +1758,14 @@ const transactionController = {
                     am_Datetime: dataObj.am_Datetime,
                     transaction_ref: dataObj.transaction_ref || null
                 };
+                if (dataObj.status === 'NOT_RECEIVED') {
+                    finalObj.am_remark = String(dataObj.am_remark).trim();
+                    finalObj.last_action_by = req.user?._id;
+                } else if (wasNotReceived) {
+                    // AM changed the status again: the old reason is cleared on the row (kept in the log)
+                    finalObj.am_remark = null;
+                    finalObj.last_action_by = req.user?._id;
+                }
             }
 
             /* ============================
@@ -1722,6 +1809,29 @@ const transactionController = {
                 finalObj.payment_id = result.insertId;
             } else {
                 finalObj.payment_id = dataObj.payment_id;
+            }
+
+            /* Re-derive the stored remaining_amount of this order's payment rows, ignoring NOT_RECEIVED
+               entries, so the list "Balance" is never based on money the AM did not receive.
+               Runs only when a NOT_RECEIVED status is set or leaves a row (no effect on other orders/SELL). */
+            if (dataObj.status === 'NOT_RECEIVED' || wasNotReceived) {
+                await getData(
+                    `UPDATE payment_transactions pt
+                     JOIN (
+                        SELECT x.payment_id,
+                               ${Number(orderAmount)} - SUM(x.eff) OVER (ORDER BY x.payment_id) AS rem
+                        FROM (
+                            SELECT payment_id,
+                                   IF((rm_status = 'RECEVIED' OR am_status = 'RECEVIED')
+                                      AND IFNULL(am_status, '') <> 'NOT_RECEIVED', amount, 0) AS eff
+                            FROM payment_transactions
+                            WHERE order_id = ${Number(dataObj.order_id)}
+                        ) x
+                     ) c ON c.payment_id = pt.payment_id
+                     SET pt.remaining_amount = c.rem
+                     WHERE pt.order_id = ${Number(dataObj.order_id)}`,
+                    next
+                );
             }
 
             /* ------------------ RESPONSE ------------------ */
@@ -2084,7 +2194,7 @@ const transactionController = {
                 searchUser: Joi.string().optional(),
 
                 company_name: Joi.string().optional(),
-                am_status: Joi.string().valid("PENDING", "RECEVIED").optional(),
+                am_status: Joi.string().valid("PENDING", "RECEVIED", "NOT_RECEIVED").optional(),
                 payment_type: Joi.string().valid("FULL", "PARTIAL").optional(),
                 from_date: Joi.string().optional(),
                 to_date: Joi.string().optional(),

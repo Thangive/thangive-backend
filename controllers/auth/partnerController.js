@@ -4,6 +4,53 @@ import { CustomErrorHandler, JwtService } from "../../service/index.js";
 import md5 from 'md5';
 import paginationQuery from '../../helper/paginationQuery.js';
 import commonFunction from '../../helper/commonFunction.js';
+import refundHelper from '../../helper/refundHelper.js';
+
+/* ---------- Prospect document passwords: who may read / write them ---------- */
+const PROSPECT_PASSWORD_FIELDS = [
+    'scanned_aadharcard_copy_password',
+    'scanned_pancard_copy_password',
+    'cancel_cheque_copy_password',
+    'scanned_cmr_copy_password',
+    'fund_transfer_document_password',
+];
+
+/**
+ * Role comes from users.user_type of the token user (never from the request).
+ * Allowed: the PARTNER who owns the prospect, the RM the partner is assigned to (users.assign_to), ADMIN.
+ */
+async function canAccessProspectPasswords(actor, ownerId, next) {
+    if (!actor) return false;
+    if (actor.user_type === 'ADMIN') return true;
+    if (actor.user_type === 'PARTNER') return Number(actor.user_id) === Number(ownerId);
+    if (actor.user_type === 'RM') {
+        const rows = await getData(
+            `SELECT assign_to FROM users WHERE user_id = ${Number(ownerId) || 0} AND user_type = 'PARTNER' LIMIT 1`,
+            next
+        );
+        return !!(rows && rows.length && Number(rows[0].assign_to) === Number(actor.user_id));
+    }
+    return false;
+}
+
+/** Blank the password fields of every prospect the caller is not allowed to see. */
+async function maskProspectPasswords(rows, userId, next) {
+    if (!rows || !rows.length) return rows;
+    const actor = await refundHelper.getActor(userId, next);
+    const allowedByOwner = {};
+    for (const row of rows) {
+        const owner = row.user_id;
+        if (allowedByOwner[owner] === undefined) {
+            allowedByOwner[owner] = await canAccessProspectPasswords(actor, owner, next);
+        }
+        if (!allowedByOwner[owner]) {
+            for (const f of PROSPECT_PASSWORD_FIELDS) {
+                if (f in row) row[f] = null;
+            }
+        }
+    }
+    return rows;
+}
 
 const partnerController = {
     async getPartners(req, res, next) {
@@ -2660,6 +2707,11 @@ const partnerController = {
                 scanned_aadharcard_copy: Joi.string().allow('').optional(),
                 cancel_cheque_copy: Joi.string().allow('').optional(),
                 fund_transfer_document: Joi.string().allow('').optional(),
+                scanned_cmr_copy_password: Joi.string().allow('').max(100).optional(),
+                scanned_pancard_copy_password: Joi.string().allow('').max(100).optional(),
+                scanned_aadharcard_copy_password: Joi.string().allow('').max(100).optional(),
+                cancel_cheque_copy_password: Joi.string().allow('').max(100).optional(),
+                fund_transfer_document_password: Joi.string().allow('').max(100).optional(),
                 stocks: Joi.any().optional(),
                 lead_status: Joi.string()
                     .valid('Prospects', 'Deal Closed', 'Not Interested', 'In discussion')
@@ -2691,12 +2743,24 @@ const partnerController = {
                     req.files.fund_transfer_document[0].path;
             }
             /* ------------------ STOCKS ------------------ */
+            // Stock rows are replaced ONLY when the request really carries a stocks list.
+            // (A status-only update has no stocks and must leave the existing rows alone.)
             let stocks = [];
-            if (dataObj.stocks) {
-                try {
-                    stocks = JSON.parse(dataObj.stocks);
-                } catch (err) {
-                    stocks = [];
+            let stocksProvided = false;
+            if (dataObj.stocks !== undefined && dataObj.stocks !== null) {
+                if (Array.isArray(dataObj.stocks)) {
+                    stocks = dataObj.stocks;
+                    stocksProvided = true;
+                } else {
+                    try {
+                        const parsed = JSON.parse(dataObj.stocks);
+                        if (Array.isArray(parsed)) {
+                            stocks = parsed;
+                            stocksProvided = true;
+                        }
+                    } catch (err) {
+                        stocksProvided = false;
+                    }
                 }
             }
             /* ------------------ VALIDATE ------------------ */
@@ -2706,12 +2770,21 @@ const partnerController = {
             }
             /* ------------------ CHECK EXISTING ------------------ */
             const checkQuery = `
-                SELECT partner_prospect_id
+                SELECT partner_prospect_id, user_id
                 FROM partner_prospects
                 WHERE partner_prospect_id = '${dataObj.partner_prospect_id || 0}'
                 AND is_deleted = 0
             `;
             const exists = await getData(checkQuery, next);
+
+            /* ------------------ DOCUMENT PASSWORD AUTHORIZATION ------------------ */
+            if (PROSPECT_PASSWORD_FIELDS.some((f) => dataObj[f] !== undefined)) {
+                const actor = await refundHelper.getActor(req.user?._id, next);
+                const ownerId = exists.length > 0 ? exists[0].user_id : dataObj.user_id;
+                if (!(await canAccessProspectPasswords(actor, ownerId, next))) {
+                    return next(new CustomErrorHandler(403, "You are not allowed to set document passwords for this prospect"));
+                }
+            }
             let query = '';
             /* ------------------ UPDATE ------------------ */
             if (exists.length > 0) {
@@ -2742,15 +2815,17 @@ const partnerController = {
 
             /* ------------------ DELETE OLD STOCKS ------------------ */
 
-            const deleteQuery = `
+            if (stocksProvided) {
+                const deleteQuery = `
                 DELETE FROM partner_prospect_stocks
                 WHERE partner_prospect_id = ${dataObj.partner_prospect_id}
             `;
-            await getData(deleteQuery, next);
+                await getData(deleteQuery, next);
+            }
 
             /* ------------------ INSERT STOCKS ------------------ */
 
-            if (stocks.length > 0) {
+            if (stocksProvided && stocks.length > 0) {
                 for (const stock of stocks) {
                     const stockObj = {
                         partner_prospect_id:
@@ -3084,6 +3159,7 @@ const partnerController = {
 
             /* ---------------- GET DATA ---------------- */
             const prospectData = await getData(query, next);
+            await maskProspectPasswords(prospectData, req.user?._id, next);
 
             /* ---------------- RESPONSE ---------------- */
             return res.json({
@@ -3170,6 +3246,7 @@ const partnerController = {
             /* ------------------ Get Prospects ------------------ */
 
             const prospects = await getData(query, next);
+            await maskProspectPasswords(prospects, req.user?._id, next);
 
             /* ------------------ Get Stocks ------------------ */
 
@@ -3315,6 +3392,8 @@ const partnerController = {
                 status: Joi.string()
                     .valid('Pending', 'Approved', 'Rejected', 'Completed')
                     .optional(),
+                // RM menus: OPEN = Pending + Rejected, APPROVED = Approved + Completed
+                status_group: Joi.string().valid('OPEN', 'APPROVED').optional(),
                 client_name: Joi.string().optional(),
                 partner_name: Joi.string().optional(),
                 order_type: Joi.string().valid('Buy', 'Sell').optional(),
@@ -3399,6 +3478,14 @@ const partnerController = {
                 cond += `
                     AND pso.status = '${req.query.status}'
                 `;
+            }
+
+            // Status group (enforced here as well as in the frontend). Combined with `status`
+            // it can only narrow the result, never widen it.
+            if (req.query.status_group === 'OPEN') {
+                cond += ` AND pso.status IN ('Pending', 'Rejected') `;
+            } else if (req.query.status_group === 'APPROVED') {
+                cond += ` AND pso.status IN ('Approved', 'Completed') `;
             }
 
             if (req.query.client_name) {
@@ -3501,6 +3588,11 @@ const partnerController = {
     },
     async addPartnerCommission(req, res, next) {
         try {
+            /* ------------------ ROLE CHECK (AM action; RM is view-only) ------------------ */
+            const commissionActor = await refundHelper.getActor(req.user?._id, next);
+            if (!commissionActor || !['AM', 'ADMIN'].includes(commissionActor.user_type)) {
+                return next(new CustomErrorHandler(403, "Only the Account Manager can add commission payments"));
+            }
 
             const commissionSchema = Joi.object({
                 order_id: Joi.number().integer().required(),
@@ -3579,6 +3671,30 @@ const partnerController = {
 
             if (error) {
                 return next(error);
+            }
+
+            /* ------------------ ROLE CHECK (read access) ------------------ */
+            // AM / ADMIN: any order. PARTNER: only their own invoice. RM: only orders of clients assigned to them.
+            const readActor = await refundHelper.getActor(req.user?._id, next);
+            let readAllowed = false;
+            if (readActor) {
+                if (['AM', 'ADMIN'].includes(readActor.user_type)) {
+                    readAllowed = true;
+                } else if (readActor.user_type === 'PARTNER') {
+                    readAllowed = Number(readActor.user_id) === Number(req.query.user_id);
+                } else if (readActor.user_type === 'RM') {
+                    const ownRows = await getData(
+                        `SELECT u.assign_to
+                         FROM order_transactions ot
+                         JOIN users u ON u.user_id = ot.user_id
+                         WHERE ot.order_id = ${Number(req.query.order_id)} LIMIT 1`,
+                        next
+                    );
+                    readAllowed = !!(ownRows && ownRows.length && Number(ownRows[0].assign_to) === Number(readActor.user_id));
+                }
+            }
+            if (!readAllowed) {
+                return next(new CustomErrorHandler(403, "You are not allowed to view this commission invoice"));
             }
 
             /* ------------------ Query ------------------ */
