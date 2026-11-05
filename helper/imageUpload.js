@@ -27,6 +27,7 @@ const storage = multer.diskStorage({
         if (file.fieldname === "ps_logo") prefix = `${req?.body?.stock_name}_`;
         if (file.fieldname === "share_Debit") prefix = `${req?.body?.order_id}_`;
         if (file.fieldname === "transaction_doc") prefix = `${req?.body?.order_id}_`;
+        if (file.fieldname === "refund_doc") prefix = `refund_${req?.body?.order_id}_`;
         if (file.fieldname === "blogImages") prefix = "blogImage";
         if (file.fieldname === "sourceAttachment") prefix = "blogAttachment";
         if (file.fieldname === "banner") prefix = "blogBanner";
@@ -82,6 +83,7 @@ const imageUpload = multer({
     { name: 'ps_logo', maxCount: 1 },
     { name: 'share_Debit', maxCount: 1 },
     { name: 'transaction_doc', maxCount: 1 },
+    { name: 'refund_doc', maxCount: 1 },
     { name: 'blogImages', maxCount: 3 },
     { name: 'sourceAttachment', maxCount: 1 },
     { name: 'banner', maxCount: 1 },

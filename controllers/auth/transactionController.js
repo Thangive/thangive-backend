@@ -3,6 +3,7 @@ import { getData, insertData, DB_NAME } from '../../config/index.js';
 import { CustomErrorHandler } from "../../service/index.js";
 import paginationQuery from '../../helper/paginationQuery.js';
 import commonFunction from '../../helper/commonFunction.js';
+import refundHelper from '../../helper/refundHelper.js';
 
 const transactionController = {
     async addUpdateOrder(req, res, next) {
@@ -332,6 +333,30 @@ const transactionController = {
                             "This user is not assigned to the given employee"
                         )
                     );
+                }
+            }
+
+            /* ------------------ REFUND GUARD ------------------ */
+            // refund_status is independent of rm/am/st status. While a refund is active (or finished)
+            // no stage can be changed, and an RM cannot cancel/reject a BUY order that already has an
+            // AM-confirmed payment (RM, AM or ST: a refund request must be used). No-payment cancel works as before.
+            const refundCtx = await refundHelper.getContext(dataObj.order_id, next);
+            if (refundCtx) {
+                if (refundCtx.order.refund_status !== 'NONE') {
+                    return next(CustomErrorHandler.badRequest(
+                        "Refund process is active or completed for this order. Order status cannot be changed."
+                    ));
+                }
+                // RM, AM and ST alike: once payment is received a BUY order cannot be cancelled / rejected
+                // directly. The RM raises a refund request and the AM processes it.
+                if (
+                    !dataObj.markAsSold &&
+                    ['REJECTED', 'CANCEL'].includes(dataObj.status) &&
+                    !refundHelper.isDirectCancelAllowed(refundCtx)
+                ) {
+                    return next(CustomErrorHandler.badRequest(
+                        "Payment is already received for this order. It cannot be cancelled or rejected directly. The RM must raise a refund request to AM."
+                    ));
                 }
             }
 
@@ -773,6 +798,8 @@ const transactionController = {
                     ot.markAsSoldStatus,
                     ot.markAsSold,
                     ot.share_Debit_Invoice,
+                    ot.refund_status,
+                    ot.cancellation_status,
                     CASE
                         WHEN ot.transaction_type = 'SELL' THEN
                             CASE
@@ -1037,6 +1064,12 @@ const transactionController = {
                 cond += ` AND DATE(ot.created_at) <= '${value.to_date}'`;
             }
 
+            // orders whose refund + cancellation is completed leave the stage-wise lists
+            // (rm/am/st statuses are untouched; the order is still visible in reports with its refund status)
+            if (value.status) {
+                cond += ` AND ot.cancellation_status <> 'COMPLETED'`;
+            }
+
             query += cond;
             // query += ` ORDER BY ot.updated_on DESC, ot.order_id DESC `;
             if (value.sort_field && value.sort_order) {
@@ -1182,6 +1215,8 @@ const transactionController = {
                 ot.share_Debit_Datetime,
                 ot.user_Datetime,
                 ot.am_datetime,
+                ot.refund_status,
+                ot.cancellation_status,
                 CONCAT(
                     rm.first_name, ' ',
                     IFNULL(rm.middle_name, ''), 
@@ -1288,6 +1323,7 @@ const transactionController = {
             const paymentQuery = `SELECT pt.payment_custom_id, DATE_FORMAT(pt.created_at, '%d-%m-%Y') AS date,b.bank_id,b.bank_name,pt.payment_id,pt.amount,pt.remaining_amount,pt.transaction_ref,pt.transaction_doc,pt.remark,pt.rm_status,pt.am_status,pt.payment_type,pt.user_Datetime,pt.rm_Datetime,pt.am_Datetime FROM payment_transactions pt LEFT JOIN user_bank_details b ON b.bank_id = pt.bank_id WHERE pt.order_id =  '${req.query.order_id}'`;
 
             const paymentData = await getData(paymentQuery, next);
+            const refundDetails = await refundHelper.getDetails(req.query.order_id, next);
 
             return res.json({
                 message: 'success',
@@ -1297,6 +1333,7 @@ const transactionController = {
                     brokerDetails: brokerData ?? [],
                     bankDetails: bankData ?? {},
                     paymentDetails: paymentData ?? [],
+                    refundDetails: refundDetails ?? null,
                     orderDetails: orderData[0]
                 }
             });
@@ -1566,6 +1603,17 @@ const transactionController = {
             /* ------------------ VALIDATE INPUT ------------------ */
             const { error } = paymentSchema.validate(dataObj);
             if (error) return next(error);
+
+            /* ------------------ REFUND GUARD ------------------ */
+            const refundRows = await getData(
+                `SELECT refund_status FROM order_transactions WHERE order_id = ${Number(dataObj.order_id)} LIMIT 1`,
+                next
+            );
+            if (refundRows && refundRows.length && refundRows[0].refund_status !== 'NONE') {
+                return next(CustomErrorHandler.badRequest(
+                    "Refund process is active or completed for this order. Payments cannot be changed."
+                ));
+            }
 
             /* ------------------ FETCH ORDER TOTAL ------------------ */
             const orderAmountQuery = `
@@ -2145,6 +2193,7 @@ const transactionController = {
                 ON st.stock_details_id = ot.stock_details_id
             WHERE 1 = 1
             AND ot.rm_status NOT IN ('CANCEL', 'REJECTED')
+            AND ot.cancellation_status <> 'COMPLETED'
         `;
 
             /* ------------------ Filters ------------------ */

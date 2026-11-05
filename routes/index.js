@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController } from '../controllers/index.js';
+import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController, refundController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
 
@@ -68,6 +68,12 @@ router.get('/orderStatement', auth, transactionController.getOrderStatement);
 // Payment APIS
 router.post('/addPaymentDetails', auth, imageUpload, transactionController.addUpdatePayment);
 router.get('/paymentDetails', auth, transactionController.getPayment);
+
+// Refund & Cancellation APIS (BUY orders only; role is checked inside from the users table)
+router.post('/refundRequest', auth, forms, refundController.raiseRefundRequest);
+router.post('/refundRequestReview', auth, forms, refundController.reviewRefundRequest);
+router.post('/addRefundDetails', auth, imageUpload, refundController.addRefundDetails);
+router.get('/refundRequests', auth, refundController.getRefundRequests);
 
 
 // Stock Details API
