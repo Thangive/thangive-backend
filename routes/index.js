@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController, refundController, dashboardController } from '../controllers/index.js';
+import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController, refundController, dashboardController, accountsDashboardController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
 
@@ -81,6 +81,14 @@ router.get('/dashboard/rm/contest', auth, dashboardController.rmContest);
 router.get('/dashboard/rm/running-orders', auth, dashboardController.rmRunningOrders);
 router.get('/dashboard/rm/orders-summary', auth, dashboardController.rmOrdersSummary);
 router.get('/dashboard/rm/month-on-month', auth, dashboardController.rmMonthOnMonth);
+
+// Dashboard APIs (AM Accounts dashboard; the AM role is checked inside from the users table)
+router.get('/dashboard/accounts/summary', auth, accountsDashboardController.accountsSummary);
+router.get('/dashboard/accounts/monthly-chart', auth, accountsDashboardController.accountsMonthlyChart);
+router.get('/dashboard/accounts/pending-refunds', auth, accountsDashboardController.accountsPendingRefunds);
+router.get('/dashboard/accounts/partner-payouts', auth, accountsDashboardController.accountsPartnerPayouts);
+router.get('/dashboard/accounts/recent-transactions', auth, accountsDashboardController.accountsRecentTransactions);
+router.get('/dashboard/accounts/export', auth, accountsDashboardController.accountsExport);
 
 
 // Stock Details API
