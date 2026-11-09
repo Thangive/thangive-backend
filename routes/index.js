@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController, refundController, dashboardController, accountsDashboardController } from '../controllers/index.js';
+import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController, refundController, dashboardController, accountsDashboardController, reportsController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
 
@@ -89,6 +89,27 @@ router.get('/dashboard/accounts/pending-refunds', auth, accountsDashboardControl
 router.get('/dashboard/accounts/partner-payouts', auth, accountsDashboardController.accountsPartnerPayouts);
 router.get('/dashboard/accounts/recent-transactions', auth, accountsDashboardController.accountsRecentTransactions);
 router.get('/dashboard/accounts/export', auth, accountsDashboardController.accountsExport);
+
+// Main Reports (RM, AM, ST; role and data scope are checked inside from the users table)
+router.get('/reports/options', auth, reportsController.reportOptions);
+router.get('/reports/orders', auth, reportsController.ordersReport);
+router.get('/reports/orders/export', auth, reportsController.ordersExport);
+router.get('/reports/payments', auth, reportsController.paymentsReport);
+router.get('/reports/payments/export', auth, reportsController.paymentsExport);
+router.get('/reports/refunds', auth, reportsController.refundsReport);
+router.get('/reports/refunds/export', auth, reportsController.refundsExport);
+router.get('/reports/partners', auth, reportsController.partnersReport);
+router.get('/reports/partners/export', auth, reportsController.partnersExport);
+router.get('/reports/commissions', auth, reportsController.commissionsReport);
+router.get('/reports/commissions/export', auth, reportsController.commissionsExport);
+router.get('/reports/share-debit', auth, reportsController.shareDebitReport);
+router.get('/reports/share-debit/export', auth, reportsController.shareDebitExport);
+router.get('/reports/prospects', auth, reportsController.prospectsReport);
+router.get('/reports/prospects/export', auth, reportsController.prospectsExport);
+router.get('/reports/performance', auth, reportsController.performanceReport);
+router.get('/reports/performance/export', auth, reportsController.performanceExport);
+router.get('/reports/financial', auth, reportsController.financialReport);
+router.get('/reports/financial/export', auth, reportsController.financialExport);
 
 
 // Stock Details API
