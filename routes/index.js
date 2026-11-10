@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController, refundController, dashboardController, accountsDashboardController, reportsController } from '../controllers/index.js';
+import { brokerAndAdvisorControler, serviceController, PriceController, sectorController, stocksCotrollers, stocksGetController, transactionController, userController, wishlistController,faqController,blogController, partnerController, refundController, dashboardController, shareTransferDashboardController, partnerDashboardController, accountsDashboardController, reportsController, partnerReportsController } from '../controllers/index.js';
 import imageUpload from '../helper/imageUpload.js';
 import auth from '../middlewares/auth.js';
 
@@ -83,6 +83,18 @@ router.get('/dashboard/rm/orders-summary', auth, dashboardController.rmOrdersSum
 router.get('/dashboard/rm/month-on-month', auth, dashboardController.rmMonthOnMonth);
 
 // Dashboard APIs (AM Accounts dashboard; the AM role is checked inside from the users table)
+// Partner dashboard APIs: read-only, PARTNER role checked inside, always limited to the caller's own data
+router.get('/dashboard/partner/summary', auth, partnerDashboardController.partnerSummary);
+router.get('/dashboard/partner/monthly-commission', auth, partnerDashboardController.partnerMonthlyCommission);
+router.get('/dashboard/partner/orders', auth, partnerDashboardController.partnerOrders);
+router.get('/dashboard/partner/payouts', auth, partnerDashboardController.partnerPayouts);
+router.get('/dashboard/partner/dealer-prices', auth, partnerDashboardController.partnerDealerPrices);
+
+// ST (Share Transfer) dashboard APIs: read-only, ST role checked inside from the users table
+router.get('/dashboard/st/summary', auth, shareTransferDashboardController.stSummary);
+router.get('/dashboard/st/attention', auth, shareTransferDashboardController.stAttention);
+router.get('/dashboard/st/stats', auth, shareTransferDashboardController.stStats);
+router.get('/dashboard/st/queue', auth, shareTransferDashboardController.stQueue);
 router.get('/dashboard/accounts/summary', auth, accountsDashboardController.accountsSummary);
 router.get('/dashboard/accounts/monthly-chart', auth, accountsDashboardController.accountsMonthlyChart);
 router.get('/dashboard/accounts/pending-refunds', auth, accountsDashboardController.accountsPendingRefunds);
@@ -110,6 +122,18 @@ router.get('/reports/performance', auth, reportsController.performanceReport);
 router.get('/reports/performance/export', auth, reportsController.performanceExport);
 router.get('/reports/financial', auth, reportsController.financialReport);
 router.get('/reports/financial/export', auth, reportsController.financialExport);
+router.get('/partner-reports/orders', auth, partnerReportsController.ordersReport);
+router.get('/partner-reports/orders/export', auth, partnerReportsController.ordersExport);
+router.get('/partner-reports/commissions', auth, partnerReportsController.commissionsReport);
+router.get('/partner-reports/commissions/export', auth, partnerReportsController.commissionsExport);
+router.get('/partner-reports/payouts', auth, partnerReportsController.payoutsReport);
+router.get('/partner-reports/payouts/export', auth, partnerReportsController.payoutsExport);
+router.get('/partner-reports/prospects', auth, partnerReportsController.prospectsReport);
+router.get('/partner-reports/prospects/export', auth, partnerReportsController.prospectsExport);
+router.get('/partner-reports/converted-clients', auth, partnerReportsController.convertedClientsReport);
+router.get('/partner-reports/converted-clients/export', auth, partnerReportsController.convertedClientsExport);
+router.get('/partner-reports/monthly-summary', auth, partnerReportsController.monthlySummaryReport);
+router.get('/partner-reports/monthly-summary/export', auth, partnerReportsController.monthlySummaryExport);
 
 
 // Stock Details API
