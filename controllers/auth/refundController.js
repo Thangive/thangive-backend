@@ -79,10 +79,12 @@ const refundController = {
             const settled = await refundHelper.reconcile(value.order_id, next);
             if (!settled) return;
 
+            // the id RF_MMYY_XX is made by the database trigger (migration 008); it is only read back here
+            const requestId = await refundHelper.getRequestId(result.insertId, next);
             return res.json({
                 success: true,
                 message: 'Refund request raised successfully',
-                data: { refund_request_id: result.insertId, order_id: value.order_id, refund_status: settled.refund_status },
+                data: { refund_request_id: result.insertId, request_id: requestId, order_id: value.order_id, refund_status: settled.refund_status },
             });
         } catch (error) {
             next(error);
@@ -162,10 +164,11 @@ const refundController = {
             // no-op when the triggers exist; repairs the order if they are missing
             if (!(await refundHelper.reconcile(request.order_id, next))) return;
 
+            const requestId = await refundHelper.getRequestId(request.refund_request_id, next);
             return res.json({
                 success: true,
                 message: value.decision === 'Accept' ? 'Refund request accepted' : 'Refund request rejected',
-                data: { refund_request_id: request.refund_request_id, order_id: request.order_id },
+                data: { refund_request_id: request.refund_request_id, request_id: requestId, order_id: request.order_id },
             });
         } catch (error) {
             next(error);
@@ -317,9 +320,11 @@ const refundController = {
                 return next(forbidden('Not allowed to view refund requests'));
             }
 
+            const hasRequestId = await refundHelper.hasRequestId(next);
             let query = `
                 SELECT
-                    rr.refund_request_id, rr.order_id, ot.order_custom_id, rr.status AS request_status,
+                    rr.refund_request_id, ${refundHelper.requestIdSql('rr', hasRequestId)} AS request_id,
+                    rr.order_id, ot.order_custom_id, rr.status AS request_status,
                     rr.request_reason, rr.requested_datetime, rr.reviewed_datetime, rr.review_remark,
                     CONCAT_WS(' ', rq.first_name, rq.middle_name, rq.last_name) AS requested_by_name,
                     CONCAT_WS(' ', rv.first_name, rv.middle_name, rv.last_name) AS reviewed_by_name,

@@ -246,7 +246,7 @@ const RR_REMAINING = `IF(rr.status IN ('Pending', 'Accepted'), GREATEST(${RR_REC
 DEFS.refunds = {
     title: 'Refund Reports',
     columns: [
-        count('refund_request_id', 'Request'), text('order_custom_id', 'Order ID'), when('requested_at', 'Requested'),
+        text('request_id', 'Request ID'), text('order_custom_id', 'Order ID'), when('requested_at', 'Requested'),
         text('client_name', 'Client'), text('rm_name', 'RM', { pdf: false }), text('company_name', 'Company', { pdf: false }),
         text('request_reason', 'Reason'), status('status', 'Status'), money('received_amount', 'Received'),
         money('refunded_amount', 'Refunded'), money('remaining_amount', 'Remaining'),
@@ -257,7 +257,10 @@ DEFS.refunds = {
     from: `FROM refund_requests rr
     JOIN order_transactions ot ON ot.order_id = rr.order_id ${ORDER_JOINS}
     LEFT JOIN users rv ON rv.user_id = rr.reviewed_by`,
-    select: `rr.refund_request_id AS refund_request_id, ot.order_custom_id AS order_custom_id, ${FMT('rr.requested_datetime')} AS requested_at,
+    // Request ID RF_MMYY_XX (migration 008, made by the database trigger). Without the column the numeric id is shown instead.
+    needs: [['refund_requests', 'request_id', 'request_id']],
+    selectFn: (has) => `${has.request_id ? 'COALESCE(rr.request_id, CAST(rr.refund_request_id AS CHAR))' : 'CAST(rr.refund_request_id AS CHAR)'} AS request_id,
+        ot.order_custom_id AS order_custom_id, ${FMT('rr.requested_datetime')} AS requested_at,
         ${NAME('u')} AS client_name, ${NAME('rm')} AS rm_name, sd.company_name AS company_name,
         rr.request_reason AS request_reason, rr.status AS status, ${RR_RECEIVED} AS received_amount,
         ${RR_REFUNDED} AS refunded_amount, ${RR_REMAINING} AS remaining_amount,
@@ -265,6 +268,7 @@ DEFS.refunds = {
     dateExpr: 'rr.requested_datetime',
     scope: scopeOwner,
     search: ['ot.order_custom_id', NAME('u'), 'sd.company_name', 'rr.request_reason'],
+    searchFn: (has) => ['ot.order_custom_id', NAME('u'), 'sd.company_name', 'rr.request_reason', ...(has.request_id ? ['rr.request_id'] : [])],
     filters: (f, actor) => [f.status && `rr.status = ${sqlStr(f.status)}`, rmFilter(f, actor)],
     orderBy: 'rr.refund_request_id DESC',
     summary: [
@@ -492,7 +496,7 @@ DEFS.performance = {
 
 /* ---------------- engines ---------------- */
 
-function sqlWhere(def, f, actor) {
+function sqlWhere(def, f, actor, has = {}) {
     const conds = [def.baseWhere || '1 = 1'];
     const scope = def.scope && def.scope(actor, f);
     if (scope) conds.push(scope);
@@ -500,16 +504,17 @@ function sqlWhere(def, f, actor) {
         if (f.start) conds.push(`${def.dateExpr} >= ${sqlStr(f.start)}`);
         if (f.end) conds.push(`${def.dateExpr} < ${sqlStr(f.end)}`);
     }
-    if (f.search && def.search) conds.push(`(${def.search.map((e) => `${e} LIKE ${likeStr(f.search)}`).join(' OR ')})`);
+    const searchCols = def.searchFn ? def.searchFn(has) : def.search;
+    if (f.search && searchCols) conds.push(`(${searchCols.map((e) => `${e} LIKE ${likeStr(f.search)}`).join(' OR ')})`);
     (def.filters ? def.filters(f, actor) : []).forEach((c) => c && conds.push(c));
     return conds.map((c) => `(${c})`).join(' AND ');
 }
 
 /** Report whose rows and totals come straight from SQL. */
 async function runSqlReport(def, f, actor, all, next) {
-    const where = sqlWhere(def, f, actor);
     const has = {};
     for (const [table, column, key] of def.needs || []) has[key] = await colExists(table, column, next);
+    const where = sqlWhere(def, f, actor, has);
     const select = def.selectFn ? def.selectFn(has) : def.select;
 
     const totalRows = await getData(`SELECT COUNT(*) AS c ${def.from} WHERE ${where}`, next);

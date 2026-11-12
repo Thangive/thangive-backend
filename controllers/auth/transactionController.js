@@ -829,7 +829,9 @@ const transactionController = {
                         ELSE latest_payment.payment_type
                     END AS payment_type,
                     latest_payment.remaining_amount AS Balance,
-                    latest_payment.payment_custom_id
+                    latest_payment.payment_custom_id,
+                    /* AM payment status of a BUY order: blank until the AM has acted on a payment row */
+                    CASE WHEN ot.transaction_type = 'BUY' THEN latest_am_payment.am_status ELSE NULL END AS am_payment_status
                 FROM order_transactions ot
                 JOIN stock_details st
                     ON ot.stock_details_id = st.stock_details_id
@@ -863,6 +865,20 @@ const transactionController = {
                         AND pt2.latest_payment_id = pt1.payment_id
                 ) latest_payment
                     ON latest_payment.order_id = ot.order_id
+                /* same "latest row" approach as latest_payment, limited to rows the AM wrote (am_Datetime is set by every AM payment write) */
+                LEFT JOIN (
+                    SELECT pa1.order_id, pa1.am_status
+                    FROM payment_transactions pa1
+                    INNER JOIN (
+                        SELECT order_id, MAX(payment_id) AS latest_am_payment_id
+                        FROM payment_transactions
+                        WHERE am_Datetime IS NOT NULL
+                        GROUP BY order_id
+                    ) pa2
+                        ON pa2.order_id = pa1.order_id
+                        AND pa2.latest_am_payment_id = pa1.payment_id
+                ) latest_am_payment
+                    ON latest_am_payment.order_id = ot.order_id
                 WHERE 1
             `;
 

@@ -70,8 +70,8 @@ const REFUNDED_SUB = `(SELECT IFNULL(SUM(rt2.amount), 0) FROM refund_transaction
         WHERE rt2.order_id = rr.order_id AND rt2.status = 'REFUNDED')`;
 
 /** Pending refund requests (one row per request, no joins that can multiply rows). */
-const pendingRefundBase = (start, end) => `
-    SELECT rr.refund_request_id, rr.order_id, ot.order_custom_id, ${NAME('u')} AS client_name,
+const pendingRefundBase = (start, end, idExpr = 'NULL') => `
+    SELECT rr.refund_request_id, ${idExpr} AS request_id, rr.order_id, ot.order_custom_id, ${NAME('u')} AS client_name,
            rr.request_reason, rr.status, rr.requested_datetime AS req_dt,
            GREATEST(${RECEIVED_SUB} - ${REFUNDED_SUB}, 0) AS amount
     FROM refund_requests rr
@@ -510,11 +510,12 @@ const accountsDashboardController = {
             const w = periodWindow(value.period);
 
             const totals = await refundTotals(w.start, w.end, next);
+            const hasRequestId = await refundHelper.hasRequestId(next); // migration 008; null id without it
             const rows = await getData(
-                `SELECT x.refund_request_id, x.order_custom_id, x.client_name, x.request_reason, x.status, x.amount,
+                `SELECT x.refund_request_id, x.request_id, x.order_custom_id, x.client_name, x.request_reason, x.status, x.amount,
                         ${FMT('x.req_dt')} AS requested_at,
                         GREATEST(DATEDIFF(DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+05:30')), DATE(x.req_dt)), 0) AS days_pending
-                 FROM (${pendingRefundBase(w.start, w.end)}) x
+                 FROM (${pendingRefundBase(w.start, w.end, refundHelper.requestIdSql('rr', hasRequestId))}) x
                  ORDER BY x.req_dt ASC, x.refund_request_id ASC
                  LIMIT ${Number(value.limit)}`,
                 next
@@ -528,6 +529,7 @@ const accountsDashboardController = {
                     amount: totals.pending.amount,
                     rows: (rows || []).map((r) => ({
                         refund_request_id: r.refund_request_id,
+                        request_id: r.request_id ?? null,
                         order_id: r.order_custom_id,
                         client_name: r.client_name || '-',
                         reason: r.request_reason || '',
