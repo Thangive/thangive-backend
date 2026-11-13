@@ -17,7 +17,7 @@ import refundHelper from '../../helper/refundHelper.js';
  * CONVERT_TZ like the rest of the backend); st_datetime is entered as IST local time by the app.
  */
 
-const MONTHLY_TARGET = 50000000; // Rs 5 Crore
+const MONTHLY_TARGET = 10000000; // Rs 1 Crore
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -193,24 +193,30 @@ const dashboardController = {
             if (!rm) return;
             const w = monthWindows();
 
+            // Only count COMPLETED orders (all three statuses are COMPLETED).
+            // Use completion date (st_datetime, fallback to created_at) for the monthly window.
+            const completedCondition = `ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'`;
+            const completionDateIST = `IFNULL(ot.st_datetime, ${CREATED_IST})`;
+
             const achievedRows = await getData(
                 `SELECT IFNULL(SUM(${VALUE}), 0) AS achieved, COUNT(*) AS orders
                  ${FROM_ORDERS}
-                 WHERE ${OWNER_RM} = ${Number(rm.user_id)} AND ${ELIGIBLE}
-                   AND ${CREATED_IST} >= '${w.start}' AND ${CREATED_IST} < '${w.next}'`,
+                 WHERE ${OWNER_RM} = ${Number(rm.user_id)} AND ${ELIGIBLE} AND ${completedCondition}
+                   AND ${completionDateIST} >= '${w.start}' AND ${completionDateIST} < '${w.next}'`,
                 next
             );
             const achieved = num(achievedRows?.[0]?.achieved);
 
             // Leaderboards for the live month and last month: every active RM, same attribution rule,
             // ranked by achieved order value (RMs with no orders are listed with 0).
+            // Only count COMPLETED orders.
             const perRm = await getData(
                 `SELECT ${OWNER_RM} AS rm_id,
-                        IFNULL(SUM(CASE WHEN ${CREATED_IST} >= '${w.start}' THEN ${VALUE} ELSE 0 END), 0) AS live_value,
-                        IFNULL(SUM(CASE WHEN ${CREATED_IST} < '${w.start}' THEN ${VALUE} ELSE 0 END), 0) AS prev_value
+                        IFNULL(SUM(CASE WHEN ${completionDateIST} >= '${w.start}' THEN ${VALUE} ELSE 0 END), 0) AS live_value,
+                        IFNULL(SUM(CASE WHEN ${completionDateIST} < '${w.start}' THEN ${VALUE} ELSE 0 END), 0) AS prev_value
                  ${FROM_ORDERS}
-                 WHERE ${ELIGIBLE} AND ${OWNER_RM} IS NOT NULL
-                   AND ${CREATED_IST} >= '${w.prevStart}' AND ${CREATED_IST} < '${w.next}'
+                 WHERE ${ELIGIBLE} AND ${completedCondition} AND ${OWNER_RM} IS NOT NULL
+                   AND ${completionDateIST} >= '${w.prevStart}' AND ${completionDateIST} < '${w.next}'
                  GROUP BY rm_id`,
                 next
             );
