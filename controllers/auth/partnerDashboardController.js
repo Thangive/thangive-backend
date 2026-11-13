@@ -139,7 +139,7 @@ const dashboardController = {
 
             const prospects = await getData(
                 `SELECT COUNT(*) AS c FROM partner_prospects
-                 WHERE user_id = ${P} AND lead_type = 'Prospects' AND is_deleted = 0${rangeCond(`IFNULL(lead_creation_date, DATE(${IST('created_at')}))`, w.start, w.end)}`,
+                 WHERE user_id = ${P} AND lead_type = 'Prospects' AND is_deleted = 0`,
                 next
             );
             const converted = await getData(
