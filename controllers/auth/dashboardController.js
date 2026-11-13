@@ -141,6 +141,46 @@ async function fetchOrderAggregates(rmId, w, next) {
     return rows && rows[0] ? rows[0] : {};
 }
 
+/** Completed order aggregates only (all three statuses COMPLETED). Used for monetary totals. */
+async function fetchCompletedOrderAggregates(rmId, w, next) {
+    const completedCondition = `ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'`;
+    const completionDateIST = `IFNULL(ot.st_datetime, ${CREATED_IST})`;
+    const rows = await getData(
+        `SELECT
+            COUNT(*)                                      AS total_count,
+            IFNULL(SUM(x.val), 0)                         AS total_value,
+            IFNULL(SUM(x.is_buy), 0)                      AS total_buy_count,
+            IFNULL(SUM(x.is_buy * x.val), 0)              AS total_buy_value,
+            IFNULL(SUM(1 - x.is_buy), 0)                  AS total_sell_count,
+            IFNULL(SUM((1 - x.is_buy) * x.val), 0)        AS total_sell_value,
+
+            IFNULL(SUM(x.in_month), 0)                    AS month_count,
+            IFNULL(SUM(x.in_month * x.val), 0)            AS month_value,
+            IFNULL(SUM(x.in_month * x.is_buy), 0)         AS month_buy_count,
+            IFNULL(SUM(x.in_month * x.is_buy * x.val), 0) AS month_buy_value,
+            IFNULL(SUM(x.in_month * (1 - x.is_buy)), 0)   AS month_sell_count,
+            IFNULL(SUM(x.in_month * (1 - x.is_buy) * x.val), 0) AS month_sell_value,
+
+            IFNULL(SUM(x.is_partner), 0)                  AS partner_count,
+            IFNULL(SUM(x.is_partner * x.is_buy), 0)       AS partner_buy_count,
+            IFNULL(SUM(x.is_partner * (1 - x.is_buy)), 0) AS partner_sell_count,
+            IFNULL(SUM(1 - x.is_partner), 0)              AS user_count,
+            IFNULL(SUM((1 - x.is_partner) * x.is_buy), 0) AS user_buy_count,
+            IFNULL(SUM((1 - x.is_partner) * (1 - x.is_buy)), 0) AS user_sell_count
+         FROM (
+            SELECT
+                ${VALUE} AS val,
+                (ot.transaction_type = 'BUY') AS is_buy,
+                (ot.addedPartnerID IS NOT NULL) AS is_partner,
+                (${completionDateIST} >= '${w.start}' AND ${completionDateIST} < '${w.next}') AS in_month
+            ${FROM_ORDERS}
+            WHERE ${OWNER_RM} = ${Number(rmId)} AND ${ELIGIBLE} AND ${completedCondition}
+         ) x`,
+        next
+    );
+    return rows && rows[0] ? rows[0] : {};
+}
+
 const dashboardController = {
     /* ---------------------------------------------------------------
      * GET /dashboard/rm/overview
@@ -161,7 +201,7 @@ const dashboardController = {
                    AND is_deleted = 0 AND is_verified = 1`,
                 next
             );
-            const a = await fetchOrderAggregates(rm.user_id, w, next);
+            const a = await fetchCompletedOrderAggregates(rm.user_id, w, next);
 
             return res.json({
                 success: true,
@@ -377,6 +417,7 @@ const dashboardController = {
             if (!rm) return;
             const w = monthWindows();
             const a = await fetchOrderAggregates(rm.user_id, w, next);
+            const ac = await fetchCompletedOrderAggregates(rm.user_id, w, next);
 
             return res.json({
                 success: true,
@@ -393,7 +434,7 @@ const dashboardController = {
                         sell: num(a.partner_sell_count),
                     },
                     completed_this_month: num(a.completed_month),
-                    month_order_value: num(a.month_value),
+                    month_order_value: num(ac.month_value),
                     month_label: w.label,
                 },
             });
@@ -406,6 +447,7 @@ const dashboardController = {
      * GET /dashboard/rm/month-on-month
      * Last 12 calendar months (current month included), BUY and SELL separately.
      * Quarterly / Buy / Sell views and the summary tiles are derived from this series.
+     * Only count COMPLETED orders; use completion date for monthly windows.
      * --------------------------------------------------------------- */
     async rmMonthOnMonth(req, res, next) {
         try {
@@ -431,15 +473,17 @@ const dashboardController = {
                 });
             }
             const rangeStart = `${months[0].key}-01 00:00:00`;
+            const completedCondition = `ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'`;
+            const completionDateIST = `IFNULL(ot.st_datetime, ${CREATED_IST})`;
 
             const data = await getData(
-                `SELECT DATE_FORMAT(${CREATED_IST}, '%Y-%m') AS ym,
+                `SELECT DATE_FORMAT(${completionDateIST}, '%Y-%m') AS ym,
                         ot.transaction_type AS t,
                         COUNT(*) AS c,
                         IFNULL(SUM(${VALUE}), 0) AS v
                  ${FROM_ORDERS}
-                 WHERE ${OWNER_RM} = ${Number(rm.user_id)} AND ${ELIGIBLE}
-                   AND ${CREATED_IST} >= '${rangeStart}' AND ${CREATED_IST} < '${w.next}'
+                 WHERE ${OWNER_RM} = ${Number(rm.user_id)} AND ${ELIGIBLE} AND ${completedCondition}
+                   AND ${completionDateIST} >= '${rangeStart}' AND ${completionDateIST} < '${w.next}'
                  GROUP BY ym, t`,
                 next
             );
