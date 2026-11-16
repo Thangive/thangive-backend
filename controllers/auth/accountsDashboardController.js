@@ -450,10 +450,12 @@ const accountsDashboardController = {
 
             const payRows = async (type) => {
                 const dateExpr = type === 'BUY' ? BUY_DATE : SELL_DATE;
+                // Chart shows only AM-verified payments (am_status = 'RECEVIED'), excluding pending and not-received
+                const chartPayCond = `ot.rm_status NOT IN ('CANCEL', 'REJECTED') AND pt.am_status = 'RECEVIED'`;
                 return getData(
                     `SELECT DATE_FORMAT(${dateExpr}, '%Y-%m') AS ym, IFNULL(SUM(pt.amount), 0) AS a
                      ${PAY_FROM}
-                     WHERE ${PAY_COND} AND ot.transaction_type = '${type}'${rangeCond(dateExpr, rangeStart, w.end)}
+                     WHERE ${chartPayCond} AND ot.transaction_type = '${type}'${rangeCond(dateExpr, rangeStart, w.end)}
                      GROUP BY ym`,
                     next
                 );

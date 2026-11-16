@@ -157,7 +157,7 @@ DEFS.orders = {
         ${NAME('rm')} AS rm_name, ${NAME('p')} AS partner_name, sd.company_name AS company_name,
         ot.transaction_type AS transaction_type, ot.quantity AS quantity, ot.price_per_share AS price, ${VALUE} AS order_value,
         ot.rm_status AS rm_status, ot.am_status AS am_status, ot.st_status AS st_status, ot.refund_status AS refund_status,
-        CASE WHEN ${CLOSED} THEN 'Closed' WHEN ${ALL_DONE} THEN 'Completed' ELSE 'Running' END AS order_status`,
+        CASE WHEN ${CLOSED} THEN 'Cancelled' WHEN ${ALL_DONE} THEN 'Completed' ELSE 'Running' END AS order_status`,
     dateExpr: CREATED_IST,
     scope: scopeOwner,
     search: ['ot.order_custom_id', NAME('u'), 'u.username', 'sd.company_name', NAME('p')],
@@ -187,7 +187,7 @@ DEFS.orders = {
         count('sell_count', 'Sell orders', { expr: `IFNULL(SUM(ot.transaction_type = 'SELL'), 0)` }),
         money('sell_value', 'Sell value', { expr: `IFNULL(SUM(IF(ot.transaction_type = 'SELL', ${VALUE}, 0)), 0)` }),
         count('completed', 'Completed', { expr: `IFNULL(SUM(${ALL_DONE} AND NOT ${CLOSED}), 0)` }),
-        count('closed', 'Closed', { expr: `IFNULL(SUM(${CLOSED}), 0)` }),
+        count('closed', 'Cancelled', { expr: `IFNULL(SUM(${CLOSED}), 0)` }),
     ],
 };
 
