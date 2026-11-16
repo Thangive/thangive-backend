@@ -26,16 +26,17 @@ const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 const FROM_ORDERS = `
     FROM order_transactions ot
     JOIN users u ON u.user_id = ot.user_id
-    LEFT JOIN users p ON p.user_id = ot.addedPartnerID`;
+    LEFT JOIN users p ON p.user_id = ot.addedPartnerID
+    LEFT JOIN advisor ad ON ad.advisor_id = ot.advisor_id`;
 const OWNER_RM = `COALESCE(NULLIF(u.assign_to, 0), NULLIF(p.assign_to, 0))`;
 const ELIGIBLE = `ot.rm_status NOT IN ('REJECTED', 'CANCEL')
     AND ot.am_status NOT IN ('REJECTED', 'CANCEL')
     AND ot.st_status NOT IN ('REJECTED', 'CANCEL')
     AND ot.cancellation_status <> 'COMPLETED'`;
 const VALUE = `(ot.price_per_share * ot.quantity)`;
-// Exclude other-advisor BUY orders and mark-as-sold SELL orders from monetary calculations
+// Exclude BUY orders with OTHER advisor and SELL orders marked as sold from monetary calculations
 const VALUE_ELIGIBLE = `CASE
-    WHEN ot.transaction_type = 'BUY' AND ot.advisor_id <> 1 THEN 0
+    WHEN ot.transaction_type = 'BUY' AND ad.advisor_name = 'OTHER' THEN 0
     WHEN ot.transaction_type = 'SELL' AND IFNULL(ot.markAsSold, 0) = 1 THEN 0
     ELSE ${VALUE}
 END`;

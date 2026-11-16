@@ -24,7 +24,7 @@ import refundHelper from '../../helper/refundHelper.js';
  *                       gross, before TDS and GST). Paid = the order has a partner_commission row,
  *                       Pending = it has none. Eligible orders are the ones the partner commission
  *                       list shows: all three stages COMPLETED, not mark-as-sold, not cancelled through
- *                       the refund flow, and not a BUY with advisor_id 2 (those never get an invoice).
+ *                       the refund flow, and not a BUY with OTHER advisor (special orders not counted).
  *
  * Transaction date used for the period filter (all values are IST local time):
  *  BUY     payment_transactions.rm_Datetime  (fallback created_at converted to IST)
@@ -207,6 +207,7 @@ async function loadPartnerRows(next) {
                 CASE WHEN pc.commission_id IS NULL THEN NULL ELSE ${paidDate} END AS paid_date
          FROM order_transactions ot
          JOIN users p ON p.user_id = ot.addedPartnerID
+         LEFT JOIN advisor ad ON ad.advisor_id = ot.advisor_id
          LEFT JOIN (SELECT order_id, MIN(commission_id) AS cid FROM partner_commission GROUP BY order_id) pcm
                 ON pcm.order_id = ot.order_id
          LEFT JOIN partner_commission pc ON pc.commission_id = pcm.cid
@@ -214,7 +215,7 @@ async function loadPartnerRows(next) {
            AND ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'
            AND ot.cancellation_status <> 'COMPLETED'
            AND IFNULL(ot.markAsSold, 0) <> 1
-           AND NOT (ot.transaction_type = 'BUY' AND ot.advisor_id = 2)`,
+           AND NOT (ot.transaction_type = 'BUY' AND ad.advisor_name = 'OTHER')`,
         next
     );
 

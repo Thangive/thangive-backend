@@ -19,7 +19,7 @@ import { commissionPerShare, commissionDeductions } from '../../helper/commissio
  *                      of the frontend calculateCommissionPerShare), gross (before TDS and GST), per share rounded
  *                      to 2 decimals, times the order quantity. Eligible orders are the ones the commission list
  *                      shows: all three stages COMPLETED, not mark-as-sold, not cancelled through the refund flow,
- *                      and not a BUY with advisor_id 2 (those never get an invoice).
+ *                      and not a BUY with OTHER advisor (special orders not counted).
  *  - Paid / pending    an order is paid when it has a partner_commission row (the lowest commission_id is used, so
  *                      old duplicate rows are never double counted), pending when it has none.
  *  - Payout amount     the amount actually payable: gross commission less TDS and GST using the percentages stored
@@ -82,7 +82,7 @@ const COMPLETED_ALL = `ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED'
 const COMM_ELIGIBLE = `${COMPLETED_ALL}
     AND IFNULL(ot.markAsSold, 0) <> 1
     AND ot.cancellation_status <> 'COMPLETED'
-    AND NOT (ot.transaction_type = 'BUY' AND ot.advisor_id = 2)`;
+    AND NOT (ot.transaction_type = 'BUY' AND ad.advisor_name = 'OTHER')`;
 const NOT_CLOSED = `ot.rm_status NOT IN ('REJECTED', 'CANCEL')
     AND ot.am_status NOT IN ('REJECTED', 'CANCEL')
     AND ot.st_status NOT IN ('REJECTED', 'CANCEL')
@@ -157,7 +157,8 @@ const dashboardController = {
             const orders = await getData(
                 `SELECT ot.order_id, ot.transaction_type AS t, ot.quantity AS qty, ot.price_per_share AS pps, ot.partner_price AS pp,
                         ${VALUE} AS val, pc.commission_id AS cid
-                 FROM order_transactions ot ${COMM_ROW}
+                 FROM order_transactions ot
+                 LEFT JOIN advisor ad ON ad.advisor_id = ot.advisor_id ${COMM_ROW}
                  WHERE ot.addedPartnerID = ${P} AND ${COMM_ELIGIBLE}${rangeCond(DONE_DT, w.start, w.end)}`,
                 next
             );
@@ -225,6 +226,7 @@ const dashboardController = {
                 `SELECT DATE_FORMAT(${DONE_DT}, '%Y-%m') AS ym, ot.transaction_type AS t, ot.quantity AS qty,
                         ot.price_per_share AS pps, ot.partner_price AS pp
                  FROM order_transactions ot
+                 LEFT JOIN advisor ad ON ad.advisor_id = ot.advisor_id
                  WHERE ot.addedPartnerID = ${P} AND ${COMM_ELIGIBLE}${rangeCond(DONE_DT, `${months[0].key}-01 00:00:00`, monthStr(nextY, (m + 1) % 12))}`,
                 next
             );
@@ -286,9 +288,10 @@ const dashboardController = {
                 `SELECT ot.order_id, ot.order_custom_id, ot.transaction_type AS t, ot.quantity AS qty,
                         ot.price_per_share AS pps, ot.partner_price AS pp, ${VALUE} AS val,
                         ot.rm_status, ot.am_status, ot.st_status, ot.cancellation_status,
-                        IFNULL(ot.markAsSold, 0) AS mas, ot.advisor_id,
+                        IFNULL(ot.markAsSold, 0) AS mas, ad.advisor_name,
                         ${NAME('u')} AS client_name, sd.company_name, pc.commission_id AS cid
                  ${from}
+                 LEFT JOIN advisor ad ON ad.advisor_id = ot.advisor_id
                  WHERE ${where}
                  ORDER BY ot.order_id DESC
                  LIMIT ${(page - 1) * perPage}, ${perPage}`,
@@ -299,7 +302,7 @@ const dashboardController = {
                 const stage = stageOf(r);
                 const closed = stage.tone === 'closed';
                 const completed = stage.tone === 'done';
-                const eligible = completed && num(r.mas) !== 1 && !(r.t === 'BUY' && num(r.advisor_id) === 2);
+                const eligible = completed && num(r.mas) !== 1 && !(r.t === 'BUY' && r.advisor_name === 'OTHER');
                 let payout = { label: '-', tone: 'none' };
                 if (!closed) {
                     if (!completed) payout = { label: 'Not yet earned', tone: 'notyet' };
