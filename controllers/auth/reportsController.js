@@ -137,6 +137,12 @@ const DEFS = {};
 /* ===== 1. Orders ===== */
 DEFS.orders = {
     title: 'Order Reports',
+    notes: [
+        'Shows all buy and sell orders, excluding special orders (OTHER advisor and mark-as-sold).',
+        'Each order shows its progress through three stages: RM approval, AM confirmation, and ST completion.',
+        'Filter by order status (running, completed, cancelled), stages, or by advisor, broker, and partner.',
+        'Completed orders show the full order value; running orders show partial amounts as they progress.',
+    ],
     columns: [
         text('order_custom_id', 'Order ID'), when('order_date', 'Order date'), text('client_name', 'Client'),
         text('rm_name', 'RM', { pdf: false }), text('partner_name', 'Partner', { pdf: false }), text('company_name', 'Company'),
@@ -194,6 +200,12 @@ DEFS.orders = {
 /* ===== 1b. Other Orders (BUY with OTHER advisor, SELL with MarkAsSold) ===== */
 DEFS.otherOrders = {
     title: 'Other Orders',
+    notes: [
+        'Shows special orders: BUY orders placed with OTHER advisor and SELL orders marked as sold.',
+        'These orders are tracked separately for reporting and do not count toward revenue targets.',
+        'Each order shows its three-stage progress (RM, AM, ST) and current completion status.',
+        'Use this report to monitor special orders and ensure they are properly processed and documented.',
+    ],
     columns: [
         text('order_custom_id', 'Order ID'), when('order_date', 'Order date'), text('client_name', 'Client'),
         text('rm_name', 'RM', { pdf: false }), text('partner_name', 'Partner', { pdf: false }), text('company_name', 'Company'),
@@ -251,6 +263,12 @@ DEFS.otherOrders = {
 /* ===== 2. Payments ===== */
 DEFS.payments = {
     title: 'Payment Reports',
+    notes: [
+        'Shows all payments: amounts received from customers (BUY) and amounts paid to sellers (SELL).',
+        'Filter by payment status (received, pending, not received), payment type (full or partial), or by RM.',
+        'Each row shows the order, client, payment amount, and approval status from both RM and AM.',
+        'NOT RECEIVED payments mean the AM marked the payment as not yet received; they still appear for review.',
+    ],
     columns: [
         text('payment_custom_id', 'Payment ID'), text('order_custom_id', 'Order ID'), when('payment_date', 'Date'),
         text('client_name', 'Client'), text('rm_name', 'RM', { pdf: false }), text('company_name', 'Company', { pdf: false }),
@@ -306,6 +324,12 @@ const RR_ORDER_REFUNDED = `(SELECT IFNULL(SUM(rt3.amount), 0) FROM refund_transa
 const RR_REMAINING = `IF(rr.status IN ('Pending', 'Accepted'), GREATEST(${RR_RECEIVED} - ${RR_ORDER_REFUNDED}, 0), 0)`;
 DEFS.refunds = {
     title: 'Refund Reports',
+    notes: [
+        'Shows all refund requests raised on completed BUY orders, tracking requests from start to completion.',
+        'Each request shows how much was received from the client, how much has been refunded, and how much remains.',
+        'Filter by request status: Pending (waiting for AM review), Accepted (approved), Rejected, or Completed.',
+        'Use this to track refund progress and ensure all customer money is accounted for and returned properly.',
+    ],
     columns: [
         text('request_id', 'Request ID'), text('order_custom_id', 'Order ID'), when('requested_at', 'Requested'),
         text('client_name', 'Client'), text('rm_name', 'RM', { pdf: false }), text('company_name', 'Company', { pdf: false }),
@@ -353,6 +377,12 @@ const P_DEALS = `(SELECT COUNT(*) FROM order_transactions ot WHERE ot.addedPartn
 const P_BUSINESS = `(SELECT IFNULL(SUM(${VALUE}), 0) FROM order_transactions ot WHERE ot.addedPartnerID = pu.user_id AND NOT ${CLOSED})`;
 DEFS.partners = {
     title: 'Partner Reports',
+    notes: [
+        'Shows all verified partners with their KYC completion status (Aadhar, PAN, CMR, Stamp) and bank verification.',
+        'Access shows "Unlocked" (fully verified) or "Locked" (waiting on documents or bank verification).',
+        'Each row shows how many prospects, orders and actual deals each partner has brought, plus total business value.',
+        'Use this report to track partner verification progress and their business contribution.',
+    ],
     columns: [
         text('user_custum_id', 'Partner ID'), text('partner_name', 'Partner'), text('phone_number', 'Phone', { pdf: false }),
         text('email', 'Email', { pdf: false }), text('rm_name', 'RM'), text('business_type', 'Business type', { pdf: false }),
@@ -395,6 +425,12 @@ DEFS.partners = {
 /* ===== 6. Share Debit ===== */
 DEFS['share-debit'] = {
     title: 'Share Debit Reports',
+    notes: [
+        'Shows orders that have completed all stages (RM, AM, ST) and have received a unique Share Debit ID for the share transfer.',
+        'Share Debit represents the official share transfer document generated when the order is fully processed and ready for the depository.',
+        'Filter by order type (buy/sell), source (partner/direct), broker, or whether a document has been uploaded.',
+        'Use this report to track completion of share transfers and ensure all documentation is in place.',
+    ],
     columns: [
         text('share_debit_invoice', 'Share Debit ID'), text('order_custom_id', 'Order ID'), when('transfer_date', 'Transfer date'),
         text('client_name', 'Client'), text('rm_name', 'RM', { pdf: false }), text('partner_name', 'Partner', { pdf: false }),
@@ -443,6 +479,12 @@ const PR_STOCK_NAMES = `(SELECT GROUP_CONCAT(DISTINCT s2.stock_name ORDER BY s2.
 const PR_ORDERS = `(SELECT COUNT(*) FROM partner_stock_orders pso WHERE pso.partner_prospect_id = pr.partner_prospect_id)`;
 DEFS.prospects = {
     title: 'Prospect Reports',
+    notes: [
+        'Shows all prospects added by partners: potential clients, their contact info, and the stocks they are interested in.',
+        'Lead type shows whether they are prospects, new leads, or already converted to paying clients. Lead status tracks the conversation status.',
+        'Filter by lead type, lead status, partner, or RM. See how many stocks each prospect is interested in and how many orders they have placed.',
+        'Use this to monitor prospect progress and ensure follow-ups are on schedule.',
+    ],
     columns: [
         count('partner_prospect_id', 'ID'), when('lead_date', 'Lead date'), text('partner_name', 'Partner'),
         text('client_name', 'Client / firm'), status('client_type', 'Client type', { pdf: false }), text('phone', 'Phone', { pdf: false }),
@@ -504,10 +546,10 @@ DEFS.commissions = {
         money('tds_total', 'TDS (paid)'), money('gst_total', 'GST (paid)'), money('payable_total', 'Payable (paid)'),
     ],
     notes: [
-        'Commission is gross, before TDS and GST, and uses the same formula as the partner commission screens (per share rounded to 2 decimals, times quantity).',
-        'Paid means the AM recorded a commission payment for the order; pending means no payment is recorded yet.',
-        'TDS, GST and Payable are shown for paid orders only, from the TDS and GST percentages saved with the payment.',
-        'An order with no partner price is calculated with a partner price of 0, as the screens do.',
+        'Shows gross commission earned by partners on completed orders (before taxes). The amount is shown per share and then multiplied by quantity.',
+        'Paid status means the AM recorded a payment; pending means no payment recorded yet. Only paid orders show tax and final payable amounts.',
+        'TDS and GST percentages are set when the AM records the payment. Payable is the gross amount minus taxes.',
+        'Filter by partner, transaction type (buy/sell), and payment status (paid/pending) to find specific commissions.',
     ],
 };
 
@@ -526,10 +568,10 @@ DEFS.financial = {
         money('commission_paid', 'Commission paid'), money('commission_pending', 'Commission pending'), money('net_flow', 'Net flow'),
     ],
     notes: [
-        'Buy received and sell paid out count payments the AM confirmed (RECEVIED); pending counts payments still PENDING. NOT_RECEIVED payments are in the Payment report only.',
-        'Refunds processed are refund slots with status REFUNDED. Commission is gross and follows the Commission report.',
-        'Net flow = buy received - sell paid out - refunds processed - commission paid. It is a cash summary of the recorded transactions, not an accounting statement.',
-        'With no date range the last 12 months are shown. Months are IST calendar months.',
+        'Monthly breakdown of all money: received from customers (buy), paid to sellers (sell), refunded to customers, and paid as commissions.',
+        'Received/paid amounts only count confirmed payments. Pending shows money still being processed. Net flow = money in minus money out minus refunds minus commissions.',
+        'Default shows last 12 months. Use date filters to see specific time periods. All dates are in India Standard Time (IST).',
+        'This is a cash summary of recorded transactions only, not a full accounting or balance-sheet statement.',
     ],
 };
 
@@ -547,11 +589,10 @@ DEFS.performance = {
         count('completed_orders', 'Completed orders'), count('refunds_reviewed', 'Refunds reviewed'), count('refunds_processed', 'Refunds processed'),
     ],
     notes: [
-        'Only data the database really records is reported. A dash means the database does not record that activity for that role.',
-        'RM: orders are the orders whose owner RM is that RM (client assignment, else the partner assignment). Order date is the date range.',
-        'AM: refund reviews and refund slots processed are recorded per user. Payments count only rows that carry a recorded acting user (last_action_by, migration 004).',
-        'ST: the database does not record which ST user completed a share transfer, so no ST activity can be shown.',
-        'The AM and ST stage completions on orders are not attributed to a person anywhere in the database, so they are not counted.',
+        'Shows activity by employees: RMs by their assigned clients and orders handled, AMs by refunds reviewed and processed, ST by share transfers completed.',
+        'A dash (–) means that activity type is not tracked in the database for that role.',
+        'Refunds raised and reviewed are only counted when the person who took that action is recorded. Commission and order completion credits are not attributed to individuals in the database.',
+        'Use date filters to see performance within specific time periods.',
     ],
 };
 
