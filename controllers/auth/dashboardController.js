@@ -45,7 +45,8 @@ const CREATED_IST = `CONVERT_TZ(ot.created_at, '+00:00', '+05:30')`;
 const BUCKET = `CASE
     WHEN NOT (${ELIGIBLE}) THEN 'CLOSED'
     WHEN ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED' THEN 'DONE'
-    WHEN ot.rm_status <> 'COMPLETED' THEN 'PENDING'
+    WHEN ot.rm_status <> 'COMPLETED' THEN
+        IF(ot.transaction_type = 'SELL' AND ot.rm_status = 'PROCCESSING', 'APPROVED', 'PENDING')
     WHEN ot.transaction_type = 'BUY' AND ot.am_status <> 'COMPLETED' THEN
         IF(EXISTS (SELECT 1 FROM payment_transactions pt WHERE pt.order_id = ot.order_id), 'PAYMENT_PENDING', 'APPROVED')
     WHEN ot.transaction_type = 'BUY' THEN 'SHARE_TRANSFER'
@@ -320,8 +321,9 @@ const dashboardController = {
     /* ---------------------------------------------------------------
      * GET /dashboard/rm/running-orders?type=all|user|partner&limit=6
      * Running = not finished, not rejected / cancelled, not a mark-as-sold order:
-     *   PENDING          RM stage not approved yet
-     *   APPROVED         RM approved, BUY, no payment entered yet
+     *   PENDING          RM stage not approved yet (BUY and SELL except PROCCESSING)
+     *   APPROVED         BUY: RM approved, no payment entered yet.
+     *                    SELL: RM status = PROCCESSING
      *   PAYMENT_PENDING  BUY: payment entered but AM not completed.
      *                    SELL: share debited (ST done), AM payment pending
      *   SHARE_TRANSFER   BUY: AM completed, ST pending.  SELL: RM approved, ST (share debit) pending

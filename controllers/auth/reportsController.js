@@ -34,6 +34,7 @@ const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 
 const REPORT_ROLES = {
     orders: ['RM', 'AM', 'ST'],
+    otherOrders: ['RM', 'AM', 'ST'],
     'share-debit': ['RM', 'AM', 'ST'],
     partners: ['RM', 'AM', 'ST'],
     prospects: ['RM', 'AM', 'ST'],
@@ -147,7 +148,7 @@ DEFS.orders = {
         transaction_type: en('BUY', 'SELL'), order_status: en('running', 'completed', 'closed'),
         rm_status: en(...STAGE), am_status: en(...STAGE), st_status: en(...STAGE),
         refund_status: en('NONE', 'REQUESTED', 'ACCEPTED', 'PARTIALLY_REFUNDED', 'REFUNDED'),
-        source: en('partner', 'direct'), selling_type: en('THANGIV', 'MARK_AS_SOLD'),
+        source: en('partner', 'direct'),
         advisor_id: idNum(), broker_id: idNum(), partner_id: idNum(), rm_id: idNum(),
     },
     from: `FROM order_transactions ot ${ORDER_JOINS}
@@ -161,6 +162,7 @@ DEFS.orders = {
     dateExpr: CREATED_IST,
     scope: scopeOwner,
     search: ['ot.order_custom_id', NAME('u'), 'u.username', 'sd.company_name', NAME('p')],
+    baseWhere: `NOT ((ot.transaction_type = 'BUY' AND ad.advisor_name = 'OTHER') OR (ot.transaction_type = 'SELL' AND ot.markAsSold = 1))`,
     filters: (f, actor) => [
         f.transaction_type && `ot.transaction_type = ${sqlStr(f.transaction_type)}`,
         f.order_status === 'closed' && CLOSED,
@@ -171,8 +173,63 @@ DEFS.orders = {
         f.st_status && `ot.st_status = ${sqlStr(f.st_status)}`,
         f.refund_status && `ot.refund_status = ${sqlStr(f.refund_status)}`,
         sourceFilter(f),
-        f.selling_type === 'MARK_AS_SOLD' && `ot.markAsSold = 1`,
-        f.selling_type === 'THANGIV' && `IFNULL(ot.markAsSold, 0) <> 1`,
+        f.advisor_id && `ot.advisor_id = ${Number(f.advisor_id)}`,
+        f.broker_id && `ot.broker_id = ${Number(f.broker_id)}`,
+        f.partner_id && `ot.addedPartnerID = ${Number(f.partner_id)}`,
+        rmFilter(f, actor),
+    ],
+    orderBy: 'ot.order_id DESC',
+    summary: [
+        count('total', 'Orders', { expr: 'COUNT(*)' }),
+        money('total_value', 'Total value', { expr: `IFNULL(SUM(${VALUE}), 0)` }),
+        count('buy_count', 'Buy orders', { expr: `IFNULL(SUM(ot.transaction_type = 'BUY'), 0)` }),
+        money('buy_value', 'Buy value', { expr: `IFNULL(SUM(IF(ot.transaction_type = 'BUY', ${VALUE}, 0)), 0)` }),
+        count('sell_count', 'Sell orders', { expr: `IFNULL(SUM(ot.transaction_type = 'SELL'), 0)` }),
+        money('sell_value', 'Sell value', { expr: `IFNULL(SUM(IF(ot.transaction_type = 'SELL', ${VALUE}, 0)), 0)` }),
+        count('completed', 'Completed', { expr: `IFNULL(SUM(${ALL_DONE} AND NOT ${CLOSED}), 0)` }),
+        count('closed', 'Cancelled', { expr: `IFNULL(SUM(${CLOSED}), 0)` }),
+    ],
+};
+
+/* ===== 1b. Other Orders (BUY with OTHER advisor, SELL with MarkAsSold) ===== */
+DEFS.otherOrders = {
+    title: 'Other Orders',
+    columns: [
+        text('order_custom_id', 'Order ID'), when('order_date', 'Order date'), text('client_name', 'Client'),
+        text('rm_name', 'RM', { pdf: false }), text('partner_name', 'Partner', { pdf: false }), text('company_name', 'Company'),
+        status('transaction_type', 'Type'), count('quantity', 'Qty'), money('price', 'Price'), money('order_value', 'Order value'),
+        status('rm_status', 'RM', { pdf: false }), status('am_status', 'AM', { pdf: false }), status('st_status', 'ST', { pdf: false }),
+        status('refund_status', 'Refund', { pdf: false }), status('order_status', 'Status'),
+    ],
+    joi: {
+        transaction_type: en('BUY', 'SELL'), order_status: en('running', 'completed', 'closed'),
+        rm_status: en(...STAGE), am_status: en(...STAGE), st_status: en(...STAGE),
+        refund_status: en('NONE', 'REQUESTED', 'ACCEPTED', 'PARTIALLY_REFUNDED', 'REFUNDED'),
+        source: en('partner', 'direct'),
+        advisor_id: idNum(), broker_id: idNum(), partner_id: idNum(), rm_id: idNum(),
+    },
+    from: `FROM order_transactions ot ${ORDER_JOINS}
+    LEFT JOIN advisor ad ON ad.advisor_id = ot.advisor_id
+    LEFT JOIN broker br ON br.broker_id = ot.broker_id`,
+    select: `ot.order_custom_id AS order_custom_id, ${FMT(CREATED_IST)} AS order_date, ${NAME('u')} AS client_name,
+        ${NAME('rm')} AS rm_name, ${NAME('p')} AS partner_name, sd.company_name AS company_name,
+        ot.transaction_type AS transaction_type, ot.quantity AS quantity, ot.price_per_share AS price, ${VALUE} AS order_value,
+        ot.rm_status AS rm_status, ot.am_status AS am_status, ot.st_status AS st_status, ot.refund_status AS refund_status,
+        CASE WHEN ${CLOSED} THEN 'Cancelled' WHEN ${ALL_DONE} THEN 'Completed' ELSE 'Running' END AS order_status`,
+    dateExpr: CREATED_IST,
+    scope: scopeOwner,
+    search: ['ot.order_custom_id', NAME('u'), 'u.username', 'sd.company_name', NAME('p')],
+    baseWhere: `(ot.transaction_type = 'BUY' AND ad.advisor_name = 'OTHER') OR (ot.transaction_type = 'SELL' AND ot.markAsSold = 1)`,
+    filters: (f, actor) => [
+        f.transaction_type && `ot.transaction_type = ${sqlStr(f.transaction_type)}`,
+        f.order_status === 'closed' && CLOSED,
+        f.order_status === 'completed' && `(${ALL_DONE} AND NOT ${CLOSED})`,
+        f.order_status === 'running' && `(NOT ${ALL_DONE} AND NOT ${CLOSED})`,
+        f.rm_status && `ot.rm_status = ${sqlStr(f.rm_status)}`,
+        f.am_status && `ot.am_status = ${sqlStr(f.am_status)}`,
+        f.st_status && `ot.st_status = ${sqlStr(f.st_status)}`,
+        f.refund_status && `ot.refund_status = ${sqlStr(f.refund_status)}`,
+        sourceFilter(f),
         f.advisor_id && `ot.advisor_id = ${Number(f.advisor_id)}`,
         f.broker_id && `ot.broker_id = ${Number(f.broker_id)}`,
         f.partner_id && `ot.addedPartnerID = ${Number(f.partner_id)}`,

@@ -122,6 +122,8 @@ router.get('/reports/performance', auth, reportsController.performanceReport);
 router.get('/reports/performance/export', auth, reportsController.performanceExport);
 router.get('/reports/financial', auth, reportsController.financialReport);
 router.get('/reports/financial/export', auth, reportsController.financialExport);
+router.get('/reports/other-orders', auth, reportsController.otherOrdersReport);
+router.get('/reports/other-orders/export', auth, reportsController.otherOrdersExport);
 router.get('/partner-reports/orders', auth, partnerReportsController.ordersReport);
 router.get('/partner-reports/orders/export', auth, partnerReportsController.ordersExport);
 router.get('/partner-reports/commissions', auth, partnerReportsController.commissionsReport);
