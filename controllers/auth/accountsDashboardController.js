@@ -259,6 +259,32 @@ async function paymentTotals(type, start, end, next) {
     return out;
 }
 
+async function sellOutstandingBalance(start, end, next) {
+    // Calculate outstanding balance for SELL orders (Deal Value - AM Verified Payments)
+    const rows = await getData(
+        `SELECT
+            COUNT(DISTINCT ot.order_id) AS count,
+            IFNULL(SUM((ot.price_per_share * ot.quantity) - COALESCE(am_payment_sum.total_paid_am, 0)), 0) AS amount
+         FROM order_transactions ot
+         LEFT JOIN (
+            SELECT order_id, SUM(amount) AS total_paid_am
+            FROM payment_transactions
+            WHERE am_status = 'RECEVIED'
+            GROUP BY order_id
+         ) am_payment_sum ON am_payment_sum.order_id = ot.order_id
+         WHERE ot.transaction_type = 'SELL'
+         AND ot.rm_status = 'COMPLETED'
+         AND ot.am_status IN ('PENDING', 'PROCCESSING')
+         AND (ot.price_per_share * ot.quantity) > COALESCE(am_payment_sum.total_paid_am, 0)
+         ${rangeCond('ot.st_datetime', start, end)}`,
+        next
+    );
+    return {
+        count: num(rows?.[0]?.count),
+        amount: round2(num(rows?.[0]?.amount))
+    };
+}
+
 async function refundTotals(start, end, next) {
     const processedRows = await getData(
         `SELECT COUNT(*) AS c, IFNULL(SUM(rt.amount), 0) AS a
@@ -291,6 +317,7 @@ function partnerTotals(partnerRows, start, end) {
 async function buildTotals(start, end, partnerRows, next) {
     const buy = await paymentTotals('BUY', start, end, next);
     const sell = await paymentTotals('SELL', start, end, next);
+    const sellOutstanding = await sellOutstandingBalance(start, end, next);
     const refund = await refundTotals(start, end, next);
     const partner = partnerTotals(partnerRows, start, end);
 
@@ -300,7 +327,7 @@ async function buildTotals(start, end, partnerRows, next) {
     });
     return {
         buy: { ...card(buy.done, buy.pending), verified: buy.done, pending: buy.pending },
-        sell: { ...card(sell.done, sell.pending), paid_out: sell.done, pending: sell.pending },
+        sell: { ...card(sell.done, sell.pending), paid_out: sell.done, pending: { count: sellOutstanding.count, amount: sellOutstanding.amount } },
         refund: { ...card(refund.processed, refund.pending), processed: refund.processed, pending: refund.pending },
         partner: { ...card(partner.paid, partner.pending), paid: partner.paid, pending: partner.pending },
     };
@@ -312,20 +339,30 @@ async function fetchPaymentRows(kind, w, limit, next) {
     const dateExpr = isBuy ? BUY_DATE : SELL_DATE;
     const rows = await getData(
         `SELECT pt.payment_custom_id AS txn_id, ot.order_custom_id, ${NAME('u')} AS client,
-                pt.amount, pt.transaction_ref AS ref, ${FMT(dateExpr)} AS txn_date, pt.am_status
+                pt.amount, pt.transaction_ref AS ref, ${FMT(dateExpr)} AS txn_date, pt.am_status,
+                (ot.price_per_share * ot.quantity) AS deal_value,
+                COALESCE(am_payment_sum.total_paid_am, 0) AS amount_paid_am
          ${PAY_FROM}
+         LEFT JOIN (
+            SELECT order_id, SUM(amount) AS total_paid_am
+            FROM payment_transactions
+            WHERE am_status = 'RECEVIED'
+            GROUP BY order_id
+         ) am_payment_sum ON am_payment_sum.order_id = ot.order_id
          WHERE ${PAY_COND} AND ot.transaction_type = '${isBuy ? 'BUY' : 'SELL'}'${rangeCond(dateExpr, w.start, w.end)}
          ORDER BY ${dateExpr} DESC, pt.payment_id DESC${limit ? ` LIMIT ${Number(limit)}` : ''}`,
         next
     );
     return (rows || []).map((r) => {
         const done = r.am_status === 'RECEVIED';
+        const outstanding = (r.deal_value || 0) - (r.amount_paid_am || 0);
         return {
             txn_id: r.txn_id || null,
             order_id: r.order_custom_id,
             client: r.client || '-',
             type: isBuy ? 'BUY' : 'SELL',
             amount: num(r.amount),
+            outstanding_balance: num(outstanding),
             mode: null,
             ref: r.ref || null,
             date: r.txn_date,

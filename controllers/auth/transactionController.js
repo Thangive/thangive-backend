@@ -831,7 +831,11 @@ const transactionController = {
                     latest_payment.remaining_amount AS Balance,
                     latest_payment.payment_custom_id,
                     /* AM payment status of a BUY order: blank until the AM has acted on a payment row */
-                    CASE WHEN ot.transaction_type = 'BUY' THEN latest_am_payment.am_status ELSE NULL END AS am_payment_status
+                    CASE WHEN ot.transaction_type = 'BUY' THEN latest_am_payment.am_status ELSE NULL END AS am_payment_status,
+                    /* Amount paid by AM (sum of AM-verified payments) */
+                    COALESCE(am_payment_sum.total_paid_am, 0) AS amount_paid_am,
+                    /* Outstanding balance (Deal Value - Amount Paid by AM) */
+                    (ot.price_per_share * ot.quantity) - COALESCE(am_payment_sum.total_paid_am, 0) AS outstanding_balance
                 FROM order_transactions ot
                 JOIN stock_details st
                     ON ot.stock_details_id = st.stock_details_id
@@ -879,6 +883,14 @@ const transactionController = {
                         AND pa2.latest_am_payment_id = pa1.payment_id
                 ) latest_am_payment
                     ON latest_am_payment.order_id = ot.order_id
+                /* Sum of all AM-verified payments (am_status = 'RECEVIED') */
+                LEFT JOIN (
+                    SELECT order_id, SUM(amount) AS total_paid_am
+                    FROM payment_transactions
+                    WHERE am_status = 'RECEVIED'
+                    GROUP BY order_id
+                ) am_payment_sum
+                    ON am_payment_sum.order_id = ot.order_id
                 WHERE 1
             `;
 
