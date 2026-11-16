@@ -33,6 +33,12 @@ const ELIGIBLE = `ot.rm_status NOT IN ('REJECTED', 'CANCEL')
     AND ot.st_status NOT IN ('REJECTED', 'CANCEL')
     AND ot.cancellation_status <> 'COMPLETED'`;
 const VALUE = `(ot.price_per_share * ot.quantity)`;
+// Exclude other-advisor BUY orders and mark-as-sold SELL orders from monetary calculations
+const VALUE_ELIGIBLE = `CASE
+    WHEN ot.transaction_type = 'BUY' AND ot.advisor_id <> 1 THEN 0
+    WHEN ot.transaction_type = 'SELL' AND IFNULL(ot.markAsSold, 0) = 1 THEN 0
+    ELSE ${VALUE}
+END`;
 const CREATED_IST = `CONVERT_TZ(ot.created_at, '+00:00', '+05:30')`;
 
 /* Running-order stage of one order (see getRunningOrders for the meaning) */
@@ -169,7 +175,7 @@ async function fetchCompletedOrderAggregates(rmId, w, next) {
             IFNULL(SUM((1 - x.is_partner) * (1 - x.is_buy)), 0) AS user_sell_count
          FROM (
             SELECT
-                ${VALUE} AS val,
+                ${VALUE_ELIGIBLE} AS val,
                 (ot.transaction_type = 'BUY') AS is_buy,
                 (ot.addedPartnerID IS NOT NULL) AS is_partner,
                 (${completionDateIST} >= '${w.start}' AND ${completionDateIST} < '${w.next}') AS in_month
@@ -239,7 +245,7 @@ const dashboardController = {
             const completionDateIST = `IFNULL(ot.st_datetime, ${CREATED_IST})`;
 
             const achievedRows = await getData(
-                `SELECT IFNULL(SUM(${VALUE}), 0) AS achieved, COUNT(*) AS orders
+                `SELECT IFNULL(SUM(${VALUE_ELIGIBLE}), 0) AS achieved, COUNT(*) AS orders
                  ${FROM_ORDERS}
                  WHERE ${OWNER_RM} = ${Number(rm.user_id)} AND ${ELIGIBLE} AND ${completedCondition}
                    AND ${completionDateIST} >= '${w.start}' AND ${completionDateIST} < '${w.next}'`,
@@ -252,8 +258,8 @@ const dashboardController = {
             // Only count COMPLETED orders.
             const perRm = await getData(
                 `SELECT ${OWNER_RM} AS rm_id,
-                        IFNULL(SUM(CASE WHEN ${completionDateIST} >= '${w.start}' THEN ${VALUE} ELSE 0 END), 0) AS live_value,
-                        IFNULL(SUM(CASE WHEN ${completionDateIST} < '${w.start}' THEN ${VALUE} ELSE 0 END), 0) AS prev_value
+                        IFNULL(SUM(CASE WHEN ${completionDateIST} >= '${w.start}' THEN ${VALUE_ELIGIBLE} ELSE 0 END), 0) AS live_value,
+                        IFNULL(SUM(CASE WHEN ${completionDateIST} < '${w.start}' THEN ${VALUE_ELIGIBLE} ELSE 0 END), 0) AS prev_value
                  ${FROM_ORDERS}
                  WHERE ${ELIGIBLE} AND ${completedCondition} AND ${OWNER_RM} IS NOT NULL
                    AND ${completionDateIST} >= '${w.prevStart}' AND ${completionDateIST} < '${w.next}'
@@ -480,7 +486,7 @@ const dashboardController = {
                 `SELECT DATE_FORMAT(${completionDateIST}, '%Y-%m') AS ym,
                         ot.transaction_type AS t,
                         COUNT(*) AS c,
-                        IFNULL(SUM(${VALUE}), 0) AS v
+                        IFNULL(SUM(${VALUE_ELIGIBLE}), 0) AS v
                  ${FROM_ORDERS}
                  WHERE ${OWNER_RM} = ${Number(rm.user_id)} AND ${ELIGIBLE} AND ${completedCondition}
                    AND ${completionDateIST} >= '${rangeStart}' AND ${completionDateIST} < '${w.next}'
