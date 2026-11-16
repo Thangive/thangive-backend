@@ -480,7 +480,7 @@ DEFS.performance = {
         count('refunds_raised', 'Refunds raised'), count('refunds_reviewed', 'Refunds reviewed'), count('refunds_processed', 'Refunds processed'),
         money('refund_amount_processed', 'Refund amount processed'), count('payments_actioned', 'Payments with recorded actor'),
     ],
-    joi: { role: en('RM', 'AM', 'ST') },
+    joi: { rm_id: idNum() },
     summary: [
         count('employees', 'Employees'), count('orders', 'Orders (RM owned)'), money('order_value', 'Order value (RM owned)'),
         count('completed_orders', 'Completed orders'), count('refunds_reviewed', 'Refunds reviewed'), count('refunds_processed', 'Refunds processed'),
@@ -749,10 +749,13 @@ async function runPerformance(def, f, actor, all, next) {
     const hasActor = await colExists('payment_transactions', 'last_action_by', next);
     const rc = (expr) => rangeCond(expr, f.start, f.end);
 
-    const conds = [`e.user_type IN ('RM', 'AM', 'ST')`, 'e.is_deleted = 0', 'e.is_verified = 1'];
-    if (actor.user_type === 'RM') conds.push(`e.user_id = ${Number(actor.user_id)}`);
-    if (f.role) conds.push(`e.user_type = ${sqlStr(f.role)}`);
-    if (f.search) conds.push(`(${[NAME('e'), 'e.user_custum_id', 'e.username'].map((x) => `${x} LIKE ${likeStr(f.search)}`).join(' OR ')})`);
+    // RM employees only. AM and ST can view all RMs; RM can only view their own.
+    const conds = [`e.user_type = 'RM'`, 'e.is_deleted = 0', 'e.is_verified = 1'];
+    if (actor.user_type === 'RM') {
+        conds.push(`e.user_id = ${Number(actor.user_id)}`);
+    } else if (f.rm_id) {
+        conds.push(`e.user_id = ${Number(f.rm_id)}`);
+    }
 
     const ownedOrders = (extraSelect, extraWhere = '') => `(SELECT ${extraSelect}
         FROM order_transactions ot
@@ -774,7 +777,7 @@ async function runPerformance(def, f, actor, all, next) {
             ${hasActor ? `IF(e.user_type = 'AM', (SELECT COUNT(*) FROM payment_transactions pt WHERE pt.last_action_by = e.user_id${rc(IST('pt.updated_on'))}), NULL)` : 'NULL'} AS payments_actioned
          FROM users e
          WHERE ${conds.map((c) => `(${c})`).join(' AND ')}
-         ORDER BY FIELD(e.user_type, 'RM', 'AM', 'ST'), e.user_id`,
+         ORDER BY e.user_id`,
         next
     );
 
