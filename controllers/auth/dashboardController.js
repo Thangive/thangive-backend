@@ -518,6 +518,92 @@ const dashboardController = {
             next(error);
         }
     },
+
+    /* ---------------------------------------------------------------
+     * GET /dashboard/rm/mark-as-sold-orders?limit=6
+     * SELL orders marked as sold (markAsSold = 1) with status counts
+     * --------------------------------------------------------------- */
+    async rmMarkAsSoldOrders(req, res, next) {
+        try {
+            const rm = await requireRm(req, next);
+            if (!rm) return;
+
+            const { error, value } = Joi.object({
+                limit: Joi.number().integer().min(1).max(200).default(6),
+            }).validate(req.query);
+            if (error) return next(error);
+
+            const inner = `
+                SELECT
+                    ot.order_id, ot.order_custom_id, ot.transaction_type, ot.quantity,
+                    ${VALUE} AS order_value,
+                    ot.created_at,
+                    (ot.addedPartnerID IS NOT NULL) AS is_partner,
+                    TRIM(CONCAT_WS(' ', u.first_name, u.middle_name, u.last_name)) AS client_name,
+                    u.username AS client_username,
+                    TRIM(CONCAT_WS(' ', p.first_name, p.middle_name, p.last_name)) AS partner_name,
+                    sd.company_name,
+                    ot.markAsSoldStatus AS bucket
+                ${FROM_ORDERS}
+                JOIN stock_details sd ON sd.stock_details_id = ot.stock_details_id
+                WHERE ${OWNER_RM} = ${Number(rm.user_id)}
+                  AND ot.markAsSold = 1
+                  AND ot.transaction_type = 'SELL'`;
+
+            const counts = await getData(
+                `SELECT x.bucket, COUNT(*) AS c FROM (${inner}) x
+                 WHERE x.bucket IN ('PENDING', 'APPROVED', 'CANCELLED') GROUP BY x.bucket`,
+                next
+            );
+            const rows = await getData(
+                `SELECT x.* FROM (${inner}) x
+                 WHERE x.bucket IN ('PENDING', 'APPROVED', 'CANCELLED')
+                 ORDER BY x.order_id DESC
+                 LIMIT ${Number(value.limit)}`,
+                next
+            );
+
+            const buckets = { pending: 0, accepted: 0, rejected: 0 };
+            (counts || []).forEach((c) => {
+                const bucket = String(c.bucket).toLowerCase();
+                if (bucket === 'pending') buckets.pending = num(c.c);
+                else if (bucket === 'approved') buckets.accepted = num(c.c);
+                else if (bucket === 'cancelled') buckets.rejected = num(c.c);
+            });
+            const total = Object.values(buckets).reduce((s, n) => s + n, 0);
+
+            const statusLabel = (r) => {
+                if (r.bucket === 'PENDING') return 'Pending';
+                if (r.bucket === 'APPROVED') return 'Accepted';
+                if (r.bucket === 'CANCELLED') return 'Rejected';
+                return '-';
+            };
+
+            return res.json({
+                success: true,
+                data: {
+                    total,
+                    buckets,
+                    rows: (rows || []).map((r) => ({
+                        order_id: r.order_id,
+                        order_custom_id: r.order_custom_id,
+                        client_name: r.client_name || r.client_username || '-',
+                        is_partner: !!num(r.is_partner),
+                        partner_name: r.partner_name || null,
+                        company_name: r.company_name,
+                        transaction_type: r.transaction_type,
+                        quantity: num(r.quantity),
+                        order_value: num(r.order_value),
+                        status: statusLabel(r),
+                        bucket: r.bucket,
+                        created_at: r.created_at,
+                    })),
+                },
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
 };
 
 export default dashboardController;

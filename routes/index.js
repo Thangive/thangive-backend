@@ -79,6 +79,7 @@ router.get('/refundRequests', auth, refundController.getRefundRequests);
 router.get('/dashboard/rm/overview', auth, dashboardController.rmOverview);
 router.get('/dashboard/rm/contest', auth, dashboardController.rmContest);
 router.get('/dashboard/rm/running-orders', auth, dashboardController.rmRunningOrders);
+router.get('/dashboard/rm/mark-as-sold-orders', auth, dashboardController.rmMarkAsSoldOrders);
 router.get('/dashboard/rm/orders-summary', auth, dashboardController.rmOrdersSummary);
 router.get('/dashboard/rm/month-on-month', auth, dashboardController.rmMonthOnMonth);
 
