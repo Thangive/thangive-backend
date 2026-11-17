@@ -40,6 +40,9 @@ const VALUE_ELIGIBLE = `CASE
     WHEN ot.transaction_type = 'SELL' AND IFNULL(ot.markAsSold, 0) = 1 THEN 0
     ELSE ${VALUE}
 END`;
+// Exclude BUY orders classified as "Other Order" and SELL orders marked as sold from order counts
+const COUNT_ELIGIBLE = `NOT ((ot.transaction_type = 'BUY' AND ad.advisor_name = 'OTHER')
+    OR (ot.transaction_type = 'SELL' AND IFNULL(ot.markAsSold, 0) = 1))`;
 const CREATED_IST = `CONVERT_TZ(ot.created_at, '+00:00', '+05:30')`;
 
 /* Running-order stage of one order (see getRunningOrders for the meaning) */
@@ -142,7 +145,7 @@ async function fetchOrderAggregates(rmId, w, next) {
                     AND IFNULL(ot.st_datetime, ${CREATED_IST}) >= '${w.start}'
                     AND IFNULL(ot.st_datetime, ${CREATED_IST}) < '${w.next}') AS completed_month
             ${FROM_ORDERS}
-            WHERE ${OWNER_RM} = ${Number(rmId)} AND ${ELIGIBLE}
+            WHERE ${OWNER_RM} = ${Number(rmId)} AND ${ELIGIBLE} AND ${COUNT_ELIGIBLE}
          ) x`,
         next
     );
@@ -182,7 +185,7 @@ async function fetchCompletedOrderAggregates(rmId, w, next) {
                 (ot.addedPartnerID IS NOT NULL) AS is_partner,
                 (${completionDateIST} >= '${w.start}' AND ${completionDateIST} < '${w.next}') AS in_month
             ${FROM_ORDERS}
-            WHERE ${OWNER_RM} = ${Number(rmId)} AND ${ELIGIBLE} AND ${completedCondition}
+            WHERE ${OWNER_RM} = ${Number(rmId)} AND ${ELIGIBLE} AND ${COUNT_ELIGIBLE} AND ${completedCondition}
          ) x`,
         next
     );
@@ -249,7 +252,7 @@ const dashboardController = {
             const achievedRows = await getData(
                 `SELECT IFNULL(SUM(${VALUE_ELIGIBLE}), 0) AS achieved, COUNT(*) AS orders
                  ${FROM_ORDERS}
-                 WHERE ${OWNER_RM} = ${Number(rm.user_id)} AND ${ELIGIBLE} AND ${completedCondition}
+                 WHERE ${OWNER_RM} = ${Number(rm.user_id)} AND ${ELIGIBLE} AND ${COUNT_ELIGIBLE} AND ${completedCondition}
                    AND ${completionDateIST} >= '${w.start}' AND ${completionDateIST} < '${w.next}'`,
                 next
             );
@@ -263,7 +266,7 @@ const dashboardController = {
                         IFNULL(SUM(CASE WHEN ${completionDateIST} >= '${w.start}' THEN ${VALUE_ELIGIBLE} ELSE 0 END), 0) AS live_value,
                         IFNULL(SUM(CASE WHEN ${completionDateIST} < '${w.start}' THEN ${VALUE_ELIGIBLE} ELSE 0 END), 0) AS prev_value
                  ${FROM_ORDERS}
-                 WHERE ${ELIGIBLE} AND ${completedCondition} AND ${OWNER_RM} IS NOT NULL
+                 WHERE ${ELIGIBLE} AND ${COUNT_ELIGIBLE} AND ${completedCondition} AND ${OWNER_RM} IS NOT NULL
                    AND ${completionDateIST} >= '${w.prevStart}' AND ${completionDateIST} < '${w.next}'
                  GROUP BY rm_id`,
                 next
@@ -361,7 +364,7 @@ const dashboardController = {
                 ${FROM_ORDERS}
                 JOIN stock_details sd ON sd.stock_details_id = ot.stock_details_id
                 WHERE ${OWNER_RM} = ${Number(rm.user_id)}
-                  AND IFNULL(ot.markAsSold, 0) <> 1${typeCond}`;
+                  AND ${COUNT_ELIGIBLE}${typeCond}`;
             const RUNNING = `('PENDING', 'APPROVED', 'PAYMENT_PENDING', 'SHARE_TRANSFER')`;
 
             const counts = await getData(
@@ -491,7 +494,7 @@ const dashboardController = {
                         COUNT(*) AS c,
                         IFNULL(SUM(${VALUE_ELIGIBLE}), 0) AS v
                  ${FROM_ORDERS}
-                 WHERE ${OWNER_RM} = ${Number(rm.user_id)} AND ${ELIGIBLE} AND ${completedCondition}
+                 WHERE ${OWNER_RM} = ${Number(rm.user_id)} AND ${ELIGIBLE} AND ${COUNT_ELIGIBLE} AND ${completedCondition}
                    AND ${completionDateIST} >= '${rangeStart}' AND ${completionDateIST} < '${w.next}'
                  GROUP BY ym, t`,
                 next
