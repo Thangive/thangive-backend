@@ -863,7 +863,9 @@ async function runPerformance(def, f, actor, all, next) {
         FROM order_transactions ot
         JOIN users u ON u.user_id = ot.user_id
         LEFT JOIN users p ON p.user_id = ot.addedPartnerID
-        WHERE ${OWNER_RM} = e.user_id AND NOT ${CLOSED}${extraWhere}${rc(CREATED_IST)})`;
+        WHERE ${OWNER_RM} = e.user_id AND NOT ${CLOSED}
+          AND NOT ((ot.transaction_type = 'BUY' AND ot.advisor_id = 2)
+                OR (ot.transaction_type = 'SELL' AND IFNULL(ot.markAsSold, 0) = 1))${extraWhere}${rc(CREATED_IST)})`;
 
     const rows = await getData(
         `SELECT e.user_custum_id AS employee_id, ${NAME('e')} AS employee_name, e.user_type AS role,
