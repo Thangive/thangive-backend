@@ -2161,6 +2161,22 @@ const partnerController = {
                 return next(error);
             }
 
+            /* ------------------ ROLE CHECK (permission enforcement) ------------------ */
+            const bankActor = await refundHelper.getActor(req.user?._id, next);
+            if (!bankActor) {
+                return; // getActor already sends 401 if missing
+            }
+
+            const isAdmin = bankActor.user_type === 'ADMIN';
+            const isOwnPartner = Number(bankActor.user_id) === Number(dataObj.user_id);
+
+            // ADMIN can manage any partner's banks; PARTNER can only manage their own
+            if (!isAdmin && !isOwnPartner) {
+                return next(new CustomErrorHandler(403, "You are not allowed to manage this partner's bank information"));
+            }
+
+            // If not ADMIN and trying to manage own bank, PARTNER verification lock applies
+            // (This is enforced by backend checks during update if needed; frontend also gates this)
 
             /* =====================================================
                BANK DOCUMENT
@@ -2359,7 +2375,7 @@ const partnerController = {
 
             /* =====================================================
                ADD NEW BANK
-               
+
                partner_bank_id NOT present
                => ALWAYS INSERT NEW ROW
             ===================================================== */
@@ -2370,6 +2386,16 @@ const partnerController = {
             dataObj.updated_at =
                 new Date();
 
+            /* NEW: ADMIN auto-verification for new banks */
+            // ADMIN adding bank for any partner -> Verified
+            // PARTNER adding own bank -> Pending
+            if (!dataObj.partner_bank_id) {
+                if (isAdmin) {
+                    dataObj.verification_status = 'Verified';
+                } else {
+                    dataObj.verification_status = 'Pending';
+                }
+            }
 
             const insertQuery = `
             INSERT INTO partner_bank_information
@@ -2393,9 +2419,6 @@ const partnerController = {
                IF NEW BANK IS DEFAULT
                MAKE OTHER BANKS NON DEFAULT
             ===================================================== */
-            if (!dataObj.verification_status) {
-                dataObj.verification_status = 'Pending';
-            }
             if (
                 dataObj.set_as_default === "Yes"
             ) {
@@ -2659,6 +2682,28 @@ const partnerController = {
 
             const { partner_bank_id, verification_status } = req.body;
 
+            /* ------------------ ROLE CHECK (only ADMIN or the partner can verify their own bank) ------------------ */
+            const bankVerifyActor = await refundHelper.getActor(req.user?._id, next);
+            if (!bankVerifyActor) {
+                return; // getActor already sends 401 if missing
+            }
+
+            const isAdmin = bankVerifyActor.user_type === 'ADMIN';
+            // For non-ADMIN (PARTNER), check that it's their own bank
+            if (!isAdmin) {
+                if (bankVerifyActor.user_type !== 'PARTNER') {
+                    return next(new CustomErrorHandler(403, "Only ADMIN or PARTNER can verify bank information"));
+                }
+                // If PARTNER, verify it's their own bank
+                const bankOwner = await getData(
+                    `SELECT user_id FROM partner_bank_information WHERE partner_bank_id = ${partner_bank_id} LIMIT 1`,
+                    next
+                );
+                if (!bankOwner || bankOwner.length === 0 || Number(bankOwner[0].user_id) !== Number(bankVerifyActor.user_id)) {
+                    return next(new CustomErrorHandler(403, "You can only verify your own bank information"));
+                }
+            }
+
             const exists = await getData(
                 `SELECT partner_bank_id FROM partner_bank_information WHERE partner_bank_id = ${partner_bank_id} LIMIT 1`,
                 next
@@ -2666,7 +2711,7 @@ const partnerController = {
             if (exists.length === 0) {
                 return res.status(404).json({ success: false, message: "Bank not found." });
             }
-            console.log(`Updating bank ${partner_bank_id} to status ${verification_status}`);
+
             await insertData(
                 `UPDATE partner_bank_information SET ? WHERE partner_bank_id = ${partner_bank_id}`,
                 { verification_status, updated_at: new Date() },
@@ -3651,7 +3696,17 @@ const partnerController = {
                 return next(new CustomErrorHandler(409, "Commission payment is already added for this order"));
             }
 
-            /* ------------------ INSERT COMMISSION ------------------ */
+            /* ------------------ FETCH PARTNER DEFAULT BANK (for snapshot) ------------------ */
+            const partnerId = orderRows[0].addedPartnerID;
+            const defaultBankRows = await getData(
+                `SELECT partner_bank_id, bank_account_name, bank_account_number, account_type, bank_name, neft_code, swift_code, micr_code, bank_branch_address
+                 FROM partner_bank_information
+                 WHERE user_id = ${Number(partnerId)} AND set_as_default = 'Yes'
+                 LIMIT 1`,
+                next
+            );
+
+            /* ------------------ INSERT COMMISSION WITH BANK SNAPSHOT ------------------ */
             // inv_number is copied from the order by the database trigger
             const commissionData = {
                 order_id: dataObj.order_id,
@@ -3660,6 +3715,16 @@ const partnerController = {
                 payment_id: dataObj.payment_id,
                 payment_date: String(dataObj.payment_date).slice(0, 10),
                 payment_doc: dataObj.payment_doc || "",
+                // Bank snapshot: capture current default bank details
+                snapshot_bank_id: defaultBankRows && defaultBankRows.length > 0 ? defaultBankRows[0].partner_bank_id : null,
+                snapshot_bank_account_name: defaultBankRows && defaultBankRows.length > 0 ? defaultBankRows[0].bank_account_name : null,
+                snapshot_bank_account_number: defaultBankRows && defaultBankRows.length > 0 ? defaultBankRows[0].bank_account_number : null,
+                snapshot_account_type: defaultBankRows && defaultBankRows.length > 0 ? defaultBankRows[0].account_type : null,
+                snapshot_bank_name: defaultBankRows && defaultBankRows.length > 0 ? defaultBankRows[0].bank_name : null,
+                snapshot_neft_code: defaultBankRows && defaultBankRows.length > 0 ? defaultBankRows[0].neft_code : null,
+                snapshot_swift_code: defaultBankRows && defaultBankRows.length > 0 ? defaultBankRows[0].swift_code : null,
+                snapshot_micr_code: defaultBankRows && defaultBankRows.length > 0 ? defaultBankRows[0].micr_code : null,
+                snapshot_bank_branch_address: defaultBankRows && defaultBankRows.length > 0 ? defaultBankRows[0].bank_branch_address : null,
             };
 
             const insertQuery = `
@@ -3731,7 +3796,7 @@ const partnerController = {
                 return next(new CustomErrorHandler(403, "You are not allowed to view this commission invoice"));
             }
 
-            /* ------------------ Query ------------------ */
+            /* ------------------ Query (includes snapshot columns) ------------------ */
             const query = `
             SELECT
                 pc.*,
@@ -3778,6 +3843,19 @@ const partnerController = {
             const data = await getData(query, next);
 
             const item = data[0];
+
+            /* Determine bank info: use snapshot if available, fallback to current default */
+            const bankInfo = {
+                bank_account_name: item.snapshot_bank_account_name || item.bank_account_name || "",
+                bank_account_number: item.snapshot_bank_account_number || item.bank_account_number || "",
+                account_type: item.snapshot_account_type || item.account_type || "",
+                bank_name: item.snapshot_bank_name || item.bank_name || "",
+                neft_code: item.snapshot_neft_code || item.neft_code || "",
+                swift_code: item.snapshot_swift_code || item.swift_code || "",
+                micr_code: item.snapshot_micr_code || item.micr_code || "",
+                bank_branch_address: item.snapshot_bank_branch_address || item.bank_branch_address || ""
+            };
+
             const response = {
                 commission: {
                     commission_id: item.commission_id || "",
@@ -3796,16 +3874,7 @@ const partnerController = {
                     updated_at: item.updated_at || ""
                 },
 
-                bankinfo: {
-                    bank_account_name: item.bank_account_name || "",
-                    bank_account_number: item.bank_account_number || "",
-                    account_type: item.account_type || "",
-                    bank_name: item.bank_name || "",
-                    neft_code: item.neft_code || "",
-                    swift_code: item.swift_code || "",
-                    micr_code: item.micr_code || "",
-                    bank_branch_address: item.bank_branch_address || ""
-                },
+                bankinfo: bankInfo,
 
                 addressinfo: {
                     business_name: item.business_name || "",
