@@ -44,6 +44,7 @@ END`;
 const COUNT_ELIGIBLE = `NOT ((ot.transaction_type = 'BUY' AND ad.advisor_name = 'OTHER')
     OR (ot.transaction_type = 'SELL' AND IFNULL(ot.markAsSold, 0) = 1))`;
 const CREATED_IST = `CONVERT_TZ(ot.created_at, '+00:00', '+05:30')`;
+const COMPLETED = `ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED'`;
 
 /* Running-order stage of one order (see getRunningOrders for the meaning) */
 const BUCKET = `CASE
@@ -145,7 +146,7 @@ async function fetchOrderAggregates(rmId, w, next) {
                     AND IFNULL(ot.st_datetime, ${CREATED_IST}) >= '${w.start}'
                     AND IFNULL(ot.st_datetime, ${CREATED_IST}) < '${w.next}') AS completed_month
             ${FROM_ORDERS}
-            WHERE ${OWNER_RM} = ${Number(rmId)} AND ${ELIGIBLE} AND ${COUNT_ELIGIBLE}
+            WHERE ${OWNER_RM} = ${Number(rmId)} AND ${ELIGIBLE} AND ${COUNT_ELIGIBLE} AND ${COMPLETED}
          ) x`,
         next
     );
