@@ -146,7 +146,25 @@ async function fetchOrderAggregates(rmId, w, next) {
                     AND IFNULL(ot.st_datetime, ${CREATED_IST}) >= '${w.start}'
                     AND IFNULL(ot.st_datetime, ${CREATED_IST}) < '${w.next}') AS completed_month
             ${FROM_ORDERS}
-            WHERE ${OWNER_RM} = ${Number(rmId)} AND ${ELIGIBLE} AND ${COUNT_ELIGIBLE} AND ${COMPLETED}
+            WHERE ${OWNER_RM} = ${Number(rmId)} AND ${ELIGIBLE} AND ${COUNT_ELIGIBLE}
+         ) x`,
+        next
+    );
+    return rows && rows[0] ? rows[0] : {};
+}
+
+/** Running order aggregates (not completed). Used for running orders total value. */
+async function fetchRunningOrdersAggregates(rmId, w, next) {
+    const runningCondition = `NOT (ot.rm_status = 'COMPLETED' AND ot.am_status = 'COMPLETED' AND ot.st_status = 'COMPLETED')`;
+    const rows = await getData(
+        `SELECT
+            COUNT(*) AS total_count,
+            IFNULL(SUM(x.val), 0) AS total_value
+         FROM (
+            SELECT
+                ${VALUE_ELIGIBLE} AS val
+            ${FROM_ORDERS}
+            WHERE ${OWNER_RM} = ${Number(rmId)} AND ${ELIGIBLE} AND ${COUNT_ELIGIBLE} AND ${runningCondition}
          ) x`,
         next
     );
@@ -431,6 +449,7 @@ const dashboardController = {
             const w = monthWindows();
             const a = await fetchOrderAggregates(rm.user_id, w, next);
             const ac = await fetchCompletedOrderAggregates(rm.user_id, w, next);
+            const ar = await fetchRunningOrdersAggregates(rm.user_id, w, next);
 
             return res.json({
                 success: true,
@@ -448,6 +467,8 @@ const dashboardController = {
                     },
                     completed_this_month: num(a.completed_month),
                     month_order_value: num(ac.month_value),
+                    running_orders_count: num(ar.total_count),
+                    running_orders_value: num(ar.total_value),
                     month_label: w.label,
                 },
             });
