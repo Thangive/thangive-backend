@@ -19,8 +19,8 @@ import { commissionPerShare, commissionDeductions } from '../../helper/commissio
  *         whose owner RM is the logged-in RM (client's assign_to, else the placing partner's assign_to,
  *         the same single-owner rule as the RM dashboard). Partners and prospects: partners assigned to the RM.
  *   AM  : everything, every report.
- *   ST  : everything, but only the operational reports: orders, share-debit, partners, prospects.
- *         The money reports (payments, refunds, commissions, performance, financial) answer 403 for ST.
+ *   ST  : operational reports (orders, share-debit, partners, prospects, performance).
+ *         The money reports (payments, refunds, commissions, financial) answer 403 for ST.
  *
  * Definitions come from existing code: an order is "closed" when any stage is REJECTED / CANCEL or the
  * refund flow completed the cancellation; payments follow GET /paymentDetails (cancelled / rejected orders
@@ -41,7 +41,7 @@ const REPORT_ROLES = {
     payments: ['RM', 'AM'],
     refunds: ['RM', 'AM'],
     commissions: ['RM', 'AM'],
-    performance: ['RM', 'AM'],
+    performance: ['RM', 'AM', 'ST'],
     financial: ['RM', 'AM'],
 };
 
